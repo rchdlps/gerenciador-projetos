@@ -4,6 +4,8 @@ import projectsRouter from './routes/projects'
 import stakeholdersRouter from './routes/stakeholders'
 import boardRouter from './routes/board'
 import knowledgeAreasRouter from './routes/knowledge-areas'
+import organizationsRouter from './routes/organizations'
+import adminRouter from './routes/admin'
 
 const app = new Hono().basePath('/api')
 
@@ -12,6 +14,9 @@ app.use('*', logger())
 app.route('/projects', projectsRouter)
 app.route('/stakeholders', stakeholdersRouter)
 app.route('/board', boardRouter)
+app.route('/knowledge-areas', knowledgeAreasRouter)
+app.route('/organizations', organizationsRouter)
+app.route('/admin', adminRouter)
 app.route('/knowledge-areas', knowledgeAreasRouter)
 
 app.get('/', (c) => {

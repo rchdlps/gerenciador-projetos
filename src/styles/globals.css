@@ -118,6 +118,6 @@
   }
 
   .bg-brand-stripe {
-    background: linear-gradient(90deg, #F5C745 0%, #F9DE4B 33%, #51A65A 66%, #367962 100%);
+    background: #F5C745;
   }
 }

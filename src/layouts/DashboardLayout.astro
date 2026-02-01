@@ -1,6 +1,7 @@
 ---
 import "@/styles/globals.css";
 import { Header } from "@/components/layout/header";
+import { Sidebar } from "@/components/layout/sidebar";
 
 interface Props {
 	title: string;
@@ -21,8 +22,11 @@ const { title } = Astro.props;
 	</head>
 	<body class="bg-background min-h-screen font-sans antialiased">
 		<Header client:load />
-		<main class="container mx-auto max-w-7xl p-6 sm:p-8">
-			<slot />
-		</main>
+		<div class="flex">
+			<Sidebar client:load />
+			<main class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8">
+				<slot />
+			</main>
+		</div>
 	</body>
 </html>

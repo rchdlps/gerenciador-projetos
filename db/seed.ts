@@ -1,9 +1,11 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { nanoid } from 'nanoid';
-import { users, accounts, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, sessions } from './schema';
+import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions } from './schema';
 import * as schema from './schema';
+import { auth } from '../src/lib/auth';
 
 const connectionString = process.env.DATABASE_URL!;
 if (!connectionString) {
@@ -14,88 +16,157 @@ const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client, { schema });
 
 async function seed() {
-    console.log('🌱 Seeding database...');
+    console.log('🌱 Seeding database with Multiple Personas...');
 
     try {
-        // 1. Find or Create User
-        // We want to attach projects to the existing user so they show up in the dashboard.
-        const existingUsers = await db.select().from(users).limit(1);
-        let userId: string;
-
-        if (existingUsers.length > 0) {
-            userId = existingUsers[0].id;
-            console.log(`👤 Using existing user: ${existingUsers[0].email} (${userId})`);
-        } else {
-            userId = nanoid();
-            const user = {
-                id: userId,
-                name: "Admin User",
-                email: "admin@example.com",
-                emailVerified: true,
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            await db.insert(users).values(user);
-            console.log('👤 Created User:', user.email);
-        }
-
-        // 2. Clean up Project Data Only (Safety: Don't delete users/sessions)
-        // We delete all projects to avoid duplicates if re-running. 
-        // Cascades should handle child tables (stakeholders, boardCards, etc.), but Drizzle + foreign keys 
-        // handling depends on schema definition. Our schema has onDelete: 'cascade', so deleting projects is enough.
-        // However, safely deleting children first is often good practice if cascades fail.
+        // 1. Clean up Data
+        console.log('🧹 Cleaning up old data...');
+        await db.delete(auditLogs);
         await db.delete(knowledgeAreas);
         await db.delete(boardCards);
         await db.delete(boardColumns);
         await db.delete(stakeholders);
         await db.delete(projects);
+        await db.delete(memberships);
+        await db.delete(organizations);
+        await db.delete(accounts); // Fix FK
+        await db.delete(sessions); // Fix FK
+        await db.delete(users);
 
-        console.log('🧹 Cleaned up existing project data');
+        // 2. Create Organizations
+        const smpoId = nanoid();
+        const demoId = nanoid();
+        const smsId = nanoid();
+        const smeId = nanoid();
+        const smobId = nanoid();
 
-        // 3. Define Projects to Seed
-        const projectsData = [
+        console.log('🏛️  Creating Secretarias...');
+        await db.insert(organizations).values([
+            { id: smpoId, name: "Secretaria de Planejamento Estratégico", code: "SMPO", logoUrl: "/logos/smpo.png" },
+            { id: demoId, name: "Ambiente de Demonstração", code: "DEMO", logoUrl: "/logos/demo.png" },
+            { id: smsId, name: "Secretaria Municipal de Saúde", code: "SMS", logoUrl: "/logos/sms.png" },
+            { id: smeId, name: "Secretaria Municipal de Educação", code: "SME", logoUrl: "/logos/sme.png" },
+            { id: smobId, name: "Secretaria de Obras Públicas", code: "SMOB", logoUrl: "/logos/smob.png" }
+        ]);
+
+        // 3. Create Users & Memberships
+        const personas = [
             {
-                name: "Implantação do Sistema ERP",
-                description: "Migração e implantação do novo sistema integrado de gestão (SAP/Oracle) para otimizar processos financeiros e contábeis.",
-                stakeholders: [
-                    { name: "Roberto Silva", role: "Diretor Financeiro", level: "patrocinador" },
-                    { name: "Ana Martins", role: "Gerente de TI", level: "gerente" },
-                    { name: "Carlos Souza", role: "Líder Técnico", level: "equipe" },
-                ],
-                columns: "todo-doing-done",
-                knowledgeAreas: [
-                    { area: "integracao", content: "Termo de Abertura assinado. Cronograma base definido." },
-                    { area: "custos", content: "Orçamento de R$ 1.5M aprovado com margem de 10%." },
+                name: "Admin Geral",
+                email: "admin@cuiaba.mt.gov.br",
+                globalRole: "super_admin" as const,
+                memberships: [
+                    { orgId: smpoId, role: "secretario" },
+                    { orgId: demoId, role: "gestor" }
                 ]
             },
             {
-                name: "Novo App Mobile (iOS/Android)",
-                description: "Desenvolvimento do aplicativo mobile nativo para clientes, focado em experiência do usuário e performance.",
-                stakeholders: [
-                    { name: "Juliana Costa", role: "Head de Produto", level: "patrocinador" },
-                    { name: "Marcos Oliveira", role: "Tech Lead", level: "equipe" },
-                    { name: "Fernanda Lima", role: "UX Designer", level: "equipe" },
-                ],
-                columns: "kanban",
-                knowledgeAreas: [
-                    { area: "escopo", content: "MVP definido: Login, Home, Perfil e Lista de Pedidos." },
-                    { area: "qualidade", content: "Testes automatizados cobrindo 80% do código. QA manual semanal." },
+                name: "Gestor Saúde",
+                email: "saude@cuiaba.mt.gov.br",
+                globalRole: "user" as const,
+                memberships: [
+                    { orgId: smsId, role: "secretario" }
                 ]
             },
             {
-                name: "Migração para Nuvem AWS",
-                description: "Migração da infraestrutura on-premise para AWS, visando escalabilidade e redução de custos operacionais.",
-                stakeholders: [
-                    { name: "Pedro Santos", role: "CTO", level: "patrocinador" },
-                    { name: "Lucas Pereira", role: "DevOps", level: "equipe" },
-                ],
-                columns: "simple",
-                knowledgeAreas: [
-                    { area: "riscos", content: "Risco de downtime durante a virada do banco de dados." },
-                    { area: "aquisicoes", content: "Contratos com AWS e fornecedores de suporte revisados." },
+                name: "Gestor Obras",
+                email: "obras@cuiaba.mt.gov.br",
+                globalRole: "user" as const,
+                memberships: [
+                    { orgId: smobId, role: "secretario" }
+                ]
+            },
+            {
+                name: "Fiscal Educação",
+                email: "educacao@cuiaba.mt.gov.br",
+                globalRole: "user" as const,
+                memberships: [
+                    { orgId: smeId, role: "viewer" }
                 ]
             }
         ];
+
+        for (const p of personas) {
+            // Use better-auth to create user + account + password
+            // We mock the request if needed, but signUpEmail usually works directly on server instance
+            const res = await auth.api.signUpEmail({
+                body: {
+                    email: p.email,
+                    password: "password123",
+                    name: p.name
+                }
+            });
+
+            if (!res?.user) {
+                console.error(`Failed to create user ${p.email}`);
+                continue;
+            }
+
+            const userId = res.user.id;
+
+            // Update global role if super_admin
+            if (p.globalRole === 'super_admin') {
+                await db.update(users).set({ globalRole: 'super_admin' }).where(eq(users.id, userId));
+            }
+
+            for (const m of p.memberships) {
+                await db.insert(memberships).values({
+                    userId,
+                    organizationId: m.orgId,
+                    role: m.role as any
+                });
+            }
+            console.log(`👤 Created ${p.name} (${p.email}) with password 'password123'`);
+        }
+
+        // Need ID of Admin for creators field later if needed, but we can reuse query if complex. 
+        // For simplicity, let's just create projects assigned to the FIRST user (Super Admin) or specific if we tracked IDs.
+        // Let's re-fetch the admin user ID.
+        const [adminUser] = await db.select().from(users).where(eq(users.email, "admin@cuiaba.mt.gov.br"));
+        const [saudeUser] = await db.select().from(users).where(eq(users.email, "saude@cuiaba.mt.gov.br"));
+        const [obrasUser] = await db.select().from(users).where(eq(users.email, "obras@cuiaba.mt.gov.br"));
+
+        // 4. Seed Projects
+        const projectsData = [
+            // DEMO (Admin)
+            {
+                name: "Implantação do Sistema ERP",
+                description: "Migração e implantação do novo sistema integrado de gestão.",
+                orgId: demoId,
+                userId: adminUser.id,
+                status: ["Planejamento", "Execução", "Homologação"],
+                cards: ["Mapeamento de Processos", "Treinamento de Key Users", "Migração de Dados Legados"]
+            },
+            // SMPO (Admin)
+            {
+                name: "Revisão do Plano Diretor 2030",
+                description: "Atualização das diretrizes de expansão urbana e saneamento.",
+                orgId: smpoId,
+                userId: adminUser.id,
+                status: ["Audiências Públicas", "Redação", "Aprovação"],
+                cards: ["Convocação de Audiência Sul", "Estudo de Impacto Ambiental"]
+            },
+            // SMS (Saude User)
+            {
+                name: "Campanha de Vacinação 2026",
+                description: "Logística e distribuição de vacinas contra Gripe e Dengue.",
+                orgId: smsId,
+                userId: saudeUser.id,
+                status: ["Logística", "Comunicação", "Execução"],
+                cards: ["Aquisição de Seringas", "Campanha TV/Rádio"]
+            },
+            // SMOB (Obras User)
+            {
+                name: "Asfalto Novo - Bairro Jardim Europa",
+                description: "Pavimentação de 15km de vias urbanas.",
+                orgId: smobId,
+                userId: obrasUser.id, // Fixed: use Obras user
+                status: ["Projetos", "Terraplanagem", "Asfaltamento"],
+                cards: ["Topografia", "Drenagem Pluvial", "Sinalização Viária"]
+            }
+        ];
+
+        console.log(`📂 Creating ${projectsData.length} projects...`);
 
         for (const p of projectsData) {
             const projectId = nanoid();
@@ -103,58 +174,53 @@ async function seed() {
                 id: projectId,
                 name: p.name,
                 description: p.description,
-                userId: userId,
+                userId: p.userId,
+                organizationId: p.orgId,
             });
 
-            // Stakeholders
-            if (p.stakeholders.length > 0) {
-                await db.insert(stakeholders).values(
-                    p.stakeholders.map(s => ({
-                        id: nanoid(),
-                        projectId,
-                        name: s.name,
-                        role: s.role,
-                        level: s.level
-                    }))
-                );
+            // Board - Create Columns
+            const colIds: string[] = [];
+            let order = 0;
+            const statusList = p.status || ["A Fazer", "Em Andamento", "Concluído"];
+
+            for (const statusName of statusList) {
+                const colId = nanoid();
+                colIds.push(colId);
+                await db.insert(boardColumns).values({
+                    id: colId,
+                    projectId,
+                    name: statusName,
+                    order: order++,
+                    color: statusName === "Concluído" || statusName === "Done" ? "green" : undefined
+                });
             }
 
-            // Board - Create standard columns
-            const col1 = nanoid();
-            const col2 = nanoid();
-            const col3 = nanoid();
-
-            // Default "To Do, Doing, Done"
-            await db.insert(boardColumns).values([
-                { id: col1, projectId, name: "A Fazer", order: 0 },
-                { id: col2, projectId, name: "Em Andamento (WIP)", order: 1 },
-                { id: col3, projectId, name: "Concluído", order: 2, color: "green" },
-            ]);
-
-            // Add some cards
-            await db.insert(boardCards).values([
-                { id: nanoid(), columnId: col1, content: "Kickoff do projeto", priority: "high", order: 0 },
-                { id: nanoid(), columnId: col1, content: "Levantamento de requisitos", priority: "medium", order: 1 },
-                { id: nanoid(), columnId: col2, content: " Análise preliminar", priority: "low", order: 0 },
-            ]);
-
-
-            // Knowledge Areas
-            if (p.knowledgeAreas && p.knowledgeAreas.length > 0) {
-                await db.insert(knowledgeAreas).values(
-                    p.knowledgeAreas.map(k => ({
+            // Cards
+            if (p.cards) {
+                for (const cardContent of p.cards) {
+                    await db.insert(boardCards).values({
                         id: nanoid(),
-                        projectId,
-                        area: k.area,
-                        content: k.content
-                    }))
-                );
+                        columnId: colIds[0], // Add to first column
+                        content: cardContent,
+                        priority: Math.random() > 0.5 ? "high" : "medium",
+                        order: 0
+                    });
+                }
             }
 
-            console.log(`🚀 Seeded project: ${p.name}`);
+            // Audit Log
+            await db.insert(auditLogs).values({
+                id: nanoid(),
+                userId: p.userId,
+                organizationId: p.orgId,
+                action: 'CREATE',
+                resource: 'PROJECT',
+                resourceId: projectId,
+                metadata: JSON.stringify({ name: p.name, source: 'seed' })
+            });
         }
 
-        console.log('✅ Seeding complete! 3 Projects created.');
+        console.log('✅ Seeding complete!');
 
     } catch (e) {
         console.error('❌ Seeding failed:', e);

@@ -4,20 +4,32 @@ import { authClient } from "@/lib/auth-client"
 export function Header() {
     return (
         <header className="bg-brand-gradient text-primary-foreground shadow-sm sticky top-0 z-50 relative pb-[5px]">
-            <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-white">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-6 h-6">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+            <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="bg-white p-1 rounded-sm w-16 h-16 flex items-center justify-center shadow-lg">
+                        {/* Placeholder for Official Logo */}
+                        <img src="/logo-cuiaba.png" alt="Brasão Cuiabá" className="w-full h-full object-contain"
+                            onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="hidden text-green-800 font-bold text-xs text-center leading-tight">
+                            BRASÃO CUIABÁ
+                        </div>
                     </div>
                     <div>
-                        <h1 className="text-lg font-bold leading-none tracking-tight text-white drop-shadow-md">
-                            GERENCIADOR
+                        <h2 className="text-sm font-semibold text-white/90 uppercase tracking-wider mb-0.5">
+                            Prefeitura Municipal de Cuiabá
+                        </h2>
+                        <h1 className="text-2xl font-bold leading-none tracking-tight text-white drop-shadow-md mb-1">
+                            Sistema de Gestão de Projetos
                         </h1>
-                        <p className="text-xs font-medium text-white/80">
-                            PROJETOS
-                        </p>
+                        <div className="flex items-center gap-2 text-[10px] md:text-xs font-medium text-white/80 border-t border-white/20 pt-1 mt-1">
+                            <span className="uppercase">Secretaria de Planejamento Estratégico e Orçamento</span>
+                            <span className="hidden md:inline text-gold-400">|</span>
+                            <span className="hidden md:inline">Diretoria Técnica de Governança</span>
+                        </div>
                     </div>
                 </div>
 

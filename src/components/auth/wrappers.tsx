@@ -1,11 +1,14 @@
 import { Providers } from "@/components/providers";
 import SignIn from "./sign-in";
 import SignUp from "./sign-up";
+import { AuthLayout } from "@/components/layout/auth-layout";
 
 export function SignInPage() {
     return (
         <Providers>
-            <SignIn />
+            <AuthLayout title="Login">
+                <SignIn />
+            </AuthLayout>
         </Providers>
     )
 }
@@ -13,7 +16,9 @@ export function SignInPage() {
 export function SignUpPage() {
     return (
         <Providers>
-            <SignUp />
+            <AuthLayout title="Cadastro">
+                <SignUp />
+            </AuthLayout>
         </Providers>
     )
 }

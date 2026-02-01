@@ -1,4 +1,35 @@
-import { pgTable, text, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+
+export const globalRolesEnum = pgEnum("global_roles", ["super_admin", "user"]);
+export const orgRolesEnum = pgEnum("org_roles", ["secretario", "gestor", "viewer"]);
+
+export const organizations = pgTable("organizations", {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    code: text("code").notNull(),
+    logoUrl: text("logo_url"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const memberships = pgTable("memberships", {
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+    organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    role: orgRolesEnum("role").notNull(),
+}, (t) => ({
+    pk: primaryKey({ columns: [t.userId, t.organizationId] }),
+}));
+
+export const auditLogs = pgTable("audit_logs", {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: 'set null' }),
+    organizationId: text("organization_id").references(() => organizations.id, { onDelete: 'set null' }),
+    action: text("action").notNull(),
+    resource: text("resource").notNull(),
+    resourceId: text("resource_id").notNull(),
+    metadata: text("metadata"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 export const users = pgTable("users", {
     id: text("id").primaryKey(),
@@ -6,6 +37,7 @@ export const users = pgTable("users", {
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    globalRole: globalRolesEnum("global_role").default("user"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -50,6 +82,7 @@ export const projects = pgTable("projects", {
     name: text("name").notNull(),
     description: text("description"),
     userId: text("user_id").notNull().references(() => users.id),
+    organizationId: text("organization_id").references(() => organizations.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
