@@ -84,3 +84,12 @@ export const boardCards = pgTable("board_cards", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const knowledgeAreas = pgTable("knowledge_areas", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    area: text("area").notNull(),
+    content: text("content"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

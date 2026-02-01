@@ -1,5 +1,5 @@
-@import 'tailwindcss';
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
 
 @theme {
   --color-border: hsl(var(--border));
@@ -36,23 +36,22 @@
 
 @layer base {
   :root {
-    --background: 265 100% 98%;
-    /* Low saturation violet tint */
-    --foreground: 262 47% 11%;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 262 47% 11%;
+    --card-foreground: 222.2 84% 4.9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 262 47% 11%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-    /* Primary #367962 -> 160 38% 34% (Restored) */
+    /* Primary #367962 */
     --primary: 160 38% 34%;
     --primary-foreground: 210 40% 98%;
 
-    /* Secondary #F5C745 -> 44 89% 62% (Restored) */
+    /* Secondary #F5C745 */
     --secondary: 44 89% 62%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -63,29 +62,30 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 262 20% 90%;
-    --input: 262 20% 90%;
-    --ring: 262 80% 58%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 160 38% 34%;
 
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 262 40% 5%;
+    --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
-    --card: 262 40% 6%;
+    --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 262 40% 6%;
+    --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    /* Primary #367962 -> 160 38% 34% (Restored) */
+    /* Primary #367962 */
     --primary: 160 38% 34%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
 
+    /* Secondary #F5C745 */
     --secondary: 44 89% 62%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
@@ -96,9 +96,9 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 262 20% 12%;
-    --input: 262 20% 12%;
-    --ring: 262 80% 58%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 160 38% 34%;
   }
 }
 
@@ -109,5 +109,15 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #367962 0%, #22524C 100%);
+  }
+
+  .bg-brand-stripe {
+    background: linear-gradient(90deg, #F5C745 0%, #F9DE4B 33%, #51A65A 66%, #367962 100%);
   }
 }

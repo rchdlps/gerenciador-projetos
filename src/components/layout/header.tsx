@@ -3,7 +3,7 @@ import { authClient } from "@/lib/auth-client"
 
 export function Header() {
     return (
-        <header className="bg-primary text-primary-foreground shadow-sm sticky top-0 z-50">
+        <header className="bg-brand-gradient text-primary-foreground shadow-sm sticky top-0 z-50 relative pb-[5px]">
             <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 text-white">
@@ -12,7 +12,7 @@ export function Header() {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="text-lg font-bold leading-none tracking-tight">
+                        <h1 className="text-lg font-bold leading-none tracking-tight text-white drop-shadow-md">
                             GERENCIADOR
                         </h1>
                         <p className="text-xs font-medium text-white/80">
@@ -23,13 +23,13 @@ export function Header() {
 
                 <div className="flex items-center gap-4">
                     <div className="hidden md:block text-right">
-                        <p className="text-sm font-semibold leading-none">Admin User</p>
+                        <p className="text-sm font-semibold leading-none text-white">Admin User</p>
                         <p className="text-xs text-white/70">admin@example.com</p>
                     </div>
                     <Button
                         variant="secondary"
                         size="sm"
-                        className="font-medium shadow-none hover:bg-white/90"
+                        className="font-medium shadow-none hover:bg-white/90 bg-secondary text-secondary-foreground border-none"
                         onClick={async () => {
                             await authClient.signOut();
                             window.location.href = "/login";
@@ -39,6 +39,7 @@ export function Header() {
                     </Button>
                 </div>
             </div>
+            <div className="absolute bottom-0 left-0 right-0 h-[5px] bg-brand-stripe" />
         </header>
     )
 }
