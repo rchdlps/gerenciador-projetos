@@ -48,39 +48,39 @@ export function ProjectList() {
         }
     })
 
-    if (isLoading) return <div className="p-10 text-center">Loading projects...</div>
+    if (isLoading) return <div className="p-10 text-center">Carregando projetos...</div>
 
     return (
         <div className="space-y-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Projects</h2>
-                    <p className="text-muted-foreground mt-1">Manage and track your ongoing projects</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Projetos</h2>
+                    <p className="text-muted-foreground mt-1">Gerencie e acompanhe seus projetos em andamento</p>
                 </div>
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
                         <Button className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-                            <Plus className="mr-2 h-4 w-4" /> New Project
+                            <Plus className="mr-2 h-4 w-4" /> Novo Projeto
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Create New Project</DialogTitle>
+                            <DialogTitle>Criar Novo Projeto</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <Label htmlFor="name">Project Name</Label>
-                                <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Office Renovation" className="col-span-3" />
+                                <Label htmlFor="name">Nome do Projeto</Label>
+                                <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="ex: Implantação de ERP" className="col-span-3" />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="desc">Description</Label>
-                                <Textarea id="desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Brief description of the scope..." className="col-span-3" />
+                                <Label htmlFor="desc">Descrição</Label>
+                                <Textarea id="desc" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Breve descrição do escopo..." className="col-span-3" />
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                            <Button variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
                             <Button onClick={() => createProject.mutate()} disabled={createProject.isPending}>
-                                {createProject.isPending ? 'Creating...' : 'Create Project'}
+                                {createProject.isPending ? 'Criando...' : 'Criar Projeto'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -92,11 +92,11 @@ export function ProjectList() {
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                         <Folder className="h-8 w-8 text-muted-foreground" />
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
+                    <h3 className="text-xl font-semibold mb-2">Nenhum projeto ainda</h3>
                     <p className="text-muted-foreground max-w-sm mb-6">
-                        Get started by creating your first project to organize tasks and manage stakeholders.
+                        Comece criando seu primeiro projeto para organizar tarefas e gerenciar partes interessadas.
                     </p>
-                    <Button onClick={() => setIsOpen(true)}>Create First Project</Button>
+                    <Button onClick={() => setIsOpen(true)}>Criar Primeiro Projeto</Button>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -114,15 +114,15 @@ export function ProjectList() {
                             <CardContent className="pb-2">
                                 <div className="flex items-center text-xs text-muted-foreground gap-1">
                                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                    Active
+                                    Ativo
                                     <span className="mx-2">•</span>
-                                    Updated {new Date(project.updatedAt).toLocaleDateString()}
+                                    Atualizado em {new Date(project.updatedAt).toLocaleDateString('pt-BR')}
                                 </div>
                             </CardContent>
                             <CardFooter className="pt-4">
                                 <Button asChild variant="secondary" className="w-full text-xs font-semibold group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                     <a href={`/projects/${project.id}`}>
-                                        View Details <ArrowRight className="ml-2 h-3 w-3" />
+                                        Ver Detalhes <ArrowRight className="ml-2 h-3 w-3" />
                                     </a>
                                 </Button>
                             </CardFooter>

@@ -40,20 +40,20 @@ export default function SignIn() {
         <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950 px-4">
             <Card className="w-full max-w-md border-0 shadow-xl bg-white/80 dark:bg-zinc-900/50 backdrop-blur-sm">
                 <CardHeader className="space-y-1 text-center">
-                    <CardTitle className="text-3xl font-bold tracking-tight text-foreground">Welcome back</CardTitle>
+                    <CardTitle className="text-3xl font-bold tracking-tight text-foreground">Bem-vindo de volta</CardTitle>
                     <CardDescription className="text-muted-foreground">
-                        Enter your credentials to access your workspace
+                        Insira suas credenciais para acessar
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={signIn} className="space-y-5">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">E-mail</Label>
                             <div className="relative">
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="name@company.com"
+                                    placeholder="nome@empresa.com"
                                     className="pl-10 h-10 transition-all hover:border-primary/50 focus:border-primary"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -67,8 +67,8 @@ export default function SignIn() {
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="password">Password</Label>
-                                <a href="#" className="text-xs text-primary hover:underline font-medium">Forgot password?</a>
+                                <Label htmlFor="password">Senha</Label>
+                                <a href="#" className="text-xs text-primary hover:underline font-medium">Esqueceu a senha?</a>
                             </div>
                             <div className="relative">
                                 <Input
@@ -95,15 +95,15 @@ export default function SignIn() {
 
                         <Button type="submit" className="w-full h-10 font-medium transition-transform active:scale-95" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sign In
+                            Entrar
                         </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4 border-t pt-6">
                     <div className="text-sm text-muted-foreground text-center">
-                        Don't have an account?{" "}
+                        Não tem uma conta?{" "}
                         <a href="/register" className="text-primary font-medium hover:underline">
-                            Create an account
+                            Criar conta
                         </a>
                     </div>
                 </CardFooter>

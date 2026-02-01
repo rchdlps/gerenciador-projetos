@@ -18,8 +18,8 @@ export function ProjectDetails({ id }: { id: string }) {
         }
     })
 
-    if (isLoading) return <div>Loading...</div>
-    if (!project) return <div>Project not found</div>
+    if (isLoading) return <div>Carregando...</div>
+    if (!project) return <div>Projeto não encontrado</div>
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">

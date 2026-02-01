@@ -36,20 +36,20 @@ export default function SignUp() {
         <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950 px-4">
             <Card className="w-full max-w-md border-0 shadow-xl bg-white/80 dark:bg-zinc-900/50 backdrop-blur-sm">
                 <CardHeader className="space-y-1 text-center">
-                    <CardTitle className="text-3xl font-bold tracking-tight text-foreground">Get Started</CardTitle>
+                    <CardTitle className="text-3xl font-bold tracking-tight text-foreground">Crie sua Conta</CardTitle>
                     <CardDescription className="text-muted-foreground">
-                        Create a new account to join the workspace
+                        Preencha os dados abaixo para começar
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={signUp} className="space-y-5">
                         <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
+                            <Label htmlFor="name">Nome Completo</Label>
                             <div className="relative">
                                 <Input
                                     id="name"
                                     type="text"
-                                    placeholder="John Doe"
+                                    placeholder="João Silva"
                                     className="pl-10 h-10 transition-all hover:border-primary/50 focus:border-primary"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -62,12 +62,12 @@ export default function SignUp() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">E-mail</Label>
                             <div className="relative">
                                 <Input
                                     id="email"
                                     type="email"
-                                    placeholder="name@company.com"
+                                    placeholder="nome@empresa.com"
                                     className="pl-10 h-10 transition-all hover:border-primary/50 focus:border-primary"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -80,7 +80,7 @@ export default function SignUp() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">Senha</Label>
                             <div className="relative">
                                 <Input
                                     id="password"
@@ -106,15 +106,15 @@ export default function SignUp() {
 
                         <Button type="submit" className="w-full h-10 font-medium transition-transform active:scale-95" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Account
+                            Criar Conta
                         </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4 border-t pt-6">
                     <div className="text-sm text-muted-foreground text-center">
-                        Already have an account?{" "}
+                        Já tem uma conta?{" "}
                         <a href="/login" className="text-primary font-medium hover:underline">
-                            Sign In
+                            Entrar
                         </a>
                     </div>
                 </CardFooter>

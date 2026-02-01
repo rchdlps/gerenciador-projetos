@@ -23,7 +23,7 @@ export function Header() {
 
                 <div className="flex items-center gap-4">
                     <div className="hidden md:block text-right">
-                        <p className="text-sm font-semibold leading-none text-white">Admin User</p>
+                        <p className="text-sm font-semibold leading-none text-white">Usuário do Sistema</p>
                         <p className="text-xs text-white/70">admin@example.com</p>
                     </div>
                     <Button

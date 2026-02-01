@@ -108,7 +108,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         }
     }
 
-    if (isLoading) return <div>Loading Board...</div>
+    if (isLoading) return <div>Carregando Quadro...</div>
 
     return (
         <div className="space-y-4 py-6">
@@ -136,7 +136,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
                     )}
                 </div>
                 <DragOverlay>
-                    {activeId ? <div className="bg-white p-4 rounded shadow-xl border-2 border-primary rotate-2 w-full h-20">Dragging...</div> : null}
+                    {activeId ? <div className="bg-white p-4 rounded shadow-xl border-2 border-primary rotate-2 w-full h-20">Movendo...</div> : null}
                 </DragOverlay>
             </DndContext>
         </div>
@@ -172,7 +172,7 @@ function BoardColumn({ column, onCreateCard }: BoardColumnProps) {
             <div className="p-3 border-t bg-muted/50 rounded-b-xl">
                 <div className="flex gap-2">
                     <Input
-                        placeholder="+ add card"
+                        placeholder="+ adicionar cartão"
                         value={newCardText}
                         onChange={e => setNewCardText(e.target.value)}
                         onKeyDown={e => {
