@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { ArrowLeft, Edit2 } from "lucide-react"
 import { Stakeholders } from "./stakeholders"
 import { ScrumbanBoard } from "./board"
-import { KnowledgeAreas } from "./knowledge-areas"
+
 
 import { useState } from "react"
 import { PhaseList } from "@/components/phases/phase-list"
@@ -111,13 +111,7 @@ export function ProjectDetails({ id }: { id: string }) {
                 )}
             </div>
 
-            {/* Knowledge Areas */}
-            <div className="space-y-4">
-                <div className="space-y-4">
-                    <h3 className="text-xl font-bold text-foreground">Áreas de Conhecimento</h3>
-                    <KnowledgeAreas projectId={id} />
-                </div>
-            </div>
+
         </div>
     )
 }
