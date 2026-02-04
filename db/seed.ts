@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { nanoid } from 'nanoid';
-import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions } from './schema';
+import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions, projectPhases, tasks } from './schema';
 import * as schema from './schema';
 import { auth } from '../src/lib/auth';
 
@@ -23,6 +23,8 @@ async function seed() {
         console.log('🧹 Cleaning up old data...');
         await db.delete(auditLogs);
         await db.delete(knowledgeAreas);
+        await db.delete(tasks);
+        await db.delete(projectPhases);
         await db.delete(boardCards);
         await db.delete(boardColumns);
         await db.delete(stakeholders);
@@ -218,6 +220,57 @@ async function seed() {
                 resourceId: projectId,
                 metadata: JSON.stringify({ name: p.name, source: 'seed' })
             });
+
+            // Phases & Tasks
+            const phasesList = [
+                {
+                    name: "Planejamento",
+                    tasks: [
+                        { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done" },
+                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress" }
+                    ]
+                },
+                {
+                    name: "Execução",
+                    tasks: [
+                        { title: "Desenvolvimento do MVP", description: "Implementar funcionalidades core.", priority: "high", status: "todo" },
+                        { title: "Testes Unitários", description: "Garantir cobertura de código.", priority: "medium", status: "todo" }
+                    ]
+                },
+                {
+                    name: "Encerramento",
+                    tasks: [
+                        { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo" }
+                    ]
+                }
+            ];
+
+            let phaseOrder = 0;
+            for (const phase of phasesList) {
+                const phaseId = nanoid();
+                await db.insert(projectPhases).values({
+                    id: phaseId,
+                    projectId,
+                    name: phase.name,
+                    order: phaseOrder++
+                });
+
+                let taskOrder = 0;
+                for (const task of phase.tasks) {
+                    await db.insert(tasks).values({
+                        id: nanoid(),
+                        phaseId,
+                        title: task.title,
+                        description: task.description,
+                        priority: task.priority,
+                        status: task.status,
+                        assigneeId: p.userId, // Assign to project owner for demo
+                        order: taskOrder++,
+                        startDate: new Date(),
+                        endDate: new Date(Date.now() + 86400000 * 7) // +7 days
+                    });
+                }
+            }
         }
 
         console.log('✅ Seeding complete!');

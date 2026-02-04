@@ -8,7 +8,13 @@ import { Stakeholders } from "./stakeholders"
 import { ScrumbanBoard } from "./board"
 import { KnowledgeAreas } from "./knowledge-areas"
 
+import { useState } from "react"
+import { PhaseList } from "@/components/phases/phase-list"
+import { LayoutList, KanbanSquare } from "lucide-react"
+
 export function ProjectDetails({ id }: { id: string }) {
+    const [viewMode, setViewMode] = useState<'kanban' | 'phases'>('phases')
+
     const { data: project, isLoading } = useQuery({
         queryKey: ['project', id],
         queryFn: async () => {
@@ -45,7 +51,6 @@ export function ProjectDetails({ id }: { id: string }) {
                         <div className="grid gap-2">
                             <label className="text-sm font-bold uppercase text-muted-foreground">Nome do Projeto</label>
                             <Input defaultValue={project.name} className="font-semibold text-lg" readOnly />
-                            {/* Note: In a real app we'd make this editable */}
                         </div>
                         <div className="grid gap-2">
                             <label className="text-sm font-bold uppercase text-muted-foreground">Descrição</label>
@@ -58,17 +63,48 @@ export function ProjectDetails({ id }: { id: string }) {
             {/* Stakeholders */}
             <Stakeholders projectId={id} />
 
+            {/* Tasks / Phases Section */}
+            <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-foreground">
+                        {viewMode === 'phases' ? 'Fases do Projeto' : 'Quadro Kanban'}
+                    </h3>
+                    <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+                        <Button
+                            variant={viewMode === 'phases' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => setViewMode('phases')}
+                            className="gap-2"
+                        >
+                            <LayoutList className="h-4 w-4" />
+                            Fases
+                        </Button>
+                        <Button
+                            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                            size="sm"
+                            onClick={() => setViewMode('kanban')}
+                            className="gap-2"
+                        >
+                            <KanbanSquare className="h-4 w-4" />
+                            Kanban
+                        </Button>
+                    </div>
+                </div>
+
+                {viewMode === 'phases' ? (
+                    <PhaseList projectId={id} />
+                ) : (
+                    <ScrumbanBoard projectId={id} />
+                )}
+            </div>
+
             {/* Knowledge Areas */}
             <div className="space-y-4">
-                {/* Knowledge Areas */}
                 <div className="space-y-4">
                     <h3 className="text-xl font-bold text-foreground">Áreas de Conhecimento</h3>
                     <KnowledgeAreas projectId={id} />
                 </div>
             </div>
-
-            {/* Scrumban Board */}
-            <ScrumbanBoard projectId={id} />
         </div>
     )
 }

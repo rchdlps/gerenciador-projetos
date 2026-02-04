@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { boardColumns, boardCards, projects } from '../../../db/schema'
+import { tasks, projectPhases, projects } from '../../../db/schema'
 import { eq, asc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -13,7 +13,7 @@ const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers });
 }
 
-// Get Board Data (Columns + Cards)
+// Get Board Data (Columns + Tasks)
 app.get('/:projectId', async (c) => {
     const session = await getSession(c)
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
@@ -24,61 +24,75 @@ app.get('/:projectId', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
 
-    const columns = await db.select().from(boardColumns).where(eq(boardColumns.projectId, projectId)).orderBy(asc(boardColumns.order))
+    // Fetch all phases for the project to get phase IDs (needed for creating tasks if we supported it here)
+    // But for now, we just fetch all tasks linked to this project via phases
+    const projectTasks = await db.select({
+        id: tasks.id,
+        title: tasks.title, // Map title to content for frontend compatibility or update frontend
+        content: tasks.title,
+        status: tasks.status,
+        priority: tasks.priority,
+        order: tasks.order,
+        description: tasks.description
+    })
+        .from(tasks)
+        .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
+        .where(eq(projectPhases.projectId, projectId))
+        .orderBy(asc(tasks.order))
 
-    // Fetch cards for each column (could be optimized with a join, but simpler separately for now)
-    const columnsWithCards = await Promise.all(columns.map(async col => {
-        const cards = await db.select().from(boardCards).where(eq(boardCards.columnId, col.id)).orderBy(asc(boardCards.order))
-        return { ...col, cards }
-    }))
+    // Define fixed columns based on status
+    const columns = [
+        { id: 'todo', name: 'Não Iniciada', cards: [] as any[] },
+        { id: 'in_progress', name: 'Em Andamento', cards: [] as any[] },
+        { id: 'review', name: 'Em Revisão', cards: [] as any[] },
+        { id: 'done', name: 'Concluída', cards: [] as any[] }
+    ]
 
-    return c.json(columnsWithCards)
+    // Distribute tasks to columns
+    projectTasks.forEach(task => {
+        const column = columns.find(c => c.id === task.status)
+        if (column) {
+            column.cards.push(task)
+        } else {
+            // Fallback to todo if status matches none (shouldn't happen with strict types)
+            columns[0].cards.push(task)
+        }
+    })
+
+    return c.json(columns)
 })
 
-// Add Column
-app.post('/:projectId/columns',
-    zValidator('json', z.object({ name: z.string() })),
+// Reorder/Move Tasks (Update Status + Order)
+app.patch('/reorder',
+    zValidator('json', z.object({
+        items: z.array(z.object({
+            id: z.string(),
+            status: z.string(),
+            order: z.number()
+        }))
+    })),
     async (c) => {
         const session = await getSession(c)
         if (!session) return c.json({ error: 'Unauthorized' }, 401)
-        const projectId = c.req.param('projectId')
-        const { name } = c.req.valid('json')
 
-        // Default columns check? For now just insert.
-        const id = nanoid()
-        const [newCol] = await db.insert(boardColumns).values({
-            id, projectId, name
-        }).returning()
-        return c.json(newCol)
+        const { items } = c.req.valid('json')
+
+        await db.transaction(async (tx) => {
+            for (const item of items) {
+                await tx.update(tasks)
+                    .set({
+                        status: item.status,
+                        order: item.order
+                    })
+                    .where(eq(tasks.id, item.id))
+            }
+        })
+
+        return c.json({ success: true })
     }
 )
 
-// Add Card
-app.post('/columns/:columnId/cards',
-    zValidator('json', z.object({ content: z.string(), priority: z.string().optional() })),
-    async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
-        const columnId = c.req.param('columnId')
-        const { content, priority } = c.req.valid('json')
-
-        const id = nanoid()
-        const [newCard] = await db.insert(boardCards).values({
-            id, columnId, content, priority: priority || 'medium'
-        }).returning()
-        return c.json(newCard)
-    }
-)
-
-app.delete('/cards/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
-    const id = c.req.param('id')
-    await db.delete(boardCards).where(eq(boardCards.id, id))
-    return c.json({ success: true })
-})
-
-// Move Card (Update Column)
+// Move Card (Update Status)
 app.patch('/cards/:id/move',
     zValidator('json', z.object({ columnId: z.string() })),
     async (c) => {
@@ -87,7 +101,11 @@ app.patch('/cards/:id/move',
         const id = c.req.param('id')
         const { columnId } = c.req.valid('json')
 
-        await db.update(boardCards).set({ columnId }).where(eq(boardCards.id, id))
+        // columnId corresponds to status now
+        await db.update(tasks)
+            .set({ status: columnId })
+            .where(eq(tasks.id, id))
+
         return c.json({ success: true })
     }
 )

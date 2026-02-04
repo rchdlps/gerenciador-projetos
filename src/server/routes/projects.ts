@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projects, memberships } from '../../../db/schema'
+import { projects, memberships, users } from '../../../db/schema'
 import { eq, desc, inArray, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { logAction } from '@/lib/audit'
@@ -108,6 +108,44 @@ app.get('/:id', async (c) => {
     }
 
     return c.json(project)
+})
+
+app.get('/:id/members', async (c) => {
+    const user = c.get('user')
+    const id = c.req.param('id')
+
+    // Get project to find organization
+    const [project] = await db.select().from(projects).where(eq(projects.id, id))
+    if (!project) return c.json({ error: 'Not found' }, 404)
+
+    if (!project.organizationId) {
+        // Personal project? Return just the owner.
+        const [owner] = await db.select().from(users).where(eq(users.id, project.userId))
+        return c.json([owner])
+    }
+
+    // Verify access
+    const membership = await db.query.memberships.findFirst({
+        where: and(
+            eq(memberships.userId, user.id),
+            eq(memberships.organizationId, project.organizationId)
+        )
+    })
+    if (!membership) return c.json({ error: 'Forbidden' }, 403)
+
+    // Fetch all members of the organization
+    const members = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        image: users.image,
+        role: memberships.role
+    })
+        .from(memberships)
+        .innerJoin(users, eq(users.id, memberships.userId))
+        .where(eq(memberships.organizationId, project.organizationId))
+
+    return c.json(members)
 })
 
 export default app

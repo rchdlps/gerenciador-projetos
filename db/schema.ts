@@ -126,3 +126,27 @@ export const knowledgeAreas = pgTable("knowledge_areas", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const projectPhases = pgTable("project_phases", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    name: text("name").notNull(),
+    order: serial("order"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const tasks = pgTable("tasks", {
+    id: text("id").primaryKey(),
+    phaseId: text("phase_id").notNull().references(() => projectPhases.id, { onDelete: 'cascade' }),
+    title: text("title").notNull(),
+    description: text("description"),
+    assigneeId: text("assignee_id").references(() => users.id, { onDelete: 'set null' }),
+    startDate: timestamp("start_date"),
+    endDate: timestamp("end_date"),
+    status: text("status").notNull().default('todo'),
+    priority: text("priority").notNull().default('medium'),
+    order: serial("order"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
