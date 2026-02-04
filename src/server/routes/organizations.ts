@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { organizations, memberships } from '../../../db/schema'
+import { organizations, memberships, users } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
@@ -12,10 +12,13 @@ const app = new Hono<{ Variables: AuthVariables }>()
 app.use('*', requireAuth)
 
 app.get('/', async (c) => {
-    const user = c.get('user') as any // Cast for custom fields
+    const sessionUser = c.get('user')
+
+    // Fetch full user to check role logic
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
 
     // Super Admin sees all organizations
-    if (user.globalRole === 'super_admin') {
+    if (user && user.globalRole === 'super_admin') {
         const allOrgs = await db.select().from(organizations)
         return c.json(allOrgs.map(o => ({
             ...o,
@@ -33,7 +36,7 @@ app.get('/', async (c) => {
     })
         .from(memberships)
         .innerJoin(organizations, eq(memberships.organizationId, organizations.id))
-        .where(eq(memberships.userId, user.id))
+        .where(eq(memberships.userId, sessionUser.id))
 
     return c.json(userOrgs)
 })

@@ -13,12 +13,23 @@ const app = new Hono<{ Variables: AuthVariables }>()
 app.use('*', requireAuth)
 
 app.get('/', async (c) => {
-    const user = c.get('user')
+    const sessionUser = c.get('user')
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+
+    // Admin Bypass: View All Projects
+    if (user && user.globalRole === 'super_admin') {
+        const allProjects = await db.select()
+            .from(projects)
+            .orderBy(desc(projects.updatedAt))
+        return c.json(allProjects)
+    }
 
     // Get all organization IDs the user belongs to
     const userMemberships = await db.select({ orgId: memberships.organizationId })
         .from(memberships)
-        .where(eq(memberships.userId, user.id))
+        .where(eq(memberships.userId, sessionUser.id))
 
     const orgIds = userMemberships.map(m => m.orgId)
 
@@ -41,18 +52,20 @@ app.post('/',
         organizationId: z.string().min(1)
     })),
     async (c) => {
-        const user = c.get('user')
+        const sessionUser = c.get('user')
         const { name, description, organizationId } = c.req.valid('json')
 
         // Verify user has access to this organization
         const membership = await db.query.memberships.findFirst({
             where: and(
-                eq(memberships.userId, user.id),
+                eq(memberships.userId, sessionUser.id),
                 eq(memberships.organizationId, organizationId)
             )
         })
 
         if (!membership) {
+            // Check for super_admin if we want admins to create anywhere, but for now stick to scope.
+            // Just renaming user -> sessionUser for consistency if desired, but not strictly needed.
             return c.json({ error: 'Forbidden: You do not have access to this organization' }, 403)
         }
 
@@ -67,13 +80,13 @@ app.post('/',
             id,
             name,
             description,
-            userId: user.id, // Creator
+            userId: sessionUser.id, // Creator
             organizationId
         }).returning()
 
         // Audit Log
         await logAction({
-            userId: user.id,
+            userId: sessionUser.id,
             organizationId,
             action: 'CREATE',
             resource: 'PROJECT',
@@ -86,8 +99,11 @@ app.post('/',
 )
 
 app.get('/:id', async (c) => {
-    const user = c.get('user')
+    const sessionUser = c.get('user')
     const id = c.req.param('id')
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
 
     // Check if project exists
     const [project] = await db.select().from(projects).where(eq(projects.id, id))
@@ -95,24 +111,35 @@ app.get('/:id', async (c) => {
 
     // Check if user has access to the project's organization
     if (project.organizationId) {
+        // Admin Bypass
+        if (user && user.globalRole === 'super_admin') {
+            return c.json(project)
+        }
+
         const membership = await db.query.memberships.findFirst({
             where: and(
-                eq(memberships.userId, user.id),
+                eq(memberships.userId, sessionUser.id),
                 eq(memberships.organizationId, project.organizationId)
             )
         })
         if (!membership) return c.json({ error: 'Forbidden' }, 403)
     } else {
         // Fallback for legacy projects (if any) - only owner can see
-        if (project.userId !== user.id) return c.json({ error: 'Forbidden' }, 403)
+        // Admin Bypass here too? Yes.
+        if (user && user.globalRole === 'super_admin') return c.json(project)
+
+        if (project.userId !== sessionUser.id) return c.json({ error: 'Forbidden' }, 403)
     }
 
     return c.json(project)
 })
 
 app.get('/:id/members', async (c) => {
-    const user = c.get('user')
+    const sessionUser = c.get('user')
     const id = c.req.param('id')
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
 
     // Get project to find organization
     const [project] = await db.select().from(projects).where(eq(projects.id, id))
@@ -125,13 +152,15 @@ app.get('/:id/members', async (c) => {
     }
 
     // Verify access
-    const membership = await db.query.memberships.findFirst({
-        where: and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, project.organizationId)
-        )
-    })
-    if (!membership) return c.json({ error: 'Forbidden' }, 403)
+    if (!user || user.globalRole !== 'super_admin') {
+        const membership = await db.query.memberships.findFirst({
+            where: and(
+                eq(memberships.userId, sessionUser.id),
+                eq(memberships.organizationId, project.organizationId)
+            )
+        })
+        if (!membership) return c.json({ error: 'Forbidden' }, 403)
+    }
 
     // Fetch all members of the organization
     const members = await db.select({

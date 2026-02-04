@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { stakeholders, projects } from '../../../db/schema'
+import { stakeholders, projects, users } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -23,7 +23,13 @@ app.get('/:projectId', async (c) => {
     // Verify project ownership (optional but strict)
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
-    if (project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     const projectStakeholders = await db.select()
         .from(stakeholders)
@@ -48,7 +54,14 @@ app.post('/:projectId',
 
         // Verify project ownership
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-        if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
 
         const id = nanoid()
         const [newStakeholder] = await db.insert(stakeholders).values({
@@ -75,7 +88,14 @@ app.delete('/:id', async (c) => {
     if (!stakeholder) return c.json({ error: 'Not found' }, 404)
 
     const [project] = await db.select().from(projects).where(eq(projects.id, stakeholder.projectId))
-    if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     await db.delete(stakeholders).where(eq(stakeholders.id, id))
     return c.json({ success: true })

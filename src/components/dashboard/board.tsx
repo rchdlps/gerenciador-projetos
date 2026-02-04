@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { createPortal } from "react-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
@@ -229,15 +230,18 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
                         <BoardColumn key={col.id} column={col} />
                     ))}
                 </div>
-                <DragOverlay>
-                    {activeCard ? (
-                        <div className="bg-card p-3 rounded-lg shadow-xl border-2 border-primary rotate-2 w-80 opacity-90">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="text-sm font-medium">{activeCard.title || activeCard.content}</span>
+                {typeof document !== 'undefined' && createPortal(
+                    <DragOverlay>
+                        {activeCard ? (
+                            <div className="bg-card p-3 rounded-lg shadow-xl border-2 border-primary rotate-2 w-80 opacity-90 cursor-grabbing z-[9999]">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-sm font-medium text-foreground">{activeCard.title || activeCard.content}</span>
+                                </div>
                             </div>
-                        </div>
-                    ) : null}
-                </DragOverlay>
+                        ) : null}
+                    </DragOverlay>,
+                    document.body
+                )}
             </DndContext>
         </div>
     )

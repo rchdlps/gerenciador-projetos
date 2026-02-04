@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { knowledgeAreas, projects } from '../../../db/schema'
+import { knowledgeAreas, projects, users } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -22,7 +22,14 @@ app.get('/:projectId', async (c) => {
 
     // Verify Access
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     const areas = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.projectId, projectId))
     return c.json(areas)
@@ -41,7 +48,14 @@ app.put('/:projectId/:area',
 
         // Verify Access
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-        if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
 
         // Check if exists
         const [existing] = await db.select().from(knowledgeAreas).where(
