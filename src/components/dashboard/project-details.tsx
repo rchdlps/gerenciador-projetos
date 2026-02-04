@@ -12,6 +12,8 @@ import { useState } from "react"
 import { PhaseList } from "@/components/phases/phase-list"
 import { LayoutList, KanbanSquare } from "lucide-react"
 
+import { TaskStats } from "./task-stats"
+
 export function ProjectDetails({ id }: { id: string }) {
     const [viewMode, setViewMode] = useState<'kanban' | 'phases'>('phases')
 
@@ -20,6 +22,15 @@ export function ProjectDetails({ id }: { id: string }) {
         queryFn: async () => {
             const res = await api.projects[':id'].$get({ param: { id } })
             if (!res.ok) throw new Error('Not found')
+            return res.json()
+        }
+    })
+
+    const { data: boardData = [], isLoading: isBoardLoading } = useQuery({
+        queryKey: ['board', id],
+        queryFn: async () => {
+            const res = await api.board[':projectId'].$get({ param: { projectId: id } })
+            if (!res.ok) throw new Error()
             return res.json()
         }
     })
@@ -65,9 +76,11 @@ export function ProjectDetails({ id }: { id: string }) {
 
             {/* Tasks / Phases Section */}
             <div className="space-y-6">
+                <TaskStats columns={boardData} isLoading={isBoardLoading} />
+
                 <div className="flex items-center justify-between">
                     <h3 className="text-xl font-bold text-foreground">
-                        {viewMode === 'phases' ? 'Fases do Projeto' : 'Quadro Kanban'}
+                        {viewMode === 'phases' ? 'Painel de Tarefas' : 'Painel de Tarefas'}
                     </h3>
                     <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
                         <Button

@@ -225,7 +225,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
-                <div className="flex gap-6 overflow-x-auto pb-6 min-h-[500px]">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 pb-6 min-h-[500px]">
                     {serverColumns.map(col => (
                         <BoardColumn key={col.id} column={col} />
                     ))}
@@ -257,7 +257,7 @@ function BoardColumn({ column }: BoardColumnProps) {
     return (
         <div
             ref={setNodeRef}
-            className="w-80 flex-shrink-0 bg-muted/30 rounded-xl border flex flex-col max-h-[700px]"
+            className="flex flex-col h-full bg-muted/30 rounded-xl border max-h-[700px]"
         >
             {/* Header */}
             <div className={`p-4 font-bold border-b rounded-t-xl bg-muted/50 sticky top-0 flex justify-between items-center ${column.id === 'done' ? 'text-green-700 dark:text-green-400' : 'text-foreground'}`}>

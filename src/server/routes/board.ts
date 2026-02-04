@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects } from '../../../db/schema'
+import { tasks, projectPhases, projects, users } from '../../../db/schema'
 import { eq, asc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -22,7 +22,14 @@ app.get('/:projectId', async (c) => {
 
     // Verify Access
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project || project.userId !== session.user.id) return c.json({ error: 'Forbidden' }, 403)
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     // Fetch all phases for the project to get phase IDs (needed for creating tasks if we supported it here)
     // But for now, we just fetch all tasks linked to this project via phases
@@ -33,7 +40,8 @@ app.get('/:projectId', async (c) => {
         status: tasks.status,
         priority: tasks.priority,
         order: tasks.order,
-        description: tasks.description
+        description: tasks.description,
+        endDate: tasks.endDate,
     })
         .from(tasks)
         .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
