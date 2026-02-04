@@ -8,6 +8,7 @@ import organizationsRouter from './routes/organizations'
 import adminRouter from './routes/admin'
 import phasesRouter from './routes/phases'
 import tasksRouter from './routes/tasks'
+import storageRouter from './routes/storage'
 
 const app = new Hono().basePath('/api')
 
@@ -21,6 +22,7 @@ app.route('/organizations', organizationsRouter)
 app.route('/admin', adminRouter)
 app.route('/phases', phasesRouter)
 app.route('/tasks', tasksRouter)
+app.route('/storage', storageRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })

@@ -1,4 +1,5 @@
-import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey, integer } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 
 export const globalRolesEnum = pgEnum("global_roles", ["super_admin", "user"]);
 export const orgRolesEnum = pgEnum("org_roles", ["secretario", "gestor", "viewer"]);
@@ -150,3 +151,22 @@ export const tasks = pgTable("tasks", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+export const attachments = pgTable("attachments", {
+    id: text("id").primaryKey(),
+    fileName: text("file_name").notNull(),
+    fileType: text("file_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    key: text("key").notNull(),
+    url: text("url"),
+    entityId: text("entity_id").notNull(),
+    entityType: text("entity_type").notNull(), // 'task', 'project', 'comment'
+    uploadedBy: text("uploaded_by").references(() => users.id).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+    user: one(users, {
+        fields: [attachments.uploadedBy],
+        references: [users.id],
+    }),
+}));
