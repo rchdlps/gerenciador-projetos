@@ -78,4 +78,34 @@ app.post('/',
     }
 )
 
+// Update Organization (Super Admin Only)
+app.put('/:id',
+    zValidator('json', z.object({
+        name: z.string().min(1),
+        code: z.string().min(1),
+        logoUrl: z.string().optional()
+    })),
+    async (c) => {
+        const user = c.get('user') as any
+
+        if (user.globalRole !== 'super_admin') {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
+        const id = c.req.param('id')
+        const { name, code, logoUrl } = c.req.valid('json')
+
+        await db.update(organizations)
+            .set({
+                name,
+                code,
+                logoUrl,
+                updatedAt: new Date()
+            })
+            .where(eq(organizations.id, id))
+
+        return c.json({ id, name, code, logoUrl })
+    }
+)
+
 export default app

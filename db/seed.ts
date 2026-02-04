@@ -1,4 +1,11 @@
 import 'dotenv/config';
+import { webcrypto } from 'node:crypto';
+
+if (!globalThis.crypto) {
+    // @ts-ignore
+    globalThis.crypto = webcrypto;
+}
+
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
