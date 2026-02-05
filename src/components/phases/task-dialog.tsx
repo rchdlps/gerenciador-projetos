@@ -44,7 +44,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
             if (!res.ok) return []
             return res.json() as Promise<Attachment[]>
         },
-        enabled: !!task?.id && open && activeTab === 'attachments'
+        enabled: !!task?.id && open
     })
 
     // Form State

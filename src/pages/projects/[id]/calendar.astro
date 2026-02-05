@@ -1,0 +1,23 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { CalendarPage } from "@/components/calendar/calendar-page";
+
+const { id } = Astro.params;
+---
+
+<DashboardLayout title="Calendário do Projeto">
+    <div class="space-y-6 animate-in fade-in duration-500">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-3xl font-bold tracking-tight">
+                    Calendário do Projeto
+                </h2>
+                <p class="text-muted-foreground">
+                    Visualize e gerencie os prazos das tarefas.
+                </p>
+            </div>
+        </div>
+
+        <CalendarPage client:load projectId={id!} />
+    </div>
+</DashboardLayout>

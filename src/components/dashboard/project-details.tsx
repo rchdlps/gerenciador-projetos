@@ -1,17 +1,15 @@
+
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Edit2 } from "lucide-react"
+import { ArrowLeft, Edit2, BookOpen } from "lucide-react"
 import { Stakeholders } from "./stakeholders"
 import { ScrumbanBoard } from "./board"
-
-
 import { useState } from "react"
 import { PhaseList } from "@/components/phases/phase-list"
 import { LayoutList, KanbanSquare } from "lucide-react"
-
 import { TaskStats } from "./task-stats"
 
 export function ProjectDetails({ id }: { id: string }) {
@@ -45,6 +43,13 @@ export function ProjectDetails({ id }: { id: string }) {
                 <Button variant="ghost" className="pl-0 hover:bg-transparent" asChild>
                     <a href="/" className="flex items-center gap-2 text-primary font-semibold">
                         <ArrowLeft className="h-4 w-4" /> Voltar
+                    </a>
+                </Button>
+                <div className="flex-1" />
+                <Button variant="outline" asChild>
+                    <a href={`/projects/${id}/knowledge-areas`}>
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Áreas de Conhecimento
                     </a>
                 </Button>
             </div>
@@ -110,7 +115,6 @@ export function ProjectDetails({ id }: { id: string }) {
                     <ScrumbanBoard projectId={id} />
                 )}
             </div>
-
 
         </div>
     )

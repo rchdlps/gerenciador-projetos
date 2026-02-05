@@ -2,26 +2,26 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { Loader2, Save } from "lucide-react"
+import { Loader2, Save, Search, Lightbulb } from "lucide-react" // Changed imports
 import {
     Puzzle, Target, Calendar, Wallet, Award,
     Users, MessageSquare, AlertTriangle, ShoppingCart, Users2
 } from "lucide-react"
 
 const AREAS = [
-    { id: "integracao", icon: Puzzle, title: "Integração", desc: "Gerencimento do plano de projeto" },
-    { id: "escopo", icon: Target, title: "Escopo", desc: "Definição do trabalho necessário" },
-    { id: "cronograma", icon: Calendar, title: "Cronograma", desc: "Estimativas e sequenciamento" },
-    { id: "custos", icon: Wallet, title: "Custos", desc: "Orçamento e controle financeiro" },
-    { id: "qualidade", icon: Award, title: "Qualidade", desc: "Padrões e garantia de qualidade" },
-    { id: "recursos", icon: Users, title: "Recursos", desc: "Equipe e recursos físicos" },
-    { id: "comunicacao", icon: MessageSquare, title: "Comunicação", desc: "Fluxo de informações" },
-    { id: "riscos", icon: AlertTriangle, title: "Riscos", desc: "Identificação e mitigação" },
-    { id: "aquisicoes", icon: ShoppingCart, title: "Aquisições", desc: "Contratos e fornecedores" },
-    { id: "partes", icon: Users2, title: "Partes Interessadas", desc: "Gestão de expectativas" },
+    { id: "integracao", icon: Puzzle, title: "Integração", desc: "Coordenação de todos os aspectos do projeto" },
+    { id: "escopo", icon: Target, title: "Escopo", desc: "Definição e controle do que está incluído no projeto" },
+    { id: "cronograma", icon: Calendar, title: "Cronograma", desc: "Gerenciamento de prazos e marcos do projeto" },
+    { id: "custos", icon: Wallet, title: "Custos", desc: "Planejamento e controle do orçamento" },
+    { id: "qualidade", icon: Award, title: "Qualidade", desc: "Garantia de atendimento aos requisitos" },
+    { id: "recursos", icon: Users, title: "Recursos", desc: "Gestão de equipe e recursos físicos" },
+    { id: "comunicacao", icon: MessageSquare, title: "Comunicação", desc: "Planejamento e distribuição de informações" },
+    { id: "riscos", icon: AlertTriangle, title: "Riscos", desc: "Identificação e mitigação de riscos" },
+    { id: "aquisicoes", icon: ShoppingCart, title: "Aquisições", desc: "Compras e contratações necessárias" },
+    { id: "partes", icon: Users2, title: "Partes Interessadas", desc: "Engajamento e gerenciamento de stakeholders" },
 ]
 
 export function KnowledgeAreas({ projectId }: { projectId: string }) {
@@ -37,18 +37,28 @@ export function KnowledgeAreas({ projectId }: { projectId: string }) {
     if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {AREAS.map(areaDef => {
-                const existingData = areasData.find((a: any) => a.area === areaDef.id)
-                return (
-                    <KnowledgeAreaCard
-                        key={areaDef.id}
-                        projectId={projectId}
-                        areaDef={areaDef}
-                        initialContent={existingData?.content || ""}
-                    />
-                )
-            })}
+        <div className="space-y-6">
+            {/* Header Info */}
+            <div className="bg-sky-50 border-l-4 border-[#1d4e46] p-4 rounded-r flex gap-3 text-sm text-[#1d4e46] items-start shadow-sm">
+                <Lightbulb className="w-5 h-5 shrink-0 text-yellow-600 mt-0.5" />
+                <p>
+                    <span className="font-bold">As 10 Áreas de Conhecimento do PMBOK</span> representam os principais campos de especialização necessários para o gerenciamento eficaz de projetos. Documente aqui as informações específicas de cada área para o seu projeto.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {AREAS.map(areaDef => {
+                    const existingData = areasData.find((a: any) => a.area === areaDef.id)
+                    return (
+                        <KnowledgeAreaCard
+                            key={areaDef.id}
+                            projectId={projectId}
+                            areaDef={areaDef}
+                            initialContent={existingData?.content || ""}
+                        />
+                    )
+                })}
+            </div>
         </div>
     )
 }
@@ -57,11 +67,7 @@ function KnowledgeAreaCard({ projectId, areaDef, initialContent }: { projectId: 
     const queryClient = useQueryClient()
     const Icon = areaDef.icon
     const [content, setContent] = useState(initialContent)
-    const [isOpen, setIsOpen] = useState(false)
-
-    // Update local state if initialContent changes (e.g. refetch) - but careful not to overwrite user typing
-    // Actually, usually redundant if we key the component or handle updates properly. 
-    // For simplicity, we trust local state is primary after mount.
+    const [open, setOpen] = useState(false)
 
     const mutation = useMutation({
         mutationFn: async (newContent: string) => {
@@ -74,6 +80,7 @@ function KnowledgeAreaCard({ projectId, areaDef, initialContent }: { projectId: 
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['knowledge-areas', projectId] })
+            setOpen(false)
         }
     })
 
@@ -82,43 +89,66 @@ function KnowledgeAreaCard({ projectId, areaDef, initialContent }: { projectId: 
     }
 
     return (
-        <Card className="border shadow-none hover:bg-muted/30 transition-colors group">
-            <CardHeader className="p-4 pb-2 flex flex-row items-center gap-3 space-y-0">
-                <div className={`p-2 rounded-lg transition-colors ${content ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white'}`}>
-                    <Icon className={`w-5 h-5 ${content ? 'text-green-700 dark:text-green-400' : 'text-primary group-hover:text-white'}`} />
+        <Dialog open={open} onOpenChange={setOpen}>
+            <div className="relative group cursor-pointer" onClick={() => setOpen(true)}>
+                <div className="bg-[#1d4e46] hover:bg-[#256056] text-white rounded-lg p-4 flex items-center justify-between transition-all shadow-md hover:shadow-lg">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/10 p-2 rounded-lg">
+                            <Icon className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg">{areaDef.title}</h3>
+                            <p className="text-xs text-white/70">{areaDef.desc}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {/* "Clique para abrir" badge - usually hidden or on hover, or always visible based on design */}
+                        <div className="hidden group-hover:flex items-center px-2 py-1 bg-yellow-500/90 text-black text-[10px] font-bold rounded-full uppercase tracking-wide animate-in fade-in">
+                            Clique para abrir
+                        </div>
+                        <div className="bg-sky-400/20 p-2 rounded-full group-hover:bg-sky-400/40 transition-colors">
+                            <Search className="w-5 h-5 text-sky-300 group-hover:text-white" />
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <CardTitle className="text-base font-bold text-foreground">{areaDef.title}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{areaDef.desc}</p>
+            </div>
+
+            <DialogContent className="sm:max-w-[700px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-xl">
+                        <div className="bg-primary/10 p-2 rounded">
+                            <Icon className="w-6 h-6 text-primary" />
+                        </div>
+                        {areaDef.title}
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                        {areaDef.desc}
+                    </p>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold">Conteúdo e Definições</label>
+                        <Textarea
+                            placeholder={`Descreva os detalhes de ${areaDef.title} para este projeto...`}
+                            className="min-h-[300px] resize-y"
+                            value={content}
+                            onChange={(e) => setContent(e.target.value)}
+                        />
+                    </div>
                 </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-                <Accordion type="single" collapsible value={isOpen ? "item-1" : ""} onValueChange={(v) => setIsOpen(v === "item-1")}>
-                    <AccordionItem value="item-1" className="border-none">
-                        <AccordionTrigger className="text-xs py-2 hover:no-underline text-primary font-medium">
-                            {isOpen ? 'Fechar' : (content ? 'Editar Detalhes' : 'Adicionar Detalhes')}
-                        </AccordionTrigger>
-                        <AccordionContent>
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-muted-foreground">Anotações</label>
-                                <Textarea
-                                    placeholder={`Insira informações sobre ${areaDef.title}...`}
-                                    className="text-xs min-h-[100px] bg-background resize-none focus-visible:ring-primary"
-                                    value={content}
-                                    onChange={(e) => setContent(e.target.value)}
-                                />
-                                <div className="flex justify-end">
-                                    <Button size="sm" onClick={handleSave} disabled={mutation.isPending}>
-                                        {mutation.isPending && <Loader2 className="w-3 h-3 mr-2 animate-spin" />}
-                                        <Save className="w-3 h-3 mr-2" />
-                                        Salvar
-                                    </Button>
-                                </div>
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-            </CardContent>
-        </Card>
+
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={mutation.isPending}>
+                        {mutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        <Save className="w-4 h-4 mr-2" />
+                        Salvar Alterações
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     )
 }

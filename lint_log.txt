@@ -1,0 +1,424 @@
+
+> app@0.0.1 lint
+> astro check
+
+19:52:26 [@astrojs/node] Enabling sessions with filesystem storage
+19:52:26 [content] Syncing content
+19:52:26 [content] Synced content
+19:52:26 [types] Generated 37ms
+19:52:26 [check] Getting diagnostics for Astro files in /home/richard/code/gerenciador-projetos...
+[96mdb/schema.ts[0m:[93m16[0m:[93m28[0m - [93mwarning[0m[90m ts(6387): [0mThe signature '(name: "memberships", columns: { userId: NotNull<PgTextBuilderInitial<"user_id", [string, ...string[]]>>; organizationId: NotNull<PgTextBuilderInitial<"organization_id", [string, ...string[]]>>; role: NotNull<...>; }, extraConfig: (self: { ...; }) => PgTableExtraConfig): PgTableWithColumns<...>' of 'pgTable' is deprecated.
+
+[7m16[0m export const memberships = pgTable("memberships", {
+[7m  [0m [93m                           ~~~~~~~[0m
+
+[96msrc/components/admin/org-manager.tsx[0m:[93m7[0m:[93m56[0m - [93mwarning[0m[90m ts(6133): [0m'SheetTrigger' is declared but its value is never read.
+
+[7m7[0m import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetFooter } from "@/components/ui/sheet"
+[7m [0m [93m                                                       ~~~~~~~~~~~~[0m
+[96msrc/components/admin/org-manager.tsx[0m:[93m4[0m:[93m52[0m - [93mwarning[0m[90m ts(6133): [0m'CardDescription' is declared but its value is never read.
+
+[7m4[0m import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+[7m [0m [93m                                                   ~~~~~~~~~~~~~~~[0m
+[96msrc/components/admin/org-manager.tsx[0m:[93m4[0m:[93m41[0m - [93mwarning[0m[90m ts(6133): [0m'CardTitle' is declared but its value is never read.
+
+[7m4[0m import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+[7m [0m [93m                                        ~~~~~~~~~[0m
+
+[96msrc/components/attachments/attachment-list.tsx[0m:[93m5[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'useState' is declared but its value is never read.
+
+[7m5[0m import { useState } from 'react'
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/auth/sign-in.tsx[0m:[93m16[0m:[93m37[0m - [93mwarning[0m[90m ts(6385): [0m'FormEvent' is deprecated.
+
+[7m16[0m     const signIn = async (e?: React.FormEvent) => {
+[7m  [0m [93m                                    ~~~~~~~~~[0m
+[96msrc/components/auth/sign-in.tsx[0m:[93m6[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m6[0m import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/auth/sign-up.tsx[0m:[93m16[0m:[93m37[0m - [93mwarning[0m[90m ts(6385): [0m'FormEvent' is deprecated.
+
+[7m16[0m     const signUp = async (e?: React.FormEvent) => {
+[7m  [0m [93m                                    ~~~~~~~~~[0m
+[96msrc/components/auth/sign-up.tsx[0m:[93m6[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m6[0m import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/calendar/calendar-page.tsx[0m:[93m28[0m:[93m33[0m - [91merror[0m[90m ts(7006): [0mParameter 'col' implicitly has an 'any' type.
+
+[7m28[0m             return data.flatMap(col => col.tasks)
+[7m  [0m [91m                                ~~~[0m
+[96msrc/components/calendar/calendar-page.tsx[0m:[93m21[0m:[93m31[0m - [93mwarning[0m[90m ts(6133): [0m'isLoading' is declared but its value is never read.
+
+[7m21[0m     const { data: tasks = [], isLoading } = useQuery({
+[7m  [0m [93m                              ~~~~~~~~~[0m
+[96msrc/components/calendar/calendar-page.tsx[0m:[93m8[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'ptBR' is declared but its value is never read.
+
+[7m8[0m import { ptBR } from "date-fns/locale"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/calendar/calendar-page.tsx[0m:[93m7[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'format' is declared but its value is never read.
+
+[7m7[0m import { format } from "date-fns"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/calendar/calendar-view.tsx[0m:[93m17[0m:[93m11[0m - [93mwarning[0m[90m ts(6133): [0m'DayContent' is declared but its value is never read.
+
+[7m17[0m     const DayContent = (props: any) => {
+[7m  [0m [93m          ~~~~~~~~~~[0m
+[96msrc/components/calendar/calendar-view.tsx[0m:[93m6[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'cn' is declared but its value is never read.
+
+[7m6[0m import { cn } from "@/lib/utils"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/calendar/day-task-list.tsx[0m:[93m11[0m:[93m44[0m - [93mwarning[0m[90m ts(6133): [0m'projectId' is declared but its value is never read.
+
+[7m11[0m export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
+[7m  [0m [93m                                           ~~~~~~~~~[0m
+
+[96msrc/components/dashboard/board.tsx[0m:[93m174[0m:[93m19[0m - [93mwarning[0m[90m ts(6133): [0m'isBelow' is declared but its value is never read.
+
+[7m174[0m             const isBelow = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height;
+[7m   [0m [93m                  ~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m131[0m:[93m29[0m - [93mwarning[0m[90m ts(6133): [0m'event' is declared but its value is never read.
+
+[7m131[0m     const handleDragOver = (event: any) => {
+[7m   [0m [93m                            ~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m108[0m:[93m24[0m - [93mwarning[0m[90m ts(6133): [0m'newTodo' is declared but its value is never read.
+
+[7m108[0m         onError: (err, newTodo, context) => {
+[7m   [0m [93m                       ~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m108[0m:[93m19[0m - [93mwarning[0m[90m ts(6133): [0m'err' is declared but its value is never read.
+
+[7m108[0m         onError: (err, newTodo, context) => {
+[7m   [0m [93m                  ~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m35[0m:[93m12[0m - [93mwarning[0m[90m ts(6133): [0m'activeId' is declared but its value is never read.
+
+[7m35[0m     const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
+[7m  [0m [93m           ~~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m12[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'Badge' is declared but its value is never read.
+
+[7m12[0m import { Badge } from "@/components/ui/badge"
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m11[0m:[93m40[0m - [93mwarning[0m[90m ts(6133): [0m'User' is declared but its value is never read.
+
+[7m11[0m import { Plus, GripVertical, Calendar, User } from "lucide-react"
+[7m  [0m [93m                                       ~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m11[0m:[93m30[0m - [93mwarning[0m[90m ts(6133): [0m'Calendar' is declared but its value is never read.
+
+[7m11[0m import { Plus, GripVertical, Calendar, User } from "lucide-react"
+[7m  [0m [93m                             ~~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m11[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'Plus' is declared but its value is never read.
+
+[7m11[0m import { Plus, GripVertical, Calendar, User } from "lucide-react"
+[7m  [0m [93m         ~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m10[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'Input' is declared but its value is never read.
+
+[7m10[0m import { Input } from "@/components/ui/input"
+[7m  [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m9[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'Button' is declared but its value is never read.
+
+[7m9[0m import { Button } from "@/components/ui/button"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/dashboard/board.tsx[0m:[93m8[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m8[0m import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/dashboard/knowledge-areas.tsx[0m:[93m5[0m:[93m60[0m - [93mwarning[0m[90m ts(6133): [0m'DialogTrigger' is declared but its value is never read.
+
+[7m5[0m import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+[7m [0m [93m                                                           ~~~~~~~~~~~~~[0m
+[96msrc/components/dashboard/knowledge-areas.tsx[0m:[93m4[0m:[93m1[0m - [93mwarning[0m[90m ts(6192): [0mAll imports in import declaration are unused.
+
+[7m4[0m import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/dashboard/stakeholders.tsx[0m:[93m14[0m:[93m11[0m - [93mwarning[0m[90m ts(6196): [0m'Stakeholder' is declared but never used.
+
+[7m14[0m interface Stakeholder {
+[7m  [0m [93m          ~~~~~~~~~~~[0m
+[96msrc/components/dashboard/stakeholders.tsx[0m:[93m4[0m:[93m52[0m - [93mwarning[0m[90m ts(6133): [0m'CardDescription' is declared but its value is never read.
+
+[7m4[0m import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+[7m [0m [93m                                                   ~~~~~~~~~~~~~~~[0m
+
+[96msrc/components/dashboard/task-stats.tsx[0m:[93m1[0m:[93m41[0m - [93mwarning[0m[90m ts(6133): [0m'CardTitle' is declared but its value is never read.
+
+[7m1[0m import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+[7m [0m [93m                                        ~~~~~~~~~[0m
+[96msrc/components/dashboard/task-stats.tsx[0m:[93m1[0m:[93m29[0m - [93mwarning[0m[90m ts(6133): [0m'CardHeader' is declared but its value is never read.
+
+[7m1[0m import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+[7m [0m [93m                            ~~~~~~~~~~[0m
+
+[96msrc/components/layout/sidebar.tsx[0m:[93m1[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'Home' is declared but its value is never read.
+
+[7m1[0m import { Home, LayoutDashboard, Settings, Layers, FolderDot, Building2, BookOpen, Calendar, ArrowLeft } from "lucide-react"
+[7m [0m [93m         ~~~~[0m
+
+[96msrc/components/phases/phase-list.tsx[0m:[93m25[0m:[93m10[0m - [93mwarning[0m[90m ts(6133): [0m'arrayMove' is declared but its value is never read.
+
+[7m25[0m import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
+[7m  [0m [93m         ~~~~~~~~~[0m
+[96msrc/components/phases/phase-list.tsx[0m:[93m20[0m:[93m5[0m - [93mwarning[0m[90m ts(6133): [0m'defaultDropAnimationSideEffects' is declared but its value is never read.
+
+[7m20[0m     defaultDropAnimationSideEffects,
+[7m  [0m [93m    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/phases/phase-list.tsx[0m:[93m2[0m:[93m20[0m - [93mwarning[0m[90m ts(6133): [0m'useMutation' is declared but its value is never read.
+
+[7m2[0m import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+[7m [0m [93m                   ~~~~~~~~~~~[0m
+[96msrc/components/phases/phase-list.tsx[0m:[93m1[0m:[93m20[0m - [93mwarning[0m[90m ts(6133): [0m'useCallback' is declared but its value is never read.
+
+[7m1[0m import { useState, useCallback } from "react"
+[7m [0m [93m                   ~~~~~~~~~~~[0m
+
+[96msrc/components/phases/task-dialog.tsx[0m:[93m59[0m:[93m42[0m - [93mwarning[0m[90m ts(6385): [0m'FormEvent' is deprecated.
+
+[7m59[0m     const handleSubmit = async (e: React.FormEvent) => {
+[7m  [0m [93m                                         ~~~~~~~~~[0m
+
+[96msrc/components/phases/task-item.tsx[0m:[93m5[0m:[93m20[0m - [93mwarning[0m[90m ts(6133): [0m'User' is declared but its value is never read.
+
+[7m5[0m import { Calendar, User, GripVertical } from "lucide-react"
+[7m [0m [93m                   ~~~~[0m
+
+[96msrc/components/ui/accordion.tsx[0m:[93m42[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m42[0m   React.ElementRef<typeof AccordionPrimitive.Content>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/accordion.tsx[0m:[93m22[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m22[0m   React.ElementRef<typeof AccordionPrimitive.Trigger>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/accordion.tsx[0m:[93m10[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m10[0m   React.ElementRef<typeof AccordionPrimitive.Item>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/avatar.tsx[0m:[93m34[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m34[0m   React.ElementRef<typeof AvatarPrimitive.Fallback>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/avatar.tsx[0m:[93m22[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m22[0m   React.ElementRef<typeof AvatarPrimitive.Image>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/avatar.tsx[0m:[93m7[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m7[0m   React.ElementRef<typeof AvatarPrimitive.Root>,
+[7m [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/dialog.tsx[0m:[93m98[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m98[0m   React.ElementRef<typeof DialogPrimitive.Description>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dialog.tsx[0m:[93m83[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m83[0m   React.ElementRef<typeof DialogPrimitive.Title>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dialog.tsx[0m:[93m31[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m31[0m   React.ElementRef<typeof DialogPrimitive.Content>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dialog.tsx[0m:[93m16[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m16[0m   React.ElementRef<typeof DialogPrimitive.Overlay>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m161[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m161[0m   React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m143[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m143[0m   React.ElementRef<typeof DropdownMenuPrimitive.Label>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m121[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m121[0m   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m97[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m97[0m   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m79[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m79[0m   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m60[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m60[0m   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m44[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m44[0m   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/dropdown-menu.tsx[0m:[93m22[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m22[0m   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/file-upload.tsx[0m:[93m3[0m:[93m29[0m - [93mwarning[0m[90m ts(6133): [0m'FileIcon' is declared but its value is never read.
+
+[7m3[0m import { Upload, X, File as FileIcon } from 'lucide-react'
+[7m [0m [93m                            ~~~~~~~~[0m
+[96msrc/components/ui/file-upload.tsx[0m:[93m3[0m:[93m18[0m - [93mwarning[0m[90m ts(6133): [0m'X' is declared but its value is never read.
+
+[7m3[0m import { Upload, X, File as FileIcon } from 'lucide-react'
+[7m [0m [93m                 ~[0m
+
+[96msrc/components/ui/label.tsx[0m:[93m12[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m12[0m   React.ElementRef<typeof LabelPrimitive.Root>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/scroll-area.tsx[0m:[93m25[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m25[0m   React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/scroll-area.tsx[0m:[93m7[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m7[0m   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+[7m [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/select.tsx[0m:[93m137[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m137[0m   React.ElementRef<typeof SelectPrimitive.Separator>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m115[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m115[0m   React.ElementRef<typeof SelectPrimitive.Item>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m103[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m103[0m   React.ElementRef<typeof SelectPrimitive.Label>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m71[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m71[0m   React.ElementRef<typeof SelectPrimitive.Content>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m53[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m53[0m   React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m36[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m36[0m   React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/select.tsx[0m:[93m16[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m16[0m   React.ElementRef<typeof SelectPrimitive.Trigger>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/separator.tsx[0m:[93m9[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m9[0m   React.ElementRef<typeof SeparatorPrimitive.Root>,
+[7m [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/sheet.tsx[0m:[93m116[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m116[0m   React.ElementRef<typeof SheetPrimitive.Description>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/sheet.tsx[0m:[93m104[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m104[0m   React.ElementRef<typeof SheetPrimitive.Title>,
+[7m   [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/sheet.tsx[0m:[93m55[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m55[0m   React.ElementRef<typeof SheetPrimitive.Content>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+[96msrc/components/ui/sheet.tsx[0m:[93m17[0m:[93m9[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m17[0m   React.ElementRef<typeof SheetPrimitive.Overlay>,
+[7m  [0m [93m        ~~~~~~~~~~[0m
+
+[96msrc/components/ui/tabs.tsx[0m:[93m39[0m:[93m11[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m39[0m     React.ElementRef<typeof TabsPrimitive.Content>,
+[7m  [0m [93m          ~~~~~~~~~~[0m
+[96msrc/components/ui/tabs.tsx[0m:[93m24[0m:[93m11[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m24[0m     React.ElementRef<typeof TabsPrimitive.Trigger>,
+[7m  [0m [93m          ~~~~~~~~~~[0m
+[96msrc/components/ui/tabs.tsx[0m:[93m9[0m:[93m11[0m - [93mwarning[0m[90m ts(6385): [0m'ElementRef' is deprecated.
+
+[7m9[0m     React.ElementRef<typeof TabsPrimitive.List>,
+[7m [0m [93m          ~~~~~~~~~~[0m
+
+[96msrc/pages/calendar.astro[0m:[93m9[0m:[93m27[0m - [91merror[0m[90m ts(2322): [0mType '{ class: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'class' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'. Did you mean 'className'?
+
+[7m9[0m             <CalendarIcon class="w-12 h-12 text-slate-400" />
+[7m [0m [91m                          ~~~~~[0m
+
+[96msrc/pages/knowledge-areas.astro[0m:[93m9[0m:[93m23[0m - [91merror[0m[90m ts(2322): [0mType '{ class: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'class' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'. Did you mean 'className'?
+
+[7m9[0m             <BookOpen class="w-12 h-12 text-slate-400" />
+[7m [0m [91m                      ~~~~~[0m
+
+[96msrc/pages/projects/[id]/calendar.astro[0m:[93m21[0m:[93m35[0m - [91merror[0m[90m ts(2322): [0mType 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+[7m21[0m         <CalendarPage client:load projectId={id} />
+[7m  [0m [91m                                  ~~~~~~~~~[0m
+
+[96msrc/pages/projects/[id]/knowledge-areas.astro[0m:[93m20[0m:[93m32[0m - [91merror[0m[90m ts(2322): [0mType '{ class: string; }' is not assignable to type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'.
+  Property 'class' does not exist on type 'IntrinsicAttributes & Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>'. Did you mean 'className'?
+
+[7m20[0m                     <ArrowLeft class="h-4 w-4" /> Voltar para o Projeto
+[7m  [0m [91m                               ~~~~~[0m
+[96msrc/pages/projects/[id]/knowledge-areas.astro[0m:[93m18[0m:[93m37[0m - [91merror[0m[90m ts(2322): [0mType '{ children: any; variant: "ghost"; class: string; asChild: true; }' is not assignable to type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'.
+  Property 'class' does not exist on type 'IntrinsicAttributes & ButtonProps & RefAttributes<HTMLButtonElement>'. Did you mean 'className'?
+
+[7m18[0m             <Button variant="ghost" class="pl-0 hover:bg-transparent" asChild>
+[7m  [0m [91m                                    ~~~~~[0m
+
+[96msrc/server/middleware/auth.ts[0m:[93m4[0m:[93m23[0m - [93mwarning[0m[90m ts(6133): [0m'organizations' is declared but its value is never read.
+
+[7m4[0m import { memberships, organizations } from '../../../db/schema'
+[7m [0m [93m                      ~~~~~~~~~~~~~[0m
+
+[96msrc/server/routes/board.ts[0m:[93m7[0m:[93m19[0m - [93mwarning[0m[90m ts(6133): [0m'and' is declared but its value is never read.
+
+[7m7[0m import { eq, asc, and } from 'drizzle-orm'
+[7m [0m [93m                  ~~~[0m
+[96msrc/server/routes/board.ts[0m:[93m4[0m:[93m1[0m - [93mwarning[0m[90m ts(6133): [0m'nanoid' is declared but its value is never read.
+
+[7m4[0m import { nanoid } from 'nanoid'
+[7m [0m [93m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/server/routes/phases.ts[0m:[93m7[0m:[93m19[0m - [93mwarning[0m[90m ts(6133): [0m'desc' is declared but its value is never read.
+
+[7m7[0m import { eq, asc, desc } from 'drizzle-orm'
+[7m [0m [93m                  ~~~~[0m
+
+[96msrc/server/routes/stakeholders.ts[0m:[93m7[0m:[93m14[0m - [93mwarning[0m[90m ts(6133): [0m'and' is declared but its value is never read.
+
+[7m7[0m import { eq, and } from 'drizzle-orm'
+[7m [0m [93m             ~~~[0m
+
+[96msrc/server/routes/storage.ts[0m:[93m7[0m:[93m14[0m - [93mwarning[0m[90m ts(6133): [0m'and' is declared but its value is never read.
+
+[7m7[0m import { eq, and } from 'drizzle-orm'
+[7m [0m [93m             ~~~[0m
+
+[96msrc/server/routes/tasks.ts[0m:[93m6[0m:[93m32[0m - [93mwarning[0m[90m ts(6133): [0m'projects' is declared but its value is never read.
+
+[7m6[0m import { tasks, projectPhases, projects } from '../../../db/schema'
+[7m [0m [93m                               ~~~~~~~~[0m
+[96msrc/server/routes/tasks.ts[0m:[93m6[0m:[93m17[0m - [93mwarning[0m[90m ts(6133): [0m'projectPhases' is declared but its value is never read.
+
+[7m6[0m import { tasks, projectPhases, projects } from '../../../db/schema'
+[7m [0m [93m                ~~~~~~~~~~~~~[0m
+
+Result (80 files): 
+- 6 errors
+- 0 warnings
+- 86 hints
+
