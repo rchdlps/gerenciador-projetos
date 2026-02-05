@@ -43,6 +43,9 @@ export function TaskStats({ columns, isLoading }: TaskStatsProps) {
             col.cards.forEach(card => {
                 if (card.endDate) {
                     const end = new Date(card.endDate)
+                    // Set to end of day to consider tasks due today as not overdue
+                    end.setHours(23, 59, 59, 999)
+
                     if (end < now) {
                         overdue++
                     }

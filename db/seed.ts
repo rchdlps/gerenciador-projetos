@@ -270,6 +270,29 @@ async function seed() {
                 metadata: JSON.stringify({ name: p.name, source: 'seed' })
             });
 
+            // Stakeholders
+            const demoStakeholders = [
+                { name: "Dr. João Silva", role: "Secretário", level: "patrocinador" },
+                { name: "Maria Oliveira", role: "Gerente de Projeto", level: "gerente" },
+                { name: "Carlos Santos", role: "Analista Financeiro", level: "equipe" },
+                { name: "Ana Costa", role: "Representante da Comunidade", level: "interessado" }
+            ];
+
+            const createdStakeholderIds: string[] = [];
+
+            for (const st of demoStakeholders) {
+                const stId = nanoid();
+                createdStakeholderIds.push(stId);
+                await db.insert(stakeholders).values({
+                    id: stId,
+                    projectId,
+                    name: st.name,
+                    role: st.role,
+                    level: st.level,
+                    email: `${st.name.toLowerCase().replace(/ /g, '.')}@example.com`
+                });
+            }
+
             // Phases & Tasks
             const phasesList = [
                 {
@@ -331,6 +354,9 @@ async function seed() {
                     const taskDate = new Date();
                     taskDate.setDate(taskDate.getDate() + task.dayOffset);
 
+                    // Assign a random stakeholder
+                    const randomStakeholderId = createdStakeholderIds[Math.floor(Math.random() * createdStakeholderIds.length)];
+
                     await db.insert(tasks).values({
                         id: nanoid(),
                         phaseId,
@@ -339,31 +365,12 @@ async function seed() {
                         priority: task.priority,
                         status: task.status,
                         assigneeId: p.userId,
+                        stakeholderId: randomStakeholderId, // Assigning random stakeholder
                         order: taskOrder++,
                         startDate: taskDate,
                         endDate: taskDate // Check if calendar uses startDate or endDate. Usually EndDate implies due date.
                     });
                 }
-            }
-
-            // Appointments
-            const demoAppointments = [
-                { description: "Reunião de Kick-off", dayOffset: 0, hour: 9 },
-                { description: "Alinhamento com Stakeholders", dayOffset: 2, hour: 14 },
-                { description: "Apresentação de Resultados", dayOffset: 5, hour: 10 },
-            ];
-
-            for (const appt of demoAppointments) {
-                const apptDate = new Date();
-                apptDate.setDate(apptDate.getDate() + appt.dayOffset);
-                apptDate.setHours(appt.hour, 0, 0, 0);
-
-                await db.insert(appointments).values({
-                    id: nanoid(),
-                    projectId,
-                    description: appt.description,
-                    date: apptDate
-                });
             }
         }
 

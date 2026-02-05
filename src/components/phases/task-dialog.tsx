@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,11 +25,13 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
     const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState("details")
 
-    const { data: members } = useQuery({
-        queryKey: ['project-members', projectId],
+    const { data: stakeholders } = useQuery({
+        queryKey: ['stakeholders', projectId],
         queryFn: async () => {
-            const res = await api.projects[':id'].members.$get({ param: { id: projectId } })
-            if (!res.ok) return []
+            const res = await api.stakeholders[':projectId'].$get({
+                param: { projectId }
+            })
+            if (!res.ok) throw new Error()
             return res.json()
         },
         enabled: open
@@ -54,7 +56,19 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
     const [endDate, setEndDate] = useState(task?.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "")
     const [status, setStatus] = useState(task?.status || "todo")
     const [priority, setPriority] = useState(task?.priority || "medium")
-    const [assigneeId, setAssigneeId] = useState(task?.assigneeId || "unassigned")
+    const [stakeholderId, setStakeholderId] = useState(task?.stakeholderId || task?.assigneeId || "unassigned")
+
+    useEffect(() => {
+        if (open) {
+            setTitle(task?.title || "")
+            setDescription(task?.description || "")
+            setStartDate(task?.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "")
+            setEndDate(task?.endDate ? new Date(task.endDate).toISOString().split('T')[0] : "")
+            setStatus(task?.status || "todo")
+            setPriority(task?.priority || "medium")
+            setStakeholderId(task?.stakeholderId || task?.assigneeId || "unassigned")
+        }
+    }, [open, task])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -70,7 +84,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         description,
                         startDate: startDate || null,
                         endDate: endDate || null,
-                        assigneeId: assigneeId === "unassigned" ? null : assigneeId,
+                        stakeholderId: stakeholderId === "unassigned" ? null : stakeholderId,
                         status,
                         priority
                     }
@@ -86,7 +100,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         description,
                         startDate: startDate || undefined,
                         endDate: endDate || undefined,
-                        assigneeId: assigneeId === "unassigned" ? undefined : assigneeId,
+                        stakeholderId: stakeholderId === "unassigned" ? undefined : stakeholderId,
                         status,
                         priority
                     }
@@ -192,16 +206,16 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Responsável</Label>
-                                <Select value={assigneeId} onValueChange={setAssigneeId}>
+                                <Label>Responsável (Stakeholder)</Label>
+                                <Select value={stakeholderId} onValueChange={setStakeholderId}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Selecione um responsável" />
+                                        <SelectValue placeholder="Sem responsável" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="unassigned">Sem responsável</SelectItem>
-                                        {members?.map((member: any) => (
-                                            <SelectItem key={member.id} value={member.id}>
-                                                {member.name}
+                                        {stakeholders?.map((s: any) => (
+                                            <SelectItem key={s.id} value={s.id}>
+                                                {s.name} ({s.role})
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

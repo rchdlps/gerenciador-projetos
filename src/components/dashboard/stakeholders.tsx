@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Trash, Plus, Users } from "lucide-react"
+import { Trash, Plus, Users, Pencil, ChevronDown, ChevronUp } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface Stakeholder {
@@ -23,8 +23,10 @@ interface Stakeholder {
 
 export function Stakeholders({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
-    const [isOpen, setIsOpen] = useState(false)
+    const [isOpen, setIsOpen] = useState(false) // Collapsible state
+    const [isDialogOpen, setIsDialogOpen] = useState(false) // Dialog state
     const [newItem, setNewItem] = useState({ name: "", role: "", level: "interessado", email: "" })
+    const [activeId, setActiveId] = useState<string | null>(null) // For editing
 
     const { data: stakeholders, isLoading } = useQuery({
         queryKey: ['stakeholders', projectId],
@@ -48,8 +50,23 @@ export function Stakeholders({ projectId }: { projectId: string }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['stakeholders', projectId] })
-            setIsOpen(false)
-            setNewItem({ name: "", role: "", level: "interessado", email: "" })
+            closeDialog()
+        }
+    })
+
+    const updateStakeholder = useMutation({
+        mutationFn: async () => {
+            if (!activeId) return
+            const res = await api.stakeholders[':id'].$put({
+                param: { id: activeId },
+                json: newItem
+            })
+            if (!res.ok) throw new Error()
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['stakeholders', projectId] })
+            closeDialog()
         }
     })
 
@@ -61,6 +78,37 @@ export function Stakeholders({ projectId }: { projectId: string }) {
             queryClient.invalidateQueries({ queryKey: ['stakeholders', projectId] })
         }
     })
+
+    const openCreateDialog = () => {
+        setNewItem({ name: "", role: "", level: "interessado", email: "" })
+        setActiveId(null)
+        setIsDialogOpen(true)
+    }
+
+    const openEditDialog = (stakeholder: any) => {
+        setNewItem({
+            name: stakeholder.name,
+            role: stakeholder.role,
+            level: stakeholder.level,
+            email: stakeholder.email || ""
+        })
+        setActiveId(stakeholder.id)
+        setIsDialogOpen(true)
+    }
+
+    const closeDialog = () => {
+        setIsDialogOpen(false)
+        setNewItem({ name: "", role: "", level: "interessado", email: "" })
+        setActiveId(null)
+    }
+
+    const handleSave = () => {
+        if (activeId) {
+            updateStakeholder.mutate()
+        } else {
+            createStakeholder.mutate()
+        }
+    }
 
     const getLevelBadge = (level: string) => {
         const styles = {
@@ -77,19 +125,22 @@ export function Stakeholders({ projectId }: { projectId: string }) {
     return (
         <Card className="border shadow-none">
             <CardHeader className="bg-primary text-primary-foreground rounded-t-lg items-center flex-row justify-between py-4">
-                <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5" />
-                    <CardTitle className="text-lg">Partes Interessadas</CardTitle>
+                <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+                    {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                    <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        <CardTitle className="text-lg">Partes Interessadas</CardTitle>
+                    </div>
                 </div>
-                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="secondary" size="sm" className="font-semibold shadow-none">
+                        <Button variant="secondary" size="sm" className="font-semibold shadow-none" onClick={openCreateDialog}>
                             <Plus className="h-4 w-4 mr-1" /> Adicionar
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Nova Parte Interessada</DialogTitle>
+                            <DialogTitle>{activeId ? "Editar Parte Interessada" : "Nova Parte Interessada"}</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid gap-2">
@@ -120,45 +171,53 @@ export function Stakeholders({ projectId }: { projectId: string }) {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button onClick={() => createStakeholder.mutate()}>Salvar</Button>
+                            <Button onClick={handleSave}>Salvar</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </CardHeader>
-            <CardContent className="p-6">
-                {!stakeholders || stakeholders.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <Users className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                        <p>Nenhuma parte interessada cadastrada.</p>
-                    </div>
-                ) : (
-                    <div className="grid gap-4">
-                        {stakeholders.map((s: any) => (
-                            <div key={s.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:border-primary transition-all">
-                                <div className="flex items-center gap-4">
-                                    <Avatar>
-                                        <AvatarFallback className="bg-primary text-white font-bold">
-                                            {s.name.substring(0, 2).toUpperCase()}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <p className="font-semibold text-sm">{s.name}</p>
-                                        <p className="text-xs text-muted-foreground">{s.role}</p>
+            {isOpen && (
+                <CardContent className="p-6">
+                    {!stakeholders || stakeholders.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Users className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                            <p>Nenhuma parte interessada cadastrada.</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4">
+                            {stakeholders.map((s: any) => (
+                                <div key={s.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:border-primary transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <Avatar>
+                                            <AvatarFallback className="bg-primary text-white font-bold">
+                                                {s.name.substring(0, 2).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="font-semibold text-sm">{s.name}</p>
+                                            <p className="text-xs text-muted-foreground">{s.role}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <Badge variant="outline" className={`border-0 uppercase text-[10px] ${getLevelBadge(s.level)}`}>
+                                            {s.level}
+                                        </Badge>
+                                        <div className="flex items-center border rounded-md">
+                                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(s)} className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                                <Pencil className="h-3.5 w-3.5" />
+                                            </Button>
+                                            <div className="w-px h-4 bg-border"></div>
+                                            <Button variant="ghost" size="icon" onClick={() => deleteStakeholder.mutate(s.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                                <Trash className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <Badge variant="outline" className={`border-0 uppercase text-[10px] ${getLevelBadge(s.level)}`}>
-                                        {s.level}
-                                    </Badge>
-                                    <Button variant="ghost" size="icon" onClick={() => deleteStakeholder.mutate(s.id)} className="text-destructive hover:bg-destructive/10">
-                                        <Trash className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            )}
         </Card>
     )
 }

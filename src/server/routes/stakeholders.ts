@@ -77,6 +77,43 @@ app.post('/:projectId',
     }
 )
 
+app.put('/:id',
+    zValidator('json', z.object({
+        name: z.string().min(1),
+        role: z.string().min(1),
+        level: z.string().min(1),
+        email: z.string().optional()
+    })),
+    async (c) => {
+        const session = await getSession(c)
+        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+        const id = c.req.param('id')
+        const { name, role, level, email } = c.req.valid('json')
+
+        // Verify ownership
+        const [stakeholder] = await db.select().from(stakeholders).where(eq(stakeholders.id, id))
+        if (!stakeholder) return c.json({ error: 'Not found' }, 404)
+
+        const [project] = await db.select().from(projects).where(eq(projects.id, stakeholder.projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
+        const [updated] = await db.update(stakeholders)
+            .set({ name, role, level, email })
+            .where(eq(stakeholders.id, id))
+            .returning()
+
+        return c.json(updated)
+    }
+)
+
 app.delete('/:id', async (c) => {
     const session = await getSession(c)
     if (!session) return c.json({ error: 'Unauthorized' }, 401)

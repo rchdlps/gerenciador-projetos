@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectPhases, tasks, projects, users } from '../../../db/schema'
+import { projectPhases, tasks, projects, users, stakeholders } from '../../../db/schema'
 import { eq, asc, desc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -28,21 +28,39 @@ app.get('/:projectId', async (c) => {
     const fasesWithTasks = await Promise.all(phases.map(async phase => {
         const localTasksRaw = await db.select({
             task: tasks,
-            assignee: users
+            assigneeUser: users,
+            assigneeStakeholder: stakeholders
         })
             .from(tasks)
             .leftJoin(users, eq(tasks.assigneeId, users.id))
+            .leftJoin(stakeholders, eq(tasks.stakeholderId, stakeholders.id))
             .where(eq(tasks.phaseId, phase.id))
             .orderBy(asc(tasks.order))
 
-        const localTasks = localTasksRaw.map(({ task, assignee }) => ({
-            ...task,
-            assignee: assignee ? {
-                id: assignee.id,
-                name: assignee.name,
-                image: assignee.image
-            } : null
-        }))
+        const localTasks = localTasksRaw.map(({ task, assigneeUser, assigneeStakeholder }) => {
+            let assignee = null
+            if (assigneeStakeholder) {
+                assignee = {
+                    id: assigneeStakeholder.id,
+                    name: assigneeStakeholder.name,
+                    image: null, // Stakeholders don't have images yet
+                    role: assigneeStakeholder.role,
+                    type: 'stakeholder'
+                }
+            } else if (assigneeUser) {
+                assignee = {
+                    id: assigneeUser.id,
+                    name: assigneeUser.name,
+                    image: assigneeUser.image,
+                    type: 'user'
+                }
+            }
+
+            return {
+                ...task,
+                assignee
+            }
+        })
 
         return { ...phase, tasks: localTasks }
     }))

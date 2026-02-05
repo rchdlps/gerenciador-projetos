@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects, users } from '../../../db/schema'
+import { tasks, projectPhases, projects, users, stakeholders } from '../../../db/schema'
 import { eq, asc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -33,21 +33,46 @@ app.get('/:projectId', async (c) => {
 
     // Fetch all phases for the project to get phase IDs (needed for creating tasks if we supported it here)
     // But for now, we just fetch all tasks linked to this project via phases
-    const projectTasks = await db.select({
-        id: tasks.id,
-        title: tasks.title, // Map title to content for frontend compatibility or update frontend
-        content: tasks.title,
-        status: tasks.status,
-        priority: tasks.priority,
-        order: tasks.order,
-        description: tasks.description,
-        endDate: tasks.endDate,
-        startDate: tasks.startDate,
+    // Fetch all tasks linked to this project via phases
+    const projectTasksRaw = await db.select({
+        task: tasks,
+        assigneeUser: users,
+        assigneeStakeholder: stakeholders
     })
         .from(tasks)
         .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
+        .leftJoin(users, eq(tasks.assigneeId, users.id))
+        .leftJoin(stakeholders, eq(tasks.stakeholderId, stakeholders.id))
         .where(eq(projectPhases.projectId, projectId))
         .orderBy(asc(tasks.order))
+
+    const projectTasks = projectTasksRaw.map(({ task, assigneeUser, assigneeStakeholder }) => {
+        let assignee = undefined
+        if (assigneeStakeholder) {
+            assignee = {
+                name: assigneeStakeholder.name,
+                image: "" // Stakeholders don't have images yet
+            }
+        } else if (assigneeUser) {
+            assignee = {
+                name: assigneeUser.name,
+                image: assigneeUser.image || ""
+            }
+        }
+
+        return {
+            id: task.id,
+            title: task.title,
+            content: task.title,
+            status: task.status,
+            priority: task.priority,
+            order: task.order,
+            description: task.description,
+            endDate: task.endDate,
+            startDate: task.startDate,
+            assignee
+        }
+    })
 
     // Define fixed columns based on status
     const columns = [

@@ -76,9 +76,9 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                                     <div className="flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />
                                         <span>
-                                            {task.startDate ? new Date(task.startDate).toLocaleDateString() : '...'}
+                                            {task.startDate ? new Date(task.startDate).toISOString().split('T')[0].split('-').reverse().join('/') : '...'}
                                             {' - '}
-                                            {task.endDate ? new Date(task.endDate).toLocaleDateString() : '...'}
+                                            {task.endDate ? new Date(task.endDate).toISOString().split('T')[0].split('-').reverse().join('/') : '...'}
                                         </span>
                                     </div>
                                 )}

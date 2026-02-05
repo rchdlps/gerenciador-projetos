@@ -383,6 +383,9 @@ function SortableCard({ card }: { card: BoardCard }) {
                                 {card.assignee.name.substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                         </Avatar>
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                            {card.assignee.name}
+                        </span>
                     </div>
                 )}
             </div>
