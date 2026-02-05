@@ -10,7 +10,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
 import { nanoid } from 'nanoid';
-import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions, projectPhases, tasks } from './schema';
+import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions, projectPhases, tasks, appointments, attachments } from './schema';
 import * as schema from './schema';
 import { auth } from '../src/lib/auth';
 
@@ -29,7 +29,9 @@ async function seed() {
         // 1. Clean up Data
         console.log('🧹 Cleaning up old data...');
         await db.delete(auditLogs);
+        await db.delete(attachments);
         await db.delete(knowledgeAreas);
+        await db.delete(appointments);
         await db.delete(tasks);
         await db.delete(projectPhases);
         await db.delete(boardCards);
@@ -233,21 +235,21 @@ async function seed() {
                 {
                     name: "Planejamento",
                     tasks: [
-                        { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done" },
-                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress" }
+                        { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done", dayOffset: 0 }, // Today
+                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress", dayOffset: 1 } // Tomorrow
                     ]
                 },
                 {
                     name: "Execução",
                     tasks: [
-                        { title: "Desenvolvimento do MVP", description: "Implementar funcionalidades core.", priority: "high", status: "todo" },
-                        { title: "Testes Unitários", description: "Garantir cobertura de código.", priority: "medium", status: "todo" }
+                        { title: "Desenvolvimento do MVP", description: "Implementar funcionalidades core.", priority: "high", status: "todo", dayOffset: 2 },
+                        { title: "Testes Unitários", description: "Garantir cobertura de código.", priority: "medium", status: "todo", dayOffset: 5 }
                     ]
                 },
                 {
                     name: "Encerramento",
                     tasks: [
-                        { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo" }
+                        { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo", dayOffset: 10 }
                     ]
                 }
             ];
@@ -264,6 +266,9 @@ async function seed() {
 
                 let taskOrder = 0;
                 for (const task of phase.tasks) {
+                    const taskDate = new Date();
+                    taskDate.setDate(taskDate.getDate() + task.dayOffset);
+
                     await db.insert(tasks).values({
                         id: nanoid(),
                         phaseId,
@@ -271,12 +276,32 @@ async function seed() {
                         description: task.description,
                         priority: task.priority,
                         status: task.status,
-                        assigneeId: p.userId, // Assign to project owner for demo
+                        assigneeId: p.userId,
                         order: taskOrder++,
-                        startDate: new Date(),
-                        endDate: new Date(Date.now() + 86400000 * 7) // +7 days
+                        startDate: taskDate,
+                        endDate: taskDate // Check if calendar uses startDate or endDate. Usually EndDate implies due date.
                     });
                 }
+            }
+
+            // Appointments
+            const demoAppointments = [
+                { description: "Reunião de Kick-off", dayOffset: 0, hour: 9 },
+                { description: "Alinhamento com Stakeholders", dayOffset: 2, hour: 14 },
+                { description: "Apresentação de Resultados", dayOffset: 5, hour: 10 },
+            ];
+
+            for (const appt of demoAppointments) {
+                const apptDate = new Date();
+                apptDate.setDate(apptDate.getDate() + appt.dayOffset);
+                apptDate.setHours(appt.hour, 0, 0, 0);
+
+                await db.insert(appointments).values({
+                    id: nanoid(),
+                    projectId,
+                    description: appt.description,
+                    date: apptDate
+                });
             }
         }
 

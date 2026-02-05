@@ -8,6 +8,7 @@ import organizationsRouter from './routes/organizations'
 import adminRouter from './routes/admin'
 import phasesRouter from './routes/phases'
 import tasksRouter from './routes/tasks'
+import appointmentsRouter from './routes/appointments'
 import storageRouter from './routes/storage'
 
 const app = new Hono().basePath('/api')
@@ -22,6 +23,7 @@ app.route('/organizations', organizationsRouter)
 app.route('/admin', adminRouter)
 app.route('/phases', phasesRouter)
 app.route('/tasks', tasksRouter)
+app.route('/appointments', appointmentsRouter)
 app.route('/storage', storageRouter)
 
 app.get('/', (c) => {

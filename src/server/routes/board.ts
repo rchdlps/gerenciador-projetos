@@ -42,6 +42,7 @@ app.get('/:projectId', async (c) => {
         order: tasks.order,
         description: tasks.description,
         endDate: tasks.endDate,
+        startDate: tasks.startDate,
     })
         .from(tasks)
         .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))

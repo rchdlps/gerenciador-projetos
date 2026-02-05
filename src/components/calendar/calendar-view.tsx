@@ -20,9 +20,10 @@ interface CalendarViewProps {
     date: Date | undefined
     setDate: (date: Date | undefined) => void
     tasks: any[]
+    appointments: any[]
 }
 
-export function CalendarView({ date, setDate, tasks }: CalendarViewProps) {
+export function CalendarView({ date, setDate, tasks, appointments }: CalendarViewProps) {
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
 
     const handlePreviousMonth = () => setCurrentMonth(prev => subMonths(prev, 1))
@@ -50,7 +51,13 @@ export function CalendarView({ date, setDate, tasks }: CalendarViewProps) {
         })
     }, [])
 
-    const hasTask = (day: Date) => tasks.some(t => t && t.dueDate && isSameDay(new Date(t.dueDate), day))
+    const hasTask = (day: Date) => tasks.some(t => {
+        if (!t) return false
+        const targetDate = t.startDate ? new Date(t.startDate) : (t.endDate ? new Date(t.endDate) : null)
+        return targetDate && isSameDay(targetDate, day)
+    })
+
+    const hasAppointment = (day: Date) => appointments.some(a => a && a.date && isSameDay(new Date(a.date), day))
 
     return (
         <div className="h-full flex flex-col p-8 w-full">
@@ -117,10 +124,19 @@ export function CalendarView({ date, setDate, tasks }: CalendarViewProps) {
                                 )}
 
                                 {/* Task Indicator */}
+                                {/* Task Indicator - Green for Tasks */}
                                 {dayHasTask && (
                                     <div className={cn(
                                         "absolute top-2 right-2 w-2 h-2 rounded-full",
                                         isSelected ? "bg-white" : "bg-[#1d4e46] ring-2 ring-white dark:ring-card"
+                                    )} />
+                                )}
+
+                                {/* Appointment Indicator - Orange/Red for Appointments */}
+                                {hasAppointment(day) && (
+                                    <div className={cn(
+                                        "absolute top-2 right-5 w-2 h-2 rounded-full", // Shifted left to avoid overlap if both exist
+                                        isSelected ? "bg-white/80" : "bg-orange-500 ring-2 ring-white dark:ring-card"
                                     )} />
                                 )}
                             </button>

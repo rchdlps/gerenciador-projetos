@@ -151,6 +151,14 @@ export const tasks = pgTable("tasks", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+export const appointments = pgTable("appointments", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    description: text("description").notNull(),
+    date: timestamp("date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const attachments = pgTable("attachments", {
     id: text("id").primaryKey(),
     fileName: text("file_name").notNull(),

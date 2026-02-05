@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { CalendarView } from "@/components/calendar/calendar-view"
 import { DayTaskList } from "@/components/calendar/day-task-list"
+import { AppointmentWidget } from "@/components/calendar/appointment-widget"
 import { Providers } from "@/components/providers"
 
 
@@ -24,7 +25,16 @@ function CalendarPageContent({ projectId }: { projectId: string }) {
             if (!res.ok) throw new Error()
             const data = await res.json()
             // Flatten columns to get all tasks
-            return data.flatMap((col: any) => col?.tasks || [])
+            return data.flatMap((col: any) => col?.cards || [])
+        }
+    })
+
+    const { data: appointments = [] } = useQuery({
+        queryKey: ['appointments', projectId],
+        queryFn: async () => {
+            const res = await api.appointments[':projectId'].$get({ param: { projectId } })
+            if (!res.ok) return []
+            return await res.json()
         }
     })
 
@@ -36,16 +46,20 @@ function CalendarPageContent({ projectId }: { projectId: string }) {
                     date={date}
                     setDate={setDate}
                     tasks={tasks}
+                    appointments={appointments}
                 />
             </div>
 
-            {/* Right Panel: Day Details */}
-            <div className="md:col-span-1 h-full">
-                <DayTaskList
-                    date={date}
-                    tasks={tasks}
-                    projectId={projectId}
-                />
+            {/* Right Panel: Day Details & Appointments */}
+            <div className="md:col-span-1 h-full flex flex-col gap-6">
+                <div className="flex-1 min-h-0">
+                    <DayTaskList
+                        date={date}
+                        tasks={tasks} // Keep tasks separate for the List
+                        projectId={projectId}
+                    />
+                </div>
+                <AppointmentWidget projectId={projectId} />
             </div>
         </div>
     )
