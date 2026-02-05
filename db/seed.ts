@@ -233,10 +233,16 @@ async function seed() {
             // Phases & Tasks
             const phasesList = [
                 {
+                    name: "Iniciação",
+                    tasks: [
+                        { title: "Project Charter", description: "Elaborar termo de abertura.", priority: "high", status: "done", dayOffset: -2 }
+                    ]
+                },
+                {
                     name: "Planejamento",
                     tasks: [
-                        { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done", dayOffset: 0 }, // Today
-                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress", dayOffset: 1 } // Tomorrow
+                        { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done", dayOffset: 0 },
+                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress", dayOffset: 1 }
                     ]
                 },
                 {
@@ -247,9 +253,16 @@ async function seed() {
                     ]
                 },
                 {
+                    name: "Monitoramento e Controle",
+                    tasks: [
+                        { title: "Reunião de Status", description: "Acompanhamento semanal.", priority: "medium", status: "todo", dayOffset: 6 }
+                    ]
+                },
+                {
                     name: "Encerramento",
                     tasks: [
-                        { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo", dayOffset: 10 }
+                        { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo", dayOffset: 10 },
+                        { title: "Lições Aprendidas", description: "Documentar aprendizados.", priority: "low", status: "todo", dayOffset: 12 }
                     ]
                 }
             ];

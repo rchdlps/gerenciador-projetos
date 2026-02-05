@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projects, memberships, users } from '../../../db/schema'
+import { projects, memberships, users, projectPhases } from '../../../db/schema'
 import { eq, desc, inArray, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { logAction } from '@/lib/audit'
@@ -83,6 +83,25 @@ app.post('/',
             userId: sessionUser.id, // Creator
             organizationId
         }).returning()
+
+        // Standard Phases
+        const standardPhases = [
+            "Iniciação",
+            "Planejamento",
+            "Execução",
+            "Monitoramento e Controle",
+            "Encerramento"
+        ];
+
+        let phaseOrder = 0;
+        for (const phaseName of standardPhases) {
+            await db.insert(projectPhases).values({
+                id: nanoid(),
+                projectId: id,
+                name: phaseName,
+                order: phaseOrder++
+            });
+        }
 
         // Audit Log
         await logAction({

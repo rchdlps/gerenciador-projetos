@@ -132,6 +132,7 @@ export const projectPhases = pgTable("project_phases", {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
     name: text("name").notNull(),
+    description: text("description"),
     order: serial("order"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

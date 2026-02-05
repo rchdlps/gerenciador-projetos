@@ -22,7 +22,7 @@ import {
     type DragOverEvent,
     type DragEndEvent
 } from "@dnd-kit/core"
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable"
+import { arrayMove, sortableKeyboardCoordinates, SortableContext } from "@dnd-kit/sortable"
 import { TaskItem } from "./task-item"
 
 interface PhaseListProps {
@@ -105,11 +105,42 @@ export function PhaseList({ projectId }: PhaseListProps) {
 
     const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event
+
+        // Reset state
         setActiveId(null)
         setActiveTask(null)
 
         if (!over) return
 
+        const activeData = active.data.current
+
+        // PHASE REORDERING
+        if (activeData?.type === "phase") {
+            if (active.id !== over.id) {
+                queryClient.setQueryData(["phases", projectId], (old: any) => {
+                    const oldIndex = old.findIndex((p: any) => p.id === active.id)
+                    const newIndex = old.findIndex((p: any) => p.id === over.id)
+
+                    const newPhases = arrayMove(old, oldIndex, newIndex)
+
+                    // Optimistic update done, now API
+                    const updates = newPhases.map((p: any, index: number) => ({
+                        id: p.id,
+                        order: index
+                    }))
+
+                    api.phases[":projectId"].reorder.$patch({
+                        param: { projectId },
+                        json: { items: updates }
+                    })
+
+                    return newPhases
+                })
+            }
+            return
+        }
+
+        // TASK REORDERING (Existing Logic)
         const activePhase = findPhase(active.id as string)
         const overPhase = findPhase(over.id as string)
 
@@ -137,9 +168,6 @@ export function PhaseList({ projectId }: PhaseListProps) {
                     }
                     // Correct index adjustment if moving down
                     newPhases[overPhaseIndex].tasks.splice(overTaskIndex, 0, movedTask)
-
-                    // Actually we should use arrayMove logic if IDs match tasks
-                    // But here over.id CAN be the phase ID if dropped on an empty phase container
                 } else {
                     // Different container
                     let newIndex = overTaskIndex
@@ -152,10 +180,6 @@ export function PhaseList({ projectId }: PhaseListProps) {
                 }
 
                 // Prepare API Update payload
-                // We need to send all affected Items? Or just the moved one?
-                // The API expects a list of items to update order
-
-                // Recalculate orders for affected phases
                 const updates: any[] = []
 
                 // Active Phase (if different)
@@ -219,69 +243,70 @@ export function PhaseList({ projectId }: PhaseListProps) {
         >
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
-                            Fases do Projeto
-                        </h2>
+                    <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+                        Fases do Projeto
+                    </h2>
+
+                    <div className="flex items-center gap-2">
                         {phases && phases.length > 0 && (
                             <Button
-                                variant="ghost"
-                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
                                 onClick={toggleAll}
-                                className="text-[#1d4e46] hover:bg-[#1d4e46]/5 font-semibold text-xs uppercase tracking-wider"
                             >
                                 {expandedPhases.length > 0 ? "Recolher Tudo" : "Expandir Tudo"}
                             </Button>
                         )}
-                    </div>
-
-                    <Dialog open={newPhaseOpen} onOpenChange={setNewPhaseOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-emerald-600 hover:bg-emerald-700">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Nova Fase
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Adicionar Nova Fase</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nome da Fase</Label>
-                                    <Input
-                                        id="name"
-                                        value={newPhaseName}
-                                        onChange={(e) => setNewPhaseName(e.target.value)}
-                                        placeholder="Ex: Pós-Implementação"
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setNewPhaseOpen(false)}>Cancelar</Button>
-                                <Button onClick={createPhase} disabled={creating || !newPhaseName}>
-                                    {creating ? "Criando..." : "Criar Fase"}
+                        <Dialog open={newPhaseOpen} onOpenChange={setNewPhaseOpen}>
+                            <DialogTrigger asChild>
+                                <Button className="bg-emerald-600 hover:bg-emerald-700">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Nova Fase
                                 </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Adicionar Nova Fase</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Nome da Fase</Label>
+                                        <Input
+                                            id="name"
+                                            value={newPhaseName}
+                                            onChange={(e) => setNewPhaseName(e.target.value)}
+                                            placeholder="Ex: Pós-Implementação"
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setNewPhaseOpen(false)}>Cancelar</Button>
+                                    <Button onClick={createPhase} disabled={creating || !newPhaseName}>
+                                        {creating ? "Criando..." : "Criar Fase"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </div>
 
-                <Accordion
-                    type="multiple"
-                    value={expandedPhases}
-                    onValueChange={setExpandedPhases}
-                    className="w-full"
-                >
-                    {phases?.map((phase: any, index: number) => (
-                        <PhaseAccordion
-                            key={phase.id}
-                            phase={phase}
-                            projectId={projectId}
-                            index={index}
-                        />
-                    ))}
-                </Accordion>
+                <SortableContext items={phases?.map((p: any) => p.id) || []}>
+                    <Accordion
+                        type="multiple"
+                        value={expandedPhases}
+                        onValueChange={setExpandedPhases}
+                        className="w-full space-y-4"
+                    >
+                        {phases?.map((phase: any, index: number) => (
+                            <SortablePhaseWrapper key={phase.id} phase={phase} projectId={projectId} index={index}>
+                                <PhaseAccordion
+                                    phase={phase}
+                                    projectId={projectId}
+                                    index={index}
+                                />
+                            </SortablePhaseWrapper>
+                        ))}
+                    </Accordion>
+                </SortableContext>
 
                 {phases?.length === 0 && (
                     <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
@@ -293,13 +318,63 @@ export function PhaseList({ projectId }: PhaseListProps) {
                 )}
 
                 <DragOverlay>
-                    {activeId && activeTask ? (
-                        <div className="opacity-80 rotate-2 cursor-grabbing">
-                            <TaskItem task={activeTask} phaseId={activeTask.phaseId} projectId={projectId} />
-                        </div>
+                    {activeId ? (
+                        activeTask ? (
+                            <div className="opacity-80 rotate-2 cursor-grabbing">
+                                <TaskItem task={activeTask} phaseId={activeTask.phaseId} projectId={projectId} />
+                            </div>
+                        ) : (
+                            // Overlay for Phase
+                            <div className="bg-white rounded-lg shadow-xl p-4 border-l-4 border-l-emerald-500 opacity-90 cursor-grabbing">
+                                <h3 className="font-semibold text-lg">{phases?.find((p: any) => p.id === activeId)?.name}</h3>
+                            </div>
+                        )
+
                     ) : null}
                 </DragOverlay>
             </div>
         </DndContext>
+    )
+}
+
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+
+function SortablePhaseWrapper({ children, phase }: { children: React.ReactNode, phase: any, projectId: string, index: number }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({
+        id: phase.id,
+        data: {
+            type: "phase",
+            phase
+        }
+    })
+
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : 'auto',
+        position: 'relative' as const
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <div className="flex items-center gap-2">
+                <div {...listeners} className="cursor-grab hover:text-emerald-600 px-2 py-4">
+                    <span className="sr-only">Move</span>
+                    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-400"><path d="M5.5 2.5C5.5 2.22386 5.27614 2 5 2C4.72386 2 4.5 2.22386 4.5 2.5V12.5C4.5 12.7761 4.72386 13 5 13C5.27614 13 5.5 12.7761 5.5 12.5V2.5ZM10.5 2.5C10.5 2.22386 10.2761 2 10 2C9.72386 2 9.5 2.22386 9.5 2.5V12.5C9.5 12.7761 9.72386 13 10 13C10.2761 13 10.5 12.7761 10.5 12.5V2.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                </div>
+                <div className="flex-1">
+                    {children}
+                </div>
+            </div>
+        </div>
     )
 }
