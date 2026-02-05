@@ -36,6 +36,7 @@ export function PhaseList({ projectId }: PhaseListProps) {
     const [creating, setCreating] = useState(false)
     const [activeId, setActiveId] = useState<string | null>(null)
     const [activeTask, setActiveTask] = useState<any>(null)
+    const [expandedPhases, setExpandedPhases] = useState<string[]>([])
 
     // Fetch Phases
     const { data: phases, isLoading } = useQuery({
@@ -43,9 +44,23 @@ export function PhaseList({ projectId }: PhaseListProps) {
         queryFn: async () => {
             const res = await api.phases[":projectId"].$get({ param: { projectId } })
             if (!res.ok) throw new Error("Failed to fetch phases")
-            return res.json()
+            const data = await res.json()
+            // Set initial expanded states if not already set
+            if (expandedPhases.length === 0) {
+                setExpandedPhases(data.map((p: any) => p.id))
+            }
+            return data
         }
     })
+
+    const toggleAll = () => {
+        if (!phases) return
+        if (expandedPhases.length > 0) {
+            setExpandedPhases([])
+        } else {
+            setExpandedPhases(phases.map((p: any) => p.id))
+        }
+    }
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -209,10 +224,20 @@ export function PhaseList({ projectId }: PhaseListProps) {
         >
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
                         <h2 className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
                             Fases do Projeto
                         </h2>
+                        {phases && phases.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={toggleAll}
+                                className="text-[#1d4e46] hover:bg-[#1d4e46]/5 font-semibold text-xs uppercase tracking-wider"
+                            >
+                                {expandedPhases.length > 0 ? "Recolher Tudo" : "Expandir Tudo"}
+                            </Button>
+                        )}
                     </div>
 
                     <Dialog open={newPhaseOpen} onOpenChange={setNewPhaseOpen}>
@@ -247,9 +272,19 @@ export function PhaseList({ projectId }: PhaseListProps) {
                     </Dialog>
                 </div>
 
-                <Accordion type="multiple" defaultValue={phases?.map((p: any) => p.id)} className="w-full">
-                    {phases?.map((phase: any) => (
-                        <PhaseAccordion key={phase.id} phase={phase} projectId={projectId} />
+                <Accordion
+                    type="multiple"
+                    value={expandedPhases}
+                    onValueChange={setExpandedPhases}
+                    className="w-full"
+                >
+                    {phases?.map((phase: any, index: number) => (
+                        <PhaseAccordion
+                            key={phase.id}
+                            phase={phase}
+                            projectId={projectId}
+                            index={index}
+                        />
                     ))}
                 </Accordion>
 
