@@ -44,12 +44,7 @@ export function PhaseList({ projectId }: PhaseListProps) {
         queryFn: async () => {
             const res = await api.phases[":projectId"].$get({ param: { projectId } })
             if (!res.ok) throw new Error("Failed to fetch phases")
-            const data = await res.json()
-            // Set initial expanded states if not already set
-            if (expandedPhases.length === 0) {
-                setExpandedPhases(data.map((p: any) => p.id))
-            }
-            return data
+            return await res.json()
         }
     })
 
