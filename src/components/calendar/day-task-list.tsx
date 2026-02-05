@@ -15,7 +15,7 @@ import {
 interface DayTaskListProps {
     date: Date | undefined
     tasks: any[]
-    projectId: string
+    projectId?: string
 }
 
 export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
@@ -29,11 +29,11 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
     const { data: phases = [] } = useQuery({
         queryKey: ['phases', projectId],
         queryFn: async () => {
-            const res = await api.phases[':projectId'].$get({ param: { projectId } })
+            const res = await api.phases[':projectId'].$get({ param: { projectId: projectId! } })
             if (!res.ok) return []
             return await res.json()
         },
-        enabled: isCreating
+        enabled: isCreating && !!projectId
     })
 
     const { mutate: createTask, isPending } = useMutation({
@@ -56,7 +56,7 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
         onSuccess: () => {
             setIsCreating(false)
             setNewTaskTitle("")
-            queryClient.invalidateQueries({ queryKey: ['board', projectId] })
+            queryClient.invalidateQueries({ queryKey: [projectId ? 'board' : 'tasks', projectId || 'dated'] })
         }
     })
 
@@ -66,7 +66,7 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
             if (!res.ok) throw new Error("Failed to delete")
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['board', projectId] })
+            queryClient.invalidateQueries({ queryKey: [projectId ? 'board' : 'tasks', projectId || 'dated'] })
         }
     })
 
@@ -105,75 +105,77 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
                     </p>
                 </div>
 
-                <Dialog open={isCreating} onOpenChange={setIsCreating}>
-                    <DialogTrigger asChild>
-                        <button className="p-2 hover:bg-[#f0fdfa] rounded-lg transition-colors text-[#1d4e46]">
-                            <Plus className="w-5 h-5" />
-                        </button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Nova Tarefa - {format(date, "dd/MM")}</DialogTitle>
-                        </DialogHeader>
-
-                        <form className="flex-col flex gap-4 mt-4" onSubmit={handleCreate}>
-                            <div>
-                                <label className="text-sm font-medium leading-none mb-2 block">Fase do Projeto</label>
-                                <select
-                                    value={selectedPhaseId}
-                                    onChange={e => setSelectedPhaseId(e.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d4e46]"
-                                    required
-                                >
-                                    <option value="">Selecione a fase...</option>
-                                    {phases.map((p: any) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium leading-none mb-2 block">Título</label>
-                                <input
-                                    autoFocus
-                                    value={newTaskTitle}
-                                    onChange={e => setNewTaskTitle(e.target.value)}
-                                    placeholder="Nome da tarefa"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d4e46]"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-medium leading-none mb-2 block">Prioridade</label>
-                                <div className="flex gap-2">
-                                    {['low', 'medium', 'high'].map(p => (
-                                        <button
-                                            key={p}
-                                            type="button"
-                                            onClick={() => setPriority(p)}
-                                            className={`flex-1 px-3 py-2 rounded-md text-sm font-medium border capitalize transition-all ${priority === p
-                                                ? 'bg-[#1d4e46] text-white border-[#1d4e46]'
-                                                : 'bg-transparent border-input hover:bg-slate-50'
-                                                }`}
-                                        >
-                                            {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isPending || !selectedPhaseId}
-                                className="w-full mt-4 py-2.5 bg-[#1d4e46] text-white rounded-xl font-medium text-sm hover:bg-[#153a34] disabled:opacity-50 flex items-center justify-center gap-2 transition-all shadow-sm"
-                            >
-                                {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                                Criar Tarefa
+                {projectId && (
+                    <Dialog open={isCreating} onOpenChange={setIsCreating}>
+                        <DialogTrigger asChild>
+                            <button className="p-2 hover:bg-[#f0fdfa] rounded-lg transition-colors text-[#1d4e46]">
+                                <Plus className="w-5 h-5" />
                             </button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Nova Tarefa - {format(date, "dd/MM")}</DialogTitle>
+                            </DialogHeader>
+
+                            <form className="flex-col flex gap-4 mt-4" onSubmit={handleCreate}>
+                                <div>
+                                    <label className="text-sm font-medium leading-none mb-2 block">Fase do Projeto</label>
+                                    <select
+                                        value={selectedPhaseId}
+                                        onChange={e => setSelectedPhaseId(e.target.value)}
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d4e46]"
+                                        required
+                                    >
+                                        <option value="">Selecione a fase...</option>
+                                        {phases.map((p: any) => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium leading-none mb-2 block">Título</label>
+                                    <input
+                                        autoFocus
+                                        value={newTaskTitle}
+                                        onChange={e => setNewTaskTitle(e.target.value)}
+                                        placeholder="Nome da tarefa"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1d4e46]"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium leading-none mb-2 block">Prioridade</label>
+                                    <div className="flex gap-2">
+                                        {['low', 'medium', 'high'].map(p => (
+                                            <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => setPriority(p)}
+                                                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium border capitalize transition-all ${priority === p
+                                                    ? 'bg-[#1d4e46] text-white border-[#1d4e46]'
+                                                    : 'bg-transparent border-input hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isPending || !selectedPhaseId}
+                                    className="w-full mt-4 py-2.5 bg-[#1d4e46] text-white rounded-xl font-medium text-sm hover:bg-[#153a34] disabled:opacity-50 flex items-center justify-center gap-2 transition-all shadow-sm"
+                                >
+                                    {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                                    Criar Tarefa
+                                </button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
 
 
@@ -196,9 +198,16 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className={`text-sm font-medium transition-colors ${task.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                                            {task.title}
-                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className={`text-sm font-medium transition-colors ${task.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                                                {task.title}
+                                            </h4>
+                                            {!projectId && task.projectName && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold uppercase truncate max-w-[100px]">
+                                                    {task.projectName}
+                                                </span>
+                                            )}
+                                        </div>
 
                                         <div className="flex items-center gap-2 mt-1">
                                             <div className={`w-1.5 h-1.5 rounded-full ${task.priority === 'high' ? 'bg-red-500' :

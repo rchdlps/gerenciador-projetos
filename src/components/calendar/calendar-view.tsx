@@ -21,9 +21,10 @@ interface CalendarViewProps {
     setDate: (date: Date | undefined) => void
     tasks: any[]
     appointments: any[]
+    showProjectNames?: boolean
 }
 
-export function CalendarView({ date, setDate, tasks, appointments }: CalendarViewProps) {
+export function CalendarView({ date, setDate, tasks, appointments, showProjectNames }: CalendarViewProps) {
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
 
     const handlePreviousMonth = () => setCurrentMonth(prev => subMonths(prev, 1))

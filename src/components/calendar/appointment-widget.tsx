@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog"
 
 interface AppointmentWidgetProps {
-    projectId: string
+    projectId?: string
 }
 
 export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
@@ -24,11 +24,17 @@ export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
 
     // Fetch Appointments
     const { data: appointments = [] } = useQuery({
-        queryKey: ['appointments', projectId],
+        queryKey: projectId ? ['appointments', projectId] : ['appointments', 'global'],
         queryFn: async () => {
-            const res = await api.appointments[':projectId'].$get({ param: { projectId } })
-            if (!res.ok) return []
-            return await res.json()
+            if (projectId) {
+                const res = await api.appointments[':projectId'].$get({ param: { projectId } })
+                if (!res.ok) return []
+                return await res.json()
+            } else {
+                const res = await api.appointments.$get()
+                if (!res.ok) return []
+                return await res.json()
+            }
         }
     })
 
@@ -150,7 +156,14 @@ export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
                     nextAppointments.map((apt: any) => (
                         <div key={apt.id} className="flex items-center justify-between group p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
                             <div className="text-sm">
-                                <p className="font-medium text-foreground">{apt.description}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-medium text-foreground">{apt.description}</p>
+                                    {!projectId && apt.projectName && (
+                                        <span className="text-[8px] px-1 py-0.5 rounded bg-blue-50 text-blue-600 font-bold uppercase truncate max-w-[80px]">
+                                            {apt.projectName}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-xs text-[#1d4e46]/40 font-medium capitalize mt-1 flex items-center gap-1.5">
                                     <Clock className="w-3 h-3" />
                                     {format(new Date(apt.date), "dd/MM 'às' HH:mm", { locale: ptBR })}

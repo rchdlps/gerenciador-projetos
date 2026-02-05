@@ -1,16 +1,14 @@
 
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ArrowLeft, Edit2, BookOpen } from "lucide-react"
+import { ArrowLeft, BookOpen, LayoutList, KanbanSquare } from "lucide-react"
 import { Stakeholders } from "./stakeholders"
 import { ScrumbanBoard } from "./board"
 import { useState } from "react"
 import { PhaseList } from "@/components/phases/phase-list"
-import { LayoutList, KanbanSquare } from "lucide-react"
 import { TaskStats } from "./task-stats"
+import { ProjectHeader } from "./project-header"
 
 export function ProjectDetails({ id }: { id: string }) {
     const [viewMode, setViewMode] = useState<'kanban' | 'phases'>('phases')
@@ -21,6 +19,37 @@ export function ProjectDetails({ id }: { id: string }) {
             const res = await api.projects[':id'].$get({ param: { id } })
             if (!res.ok) throw new Error('Not found')
             return res.json()
+        }
+    })
+
+    const { data: organization } = useQuery({
+        queryKey: ['organization', project?.organizationId],
+        queryFn: async () => {
+            if (!project?.organizationId) return null
+            const res = await api.organizations[':id'].$get({ param: { id: project.organizationId } })
+            if (!res.ok) return null
+            return res.json()
+        },
+        enabled: !!project?.organizationId
+    })
+
+    const { data: stakeholders = [] } = useQuery({
+        queryKey: ['stakeholders', id],
+        queryFn: async () => {
+            const res = await api.stakeholders[':projectId'].$get({
+                param: { projectId: id }
+            })
+            if (!res.ok) throw new Error()
+            return res.json()
+        }
+    })
+
+    const { data: phases = [] } = useQuery({
+        queryKey: ["phases", id],
+        queryFn: async () => {
+            const res = await api.phases[":projectId"].$get({ param: { projectId: id } })
+            if (!res.ok) throw new Error("Failed to fetch phases")
+            return await res.json()
         }
     })
 
@@ -35,6 +64,13 @@ export function ProjectDetails({ id }: { id: string }) {
 
     if (isLoading) return <div>Carregando...</div>
     if (!project) return <div>Projeto não encontrado</div>
+
+    // Calculate Phases Stats
+    const totalPhases = phases.length
+    // A phase is complete if it has tasks and all tasks are 'done'
+    const completedPhases = phases.filter((p: any) =>
+        p.tasks && p.tasks.length > 0 && p.tasks.every((t: any) => t.status === 'done')
+    ).length
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -54,29 +90,16 @@ export function ProjectDetails({ id }: { id: string }) {
                 </Button>
             </div>
 
-            {/* Config Card */}
-            <Card className="border shadow-none">
-                <CardHeader className="bg-primary text-primary-foreground rounded-t-lg flex flex-row items-center justify-between py-4">
-                    <div className="flex items-center gap-3">
-                        <Edit2 className="h-5 w-5" />
-                        <CardTitle className="text-lg">Configuração do Projeto</CardTitle>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                    <div className="space-y-4">
-                        <div className="grid gap-2">
-                            <label className="text-sm font-bold uppercase text-muted-foreground">Nome do Projeto</label>
-                            <Input defaultValue={project.name} className="font-semibold text-lg" readOnly />
-                        </div>
-                        <div className="grid gap-2">
-                            <label className="text-sm font-bold uppercase text-muted-foreground">Descrição</label>
-                            <p className="text-sm text-foreground/80">{project.description || "Sem descrição"}</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Project Header (Info & Stats) */}
+            <ProjectHeader
+                project={project}
+                organization={organization}
+                stakeholders={stakeholders}
+                totalPhases={totalPhases}
+                completedPhases={completedPhases}
+            />
 
-            {/* Stakeholders */}
+            {/* Stakeholders (Manage List) */}
             <Stakeholders projectId={id} />
 
             {/* Tasks / Phases Section */}

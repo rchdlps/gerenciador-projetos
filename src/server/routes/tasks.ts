@@ -3,8 +3,8 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects } from '../../../db/schema'
-import { eq } from 'drizzle-orm'
+import { tasks, projectPhases, projects, users, memberships } from '../../../db/schema'
+import { eq, or, isNotNull, and, inArray, asc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
 const app = new Hono()
@@ -12,6 +12,68 @@ const app = new Hono()
 const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers });
 }
+
+// Get All Dated Tasks (Global Calendar)
+app.get('/dated', async (c) => {
+    const session = await getSession(c)
+    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    let tasksQuery;
+
+    // Filter to ensure task has at least one date
+    const dateCondition = (t: any) => or(isNotNull(t.startDate), isNotNull(t.endDate))
+
+    if (user && user.globalRole === 'super_admin') {
+        tasksQuery = db.select({
+            id: tasks.id,
+            title: tasks.title,
+            status: tasks.status,
+            priority: tasks.priority,
+            startDate: tasks.startDate,
+            endDate: tasks.endDate,
+            projectId: projectPhases.projectId,
+            projectName: projects.name
+        })
+            .from(tasks)
+            .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
+            .innerJoin(projects, eq(projectPhases.projectId, projects.id))
+            .where(dateCondition(tasks))
+            .orderBy(asc(tasks.endDate))
+    } else {
+        const userMemberships = await db.select({ orgId: memberships.organizationId })
+            .from(memberships)
+            .where(eq(memberships.userId, session.user.id))
+
+        const orgIds = userMemberships.map(m => m.orgId)
+
+        if (orgIds.length === 0) return c.json([])
+
+        tasksQuery = db.select({
+            id: tasks.id,
+            title: tasks.title,
+            status: tasks.status,
+            priority: tasks.priority,
+            startDate: tasks.startDate,
+            endDate: tasks.endDate,
+            projectId: projectPhases.projectId,
+            projectName: projects.name
+        })
+            .from(tasks)
+            .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
+            .innerJoin(projects, eq(projectPhases.projectId, projects.id))
+            .where(and(
+                inArray(projects.organizationId, orgIds),
+                dateCondition(tasks)
+            ))
+            .orderBy(asc(tasks.endDate))
+    }
+
+    const results = await tasksQuery
+    return c.json(results)
+})
 
 // Create Task
 app.post('/',

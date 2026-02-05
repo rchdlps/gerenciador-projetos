@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
 import { organizations, memberships, users } from '../../../db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
 const app = new Hono<{ Variables: AuthVariables }>()
@@ -39,6 +39,34 @@ app.get('/', async (c) => {
         .where(eq(memberships.userId, sessionUser.id))
 
     return c.json(userOrgs)
+})
+
+app.get('/:id', async (c) => {
+    const sessionUser = c.get('user')
+    const id = c.req.param('id')
+
+    // Fetch full user for role check
+    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id))
+    if (!org) return c.json({ error: 'Not found' }, 404)
+
+    // Admin Bypass
+    if (user && user.globalRole === 'super_admin') {
+        return c.json(org)
+    }
+
+    // Check membership
+    const membership = await db.query.memberships.findFirst({
+        where: and(
+            eq(memberships.userId, sessionUser.id),
+            eq(memberships.organizationId, id)
+        )
+    })
+
+    if (!membership) return c.json({ error: 'Forbidden' }, 403)
+
+    return c.json(org)
 })
 
 // Create Organization (Super Admin Only)

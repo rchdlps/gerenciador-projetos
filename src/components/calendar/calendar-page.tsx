@@ -7,7 +7,7 @@ import { AppointmentWidget } from "@/components/calendar/appointment-widget"
 import { Providers } from "@/components/providers"
 
 
-export function CalendarPage({ projectId }: { projectId: string }) {
+export function CalendarPage({ projectId }: { projectId?: string }) {
     return (
         <Providers>
             <CalendarPageContent projectId={projectId} />
@@ -15,26 +15,38 @@ export function CalendarPage({ projectId }: { projectId: string }) {
     )
 }
 
-function CalendarPageContent({ projectId }: { projectId: string }) {
+function CalendarPageContent({ projectId }: { projectId?: string }) {
     const [date, setDate] = useState<Date | undefined>(new Date())
 
     const { data: tasks = [] } = useQuery({
-        queryKey: ['board', projectId],
+        queryKey: projectId ? ['board', projectId] : ['tasks', 'dated'],
         queryFn: async () => {
-            const res = await api.board[':projectId'].$get({ param: { projectId } })
-            if (!res.ok) throw new Error()
-            const data = await res.json()
-            // Flatten columns to get all tasks
-            return data.flatMap((col: any) => col?.cards || [])
+            if (projectId) {
+                const res = await api.board[':projectId'].$get({ param: { projectId } })
+                if (!res.ok) throw new Error()
+                const data = await res.json()
+                // Flatten columns to get all tasks
+                return data.flatMap((col: any) => col?.cards || [])
+            } else {
+                const res = await api.tasks.dated.$get()
+                if (!res.ok) return []
+                return await res.json()
+            }
         }
     })
 
     const { data: appointments = [] } = useQuery({
-        queryKey: ['appointments', projectId],
+        queryKey: projectId ? ['appointments', projectId] : ['appointments', 'global'],
         queryFn: async () => {
-            const res = await api.appointments[':projectId'].$get({ param: { projectId } })
-            if (!res.ok) return []
-            return await res.json()
+            if (projectId) {
+                const res = await api.appointments[':projectId'].$get({ param: { projectId } })
+                if (!res.ok) return []
+                return await res.json()
+            } else {
+                const res = await api.appointments.$get()
+                if (!res.ok) return []
+                return await res.json()
+            }
         }
     })
 
@@ -47,6 +59,7 @@ function CalendarPageContent({ projectId }: { projectId: string }) {
                     setDate={setDate}
                     tasks={tasks}
                     appointments={appointments}
+                    showProjectNames={!projectId}
                 />
             </div>
 
