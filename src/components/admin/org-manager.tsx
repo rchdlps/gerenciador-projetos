@@ -22,6 +22,9 @@ type Organization = {
     name: string
     code: string
     logoUrl?: string
+    secretario?: string
+    secretariaAdjunta?: string
+    diretoriaTecnica?: string
 }
 
 export function OrgManager() {
@@ -33,6 +36,9 @@ export function OrgManager() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [name, setName] = useState("")
     const [code, setCode] = useState("")
+    const [secretario, setSecretario] = useState("")
+    const [secretariaAdjunta, setSecretariaAdjunta] = useState("")
+    const [diretoriaTecnica, setDiretoriaTecnica] = useState("")
 
     const { data: organizations, isLoading } = useQuery<Organization[]>({
         queryKey: ['organizations'],
@@ -46,7 +52,7 @@ export function OrgManager() {
     const createOrg = useMutation({
         mutationFn: async () => {
             const res = await api.organizations.$post({
-                json: { name, code }
+                json: { name, code, secretario, secretariaAdjunta, diretoriaTecnica }
             })
             if (!res.ok) throw new Error("Failed to create")
             return res.json()
@@ -58,10 +64,16 @@ export function OrgManager() {
     })
 
     const updateOrg = useMutation({
-        mutationFn: async (vars: { id: string, name: string, code: string }) => {
+        mutationFn: async (vars: { id: string, name: string, code: string, secretario: string, secretariaAdjunta: string, diretoriaTecnica: string }) => {
             const res = await api.organizations[':id'].$put({
                 param: { id: vars.id },
-                json: { name: vars.name, code: vars.code }
+                json: {
+                    name: vars.name,
+                    code: vars.code,
+                    secretario: vars.secretario,
+                    secretariaAdjunta: vars.secretariaAdjunta,
+                    diretoriaTecnica: vars.diretoriaTecnica
+                }
             })
             if (!res.ok) throw new Error("Failed to update")
             return res.json()
@@ -77,12 +89,18 @@ export function OrgManager() {
         setEditingId(null)
         setName("")
         setCode("")
+        setSecretario("")
+        setSecretariaAdjunta("")
+        setDiretoriaTecnica("")
     }
 
     function handleEdit(org: Organization) {
         setEditingId(org.id)
         setName(org.name)
         setCode(org.code)
+        setSecretario(org.secretario || "")
+        setSecretariaAdjunta(org.secretariaAdjunta || "")
+        setDiretoriaTecnica(org.diretoriaTecnica || "")
         setIsSheetOpen(true)
     }
 
@@ -90,6 +108,9 @@ export function OrgManager() {
         setEditingId(null)
         setName("")
         setCode("")
+        setSecretario("")
+        setSecretariaAdjunta("")
+        setDiretoriaTecnica("")
         setIsSheetOpen(true)
     }
 
@@ -149,12 +170,24 @@ export function OrgManager() {
                                     <Label htmlFor="code">Sigla / Código</Label>
                                     <Input id="code" value={code} onChange={e => setCode(e.target.value)} placeholder="Ex: SMS" />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="secretario">Secretário(a)</Label>
+                                    <Input id="secretario" value={secretario} onChange={e => setSecretario(e.target.value)} placeholder="Nome do Secretário(a)" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="secretariaAdjunta">Secretário(a) Adjunto(a)</Label>
+                                    <Input id="secretariaAdjunta" value={secretariaAdjunta} onChange={e => setSecretariaAdjunta(e.target.value)} placeholder="Nome do Secretário(a) Adjunto(a)" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="diretoriaTecnica">Diretor(a) Técnico(a)</Label>
+                                    <Input id="diretoriaTecnica" value={diretoriaTecnica} onChange={e => setDiretoriaTecnica(e.target.value)} placeholder="Nome do Diretor(a) Técnico(a)" />
+                                </div>
                             </div>
                             <SheetFooter>
                                 <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
                                 <Button
                                     onClick={() => editingId
-                                        ? updateOrg.mutate({ id: editingId, name, code })
+                                        ? updateOrg.mutate({ id: editingId, name, code, secretario, secretariaAdjunta, diretoriaTecnica })
                                         : createOrg.mutate()
                                     }
                                     disabled={createOrg.isPending || updateOrg.isPending}

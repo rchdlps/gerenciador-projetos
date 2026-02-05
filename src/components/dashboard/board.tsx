@@ -2,7 +2,7 @@ import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCorners, pointerWithin, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -129,7 +129,53 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
     };
 
     const handleDragOver = (event: any) => {
-        // Could implement real-time column switching here for smoother visual
+        const { active, over } = event;
+        if (!over) return;
+
+        const activeId = String(active.id);
+        const overId = String(over.id);
+
+        // Find sortable container ids
+        const sourceColumn = serverColumns.find(col => col.cards.some(c => c.id === activeId));
+        const destColumn = serverColumns.find(col => col.id === overId) ||
+            serverColumns.find(col => col.cards.some(c => c.id === overId));
+
+        if (!sourceColumn || !destColumn) return;
+        if (sourceColumn.id === destColumn.id) return;
+
+        // Moving to different column
+        // We need to optimistically update the query cache to reflect the move
+        queryClient.setQueryData(['board', projectId], (old: BoardColumn[] = []) => {
+            const newColumns = JSON.parse(JSON.stringify(old)) as BoardColumn[];
+            const sourceColIdx = newColumns.findIndex(c => c.id === sourceColumn.id);
+            const destColIdx = newColumns.findIndex(c => c.id === destColumn.id);
+
+            const sourceCards = newColumns[sourceColIdx].cards;
+            const destCards = newColumns[destColIdx].cards;
+
+            const oldIndex = sourceCards.findIndex(c => c.id === activeId);
+            const cardToMove = sourceCards[oldIndex];
+
+            // Remove from source
+            sourceCards.splice(oldIndex, 1);
+
+            // Add to dest
+            let newIndex;
+            if (destColumn.id === overId) {
+                newIndex = destCards.length;
+            } else {
+                const overIndex = destCards.findIndex(c => c.id === overId);
+                const isBelow = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height;
+                const modifier = isBelow ? 1 : 0;
+                newIndex = overIndex >= 0 ? overIndex + modifier : destCards.length;
+            }
+
+            // Update status temporarily (will be fixed in DragEnd)
+            cardToMove.status = destColumn.id;
+            destCards.splice(newIndex, 0, cardToMove);
+
+            return newColumns;
+        });
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -142,15 +188,27 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         const activeId = String(active.id);
         const overId = String(over.id);
 
-        // Find source and destination columns
-        const sourceColumn = serverColumns.find(col => col.cards.some(c => c.id === activeId));
-        const destColumn = serverColumns.find(col => col.id === overId) ||
-            serverColumns.find(col => col.cards.some(c => c.id === overId));
+        // At this point, thanks to handleDragOver, the item might already be in the dest column in local state?
+        // Actually, dnd-kit resets state on drag end if we don't commit it?
+        // No, we updated queryClient data, so the UI is already showing it in the new place.
+        // We just need to persist the FINAL state and order.
+
+        // However, handleDragOver doesn't run on the very last drop frame sometimes.
+        // We should recalculate the final move to be safe and persist it.
+
+        const currentColumns = queryClient.getQueryData<BoardColumn[]>(['board', projectId]) || [];
+
+        // Find where the item IS now (should be in dest column if DragOver ran)
+        const sourceColumn = currentColumns.find(col => col.cards.some(c => c.id === activeId));
+
+        // If we dropped on a container or item, find that column
+        const destColumn = currentColumns.find(col => col.id === overId) ||
+            currentColumns.find(col => col.cards.some(c => c.id === overId));
 
         if (!sourceColumn || !destColumn) return;
 
-        // Clone deeply
-        const newColumns = JSON.parse(JSON.stringify(serverColumns)) as BoardColumn[];
+        // Perform the final reorder in memory to get clean payload
+        const newColumns = JSON.parse(JSON.stringify(currentColumns)) as BoardColumn[];
         const sourceColIdx = newColumns.findIndex(c => c.id === sourceColumn.id);
         const destColIdx = newColumns.findIndex(c => c.id === destColumn.id);
 
@@ -160,51 +218,57 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         const oldIndex = sourceCards.findIndex(c => c.id === activeId);
         const cardToMove = sourceCards[oldIndex];
 
-        // Remove from source
-        sourceCards.splice(oldIndex, 1);
-
-        // Add to destination
-        let newIndex;
-        if (destColumn.id === overId) {
-            // Dropped on column container -> append
-            newIndex = destCards.length;
-        } else {
-            // Dropped on a card
+        // If simple reorder in same column
+        if (sourceColumn.id === destColumn.id) {
             const overIndex = destCards.findIndex(c => c.id === overId);
-            const isBelow = over && active.rect.current.translated && active.rect.current.translated.top > over.rect.top + over.rect.height;
-            // Simplified: just insert at index
-            newIndex = overIndex >= 0 ? overIndex : destCards.length;
+            // Use arrayMove equivalent logic
+            if (oldIndex !== overIndex && overIndex !== -1) {
+                const [removed] = destCards.splice(oldIndex, 1);
+                destCards.splice(overIndex, 0, removed);
+                queryClient.setQueryData(['board', projectId], newColumns);
+            }
+        } else {
+            // Should have been handled by DragOver, but handle edge case if DragOver didn't fire?
+            // If DragOver fired, sourceColumn === destColumn (the new one).
+            // So we likely fall into the block above.
+            // If DragOver didn't fire (fast drop?), we handle cross-column here.
+
+            // Remove from source
+            sourceCards.splice(oldIndex, 1);
+
+            // Add to dest
+            let newIndex;
+            if (destColumn.id === overId) {
+                newIndex = destCards.length;
+            } else {
+                const overIndex = destCards.findIndex(c => c.id === overId);
+                newIndex = overIndex >= 0 ? overIndex : destCards.length;
+            }
+
+            cardToMove.status = destColumn.id;
+            destCards.splice(newIndex, 0, cardToMove);
+            queryClient.setQueryData(['board', projectId], newColumns);
         }
 
-        // Insert
-        cardToMove.status = destColumn.id; // Update status
-        destCards.splice(newIndex, 0, cardToMove);
-
-        // Calculate updates
+        // --- Persist to Backend ---
+        // We calculate updates based on the FINAL state of newColumns
         const updates: { id: string, status: string, order: number }[] = [];
 
-        // Update dest column orders
-        destCards.forEach((card, index) => {
-            updates.push({
-                id: card.id,
-                status: destColumn.id,
-                order: index
-            });
-        });
+        // We only really need to send updates for the modified columns
+        // For simplicity, let's send updates for all cards in modified columns (source and dest)
+        const columnsToUpdate = new Set([sourceColumn.id, destColumn.id]);
 
-        // Update source column orders if different
-        if (sourceColumn.id !== destColumn.id) {
-            sourceCards.forEach((card, index) => {
-                updates.push({
-                    id: card.id,
-                    status: sourceColumn.id,
-                    order: index
+        newColumns.forEach(col => {
+            if (columnsToUpdate.has(col.id)) {
+                col.cards.forEach((card, index) => {
+                    updates.push({
+                        id: card.id,
+                        status: col.id,
+                        order: index
+                    });
                 });
-            });
-        }
-
-        // Optimistic UI update
-        queryClient.setQueryData(['board', projectId], newColumns);
+            }
+        });
 
         await reorderTasks.mutateAsync(updates);
     };
@@ -220,7 +284,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
 
             <DndContext
                 sensors={sensors}
-                collisionDetection={closestCorners}
+                collisionDetection={pointerWithin}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}

@@ -53,11 +53,51 @@ async function seed() {
 
         console.log('🏛️  Creating Secretarias...');
         await db.insert(organizations).values([
-            { id: smpoId, name: "Secretaria de Planejamento Estratégico", code: "SMPO", logoUrl: "/logos/smpo.png" },
-            { id: demoId, name: "Ambiente de Demonstração", code: "DEMO", logoUrl: "/logos/demo.png" },
-            { id: smsId, name: "Secretaria Municipal de Saúde", code: "SMS", logoUrl: "/logos/sms.png" },
-            { id: smeId, name: "Secretaria Municipal de Educação", code: "SME", logoUrl: "/logos/sme.png" },
-            { id: smobId, name: "Secretaria de Obras Públicas", code: "SMOB", logoUrl: "/logos/smob.png" }
+            {
+                id: smpoId,
+                name: "Secretaria de Planejamento Estratégico",
+                code: "SMPO",
+                logoUrl: "/logos/smpo.png",
+                secretario: "Dr. João Silva",
+                secretariaAdjunta: "Maria Oliveira",
+                diretoriaTecnica: "Eng. Carlos Santos"
+            },
+            {
+                id: demoId,
+                name: "Ambiente de Demonstração",
+                code: "DEMO",
+                logoUrl: "/logos/demo.png",
+                secretario: "Admin Demo",
+                secretariaAdjunta: "Assistente Demo",
+                diretoriaTecnica: "Técnico Demo"
+            },
+            {
+                id: smsId,
+                name: "Secretaria Municipal de Saúde",
+                code: "SMS",
+                logoUrl: "/logos/sms.png",
+                secretario: "Dra. Ana Costa",
+                secretariaAdjunta: "Enf. Beatriz Lima",
+                diretoriaTecnica: "Dr. Pedro Alves"
+            },
+            {
+                id: smeId,
+                name: "Secretaria Municipal de Educação",
+                code: "SME",
+                logoUrl: "/logos/sme.png",
+                secretario: "Prof. Ricardo Nunes",
+                secretariaAdjunta: "Profa. Julia Souza",
+                diretoriaTecnica: "Pedagoga Fernanda Torres"
+            },
+            {
+                id: smobId,
+                name: "Secretaria de Obras Públicas",
+                code: "SMOB",
+                logoUrl: "/logos/smob.png",
+                secretario: "Eng. Roberto Dias",
+                secretariaAdjunta: "Arq. Camila Rocha",
+                diretoriaTecnica: "Eng. Lucas Mendes"
+            }
         ]);
 
         // 3. Create Users & Memberships
@@ -235,33 +275,42 @@ async function seed() {
                 {
                     name: "Iniciação",
                     tasks: [
-                        { title: "Project Charter", description: "Elaborar termo de abertura.", priority: "high", status: "done", dayOffset: -2 }
+                        { title: "Project Charter", description: "Elaborar termo de abertura.", priority: "high", status: "done", dayOffset: -2 },
+                        { title: "Identificação de Stakeholders", description: "Mapear interessados.", priority: "high", status: "done", dayOffset: -1 }
                     ]
                 },
                 {
                     name: "Planejamento",
                     tasks: [
                         { title: "Definição de Escopo", description: "Alinhar expectativas e entregáveis.", priority: "high", status: "done", dayOffset: 0 },
-                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress", dayOffset: 1 }
+                        { title: "Cronograma Preliminar", description: "Estimativa de prazos.", priority: "high", status: "done", dayOffset: 0 },
+                        { title: "Levantamento de Requisitos", description: "Entrevistas com stakeholders.", priority: "medium", status: "in_progress", dayOffset: 1 },
+                        { title: "Matriz de Riscos", description: "Análise qualitativa.", priority: "medium", status: "todo", dayOffset: 1 }
                     ]
                 },
                 {
                     name: "Execução",
                     tasks: [
                         { title: "Desenvolvimento do MVP", description: "Implementar funcionalidades core.", priority: "high", status: "todo", dayOffset: 2 },
+                        { title: "Design Sprint", description: "Validação de UX.", priority: "medium", status: "todo", dayOffset: 3 },
+                        { title: "Revisão de Código", description: "Garantir qualidade.", priority: "medium", status: "todo", dayOffset: 4 },
                         { title: "Testes Unitários", description: "Garantir cobertura de código.", priority: "medium", status: "todo", dayOffset: 5 }
                     ]
                 },
                 {
                     name: "Monitoramento e Controle",
                     tasks: [
-                        { title: "Reunião de Status", description: "Acompanhamento semanal.", priority: "medium", status: "todo", dayOffset: 6 }
+                        { title: "Reunião de Status", description: "Acompanhamento semanal.", priority: "medium", status: "todo", dayOffset: 6 },
+                        { title: "Relatório de Progresso", description: "Atualizar KPI's.", priority: "low", status: "todo", dayOffset: 7 },
+                        { title: "Gestão de Mudanças", description: "Avaliar solicitações.", priority: "medium", status: "todo", dayOffset: 8 }
                     ]
                 },
                 {
                     name: "Encerramento",
                     tasks: [
+                        { title: "Homologação Final", description: "Aceite do cliente.", priority: "high", status: "todo", dayOffset: 9 },
                         { title: "Treinamento Final", description: "Capacitar usuários finais.", priority: "low", status: "todo", dayOffset: 10 },
+                        { title: "Desmobilização", description: "Liberar recursos.", priority: "low", status: "todo", dayOffset: 11 },
                         { title: "Lições Aprendidas", description: "Documentar aprendizados.", priority: "low", status: "todo", dayOffset: 12 }
                     ]
                 }

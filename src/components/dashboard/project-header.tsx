@@ -15,14 +15,11 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
     // Calculate progress percentage
     const progressPercentage = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0
 
-    // Helper to find stakeholder by role
-    const getStakeholderByRole = (roleName: string) => {
-        return stakeholders.find(s => s.role && s.role.toLowerCase() === roleName.toLowerCase())
-    }
-
-    const secretario = getStakeholderByRole("Secretário")
-    const secretariaAdjunta = getStakeholderByRole("Secretária Adjunta")
-    const diretoraTecnica = getStakeholderByRole("Diretora Técnica de Governança")
+    // We now prioritize Organization fields for these roles, but could fallback to Stakeholders if needed.
+    // For now, let's purely use Organization fields as per the request.
+    const secretarioName = organization?.secretario || "-"
+    const secretariaAdjuntaName = organization?.secretariaAdjunta || "-"
+    const diretoriaTecnicaName = organization?.diretoriaTecnica || "-"
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
@@ -50,8 +47,8 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                                 <User className="w-3.5 h-3.5" />
                                 Secretário
                             </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={secretario?.name}>
-                                {secretario?.name || "-"}
+                            <p className="font-bold text-lg text-slate-900 truncate" title={secretarioName}>
+                                {secretarioName}
                             </p>
                         </div>
 
@@ -59,10 +56,10 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.15em]">
                                 <UserCheck className="w-3.5 h-3.5" />
-                                Secretária Adjunta
+                                Secretaria Adjunta
                             </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={secretariaAdjunta?.name}>
-                                {secretariaAdjunta?.name || "-"}
+                            <p className="font-bold text-lg text-slate-900 truncate" title={secretariaAdjuntaName}>
+                                {secretariaAdjuntaName}
                             </p>
                         </div>
 
@@ -70,10 +67,10 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.15em]">
                                 <Activity className="w-3.5 h-3.5" />
-                                Diretora Técnica
+                                Diretoria Técnica
                             </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={diretoraTecnica?.name}>
-                                {diretoraTecnica?.name || "-"}
+                            <p className="font-bold text-lg text-slate-900 truncate" title={diretoriaTecnicaName}>
+                                {diretoriaTecnicaName}
                             </p>
                         </div>
                     </div>

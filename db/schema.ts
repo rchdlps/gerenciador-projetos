@@ -9,6 +9,9 @@ export const organizations = pgTable("organizations", {
     name: text("name").notNull(),
     code: text("code").notNull(),
     logoUrl: text("logo_url"),
+    secretario: text("secretario"),
+    secretariaAdjunta: text("secretaria_adjunta"),
+    diretoriaTecnica: text("diretoria_tecnica"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

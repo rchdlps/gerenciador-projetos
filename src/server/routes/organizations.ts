@@ -74,7 +74,10 @@ app.post('/',
     zValidator('json', z.object({
         name: z.string().min(1),
         code: z.string().min(1),
-        logoUrl: z.string().optional()
+        logoUrl: z.string().optional(),
+        secretario: z.string().optional(),
+        secretariaAdjunta: z.string().optional(),
+        diretoriaTecnica: z.string().optional()
     })),
     async (c) => {
         const user = c.get('user') as any
@@ -85,14 +88,17 @@ app.post('/',
             // return c.json({ error: 'Forbidden' }, 403)
         }
 
-        const { name, code, logoUrl } = c.req.valid('json')
+        const { name, code, logoUrl, secretario, secretariaAdjunta, diretoriaTecnica } = c.req.valid('json')
         const id = nanoid()
 
         await db.insert(organizations).values({
             id,
             name,
             code,
-            logoUrl
+            logoUrl,
+            secretario,
+            secretariaAdjunta,
+            diretoriaTecnica
         })
 
         // Auto-add creator as 'secretario'
@@ -111,7 +117,10 @@ app.put('/:id',
     zValidator('json', z.object({
         name: z.string().min(1),
         code: z.string().min(1),
-        logoUrl: z.string().optional()
+        logoUrl: z.string().optional(),
+        secretario: z.string().optional(),
+        secretariaAdjunta: z.string().optional(),
+        diretoriaTecnica: z.string().optional()
     })),
     async (c) => {
         const user = c.get('user') as any
@@ -121,13 +130,16 @@ app.put('/:id',
         }
 
         const id = c.req.param('id')
-        const { name, code, logoUrl } = c.req.valid('json')
+        const { name, code, logoUrl, secretario, secretariaAdjunta, diretoriaTecnica } = c.req.valid('json')
 
         await db.update(organizations)
             .set({
                 name,
                 code,
                 logoUrl,
+                secretario,
+                secretariaAdjunta,
+                diretoriaTecnica,
                 updatedAt: new Date()
             })
             .where(eq(organizations.id, id))
