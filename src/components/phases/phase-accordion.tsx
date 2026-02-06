@@ -123,7 +123,38 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                 value={phase.id}
                 className={`border rounded-xl px-4 mb-4 bg-white shadow-sm border-l-4 transition-all duration-300 ${color.border}`}
             >
-                <AccordionTrigger className="hover:no-underline py-6">
+                <AccordionTrigger
+                    className="hover:no-underline py-6"
+                    extraActions={
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => {
+                                        setEditName(phase.name)
+                                        setEditDescription(phase.description || getPhaseSubtitle(phase.name))
+                                        setEditOpen(true)
+                                    }}
+                                >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Editar Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
+                                    onClick={() => setDeleteOpen(true)}
+                                >
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    Excluir Fase
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    }
+                >
                     <div className="flex items-center justify-between w-full pr-4">
                         <div className="flex flex-col items-start gap-0.5">
                             <span className="text-lg font-bold text-gray-800">{phase.name}</span>
@@ -147,36 +178,6 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                             <div className="flex flex-col items-center min-w-[60px]">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tarefas</span>
                                 <span className="text-sm font-bold text-gray-700">{completedCount}/{taskCount}</span>
-                            </div>
-
-                            <div onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            className="cursor-pointer"
-                                            onClick={() => {
-                                                setEditName(phase.name)
-                                                setEditDescription(phase.description || getPhaseSubtitle(phase.name))
-                                                setEditOpen(true)
-                                            }}
-                                        >
-                                            <Pencil className="mr-2 h-4 w-4" />
-                                            Editar Detalhes
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
-                                            onClick={() => setDeleteOpen(true)}
-                                        >
-                                            <Trash className="mr-2 h-4 w-4" />
-                                            Excluir Fase
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
                             </div>
                         </div>
                     </div>

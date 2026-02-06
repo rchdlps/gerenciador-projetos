@@ -17,5 +17,9 @@ export default defineConfig({
 
   adapter: vercel({
     maxDuration: 60
-  })
+  }),
+
+  image: {
+    domains: ['hel1.your-objectstorage.com']
+  }
 });
