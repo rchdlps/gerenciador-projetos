@@ -14,6 +14,9 @@ import projectCharterRouter from './routes/project-charter'
 import scheduleRouter from './routes/schedule'
 import qualityRouter from './routes/quality'
 
+import communicationRouter from './routes/communication'
+import procurementRouter from './routes/procurement'
+
 const app = new Hono().basePath('/api')
 
 app.use('*', logger())
@@ -33,6 +36,8 @@ const apiRoutes = app
     .route('/project-charter', projectCharterRouter)
     .route('/schedule', scheduleRouter)
     .route('/quality', qualityRouter)
+    .route('/communication', communicationRouter)
+    .route('/procurement', procurementRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })

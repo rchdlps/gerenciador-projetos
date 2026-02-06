@@ -13,6 +13,8 @@ import { AttachmentList, type Attachment } from "@/components/attachments/attach
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import CommunicationView from "../projects/knowledge-areas/communication/communication-view"
+import ProcurementView from "./procurement-view"
 
 export function KnowledgeAreaDetail({ projectId, area }: { projectId: string, area: string }) {
     return (
@@ -121,15 +123,23 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             {/* Quality Section - Only for quality */}
             {area === 'qualidade' && <QualitySection projectId={projectId} />}
 
-            {/* Notes Section */}
-            <NotesSection
-                projectId={projectId}
-                area={area}
-                initialContent={ka.content || ""}
-            />
+            {/* Communication Section - Only for communication */}
+            {area === 'comunicacao' && <CommunicationView projectId={projectId} />}
 
-            {/* Change Control Section - Hidden for schedule and quality */}
-            {area !== 'cronograma' && area !== 'qualidade' && (
+            {/* Procurement Section - Only for procurement */}
+            {area === 'aquisicoes' && <ProcurementView projectId={projectId} />}
+
+            {/* Notes Section - Hidden for communication and procurement */}
+            {area !== 'comunicacao' && area !== 'aquisicoes' && (
+                <NotesSection
+                    projectId={projectId}
+                    area={area}
+                    initialContent={ka.content || ""}
+                />
+            )}
+
+            {/* Change Control Section - Hidden for schedule, quality, communication and procurement */}
+            {area !== 'cronograma' && area !== 'qualidade' && area !== 'comunicacao' && area !== 'aquisicoes' && (
                 <ChangeControlSection
                     projectId={projectId}
                     area={area}

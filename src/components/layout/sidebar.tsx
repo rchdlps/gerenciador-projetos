@@ -91,13 +91,13 @@ export function Sidebar() {
                         Administração
                     </h3>
                     <div className="space-y-1">
-                        <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
-                            <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
-                            Gerenciar Usuários
-                        </a>
                         <a href="/admin" className={getLinkClass(currentPath === "/admin")}>
                             <Building2 className={cn("w-4 h-4 group-hover:text-primary", currentPath === "/admin" ? "text-primary" : "text-muted-foreground")} />
                             Gestão de Secretarias
+                        </a>
+                        <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
+                            <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
+                            Gerenciar Usuários
                         </a>
                     </div>
                 </div>

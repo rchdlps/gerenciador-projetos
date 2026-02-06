@@ -244,3 +244,45 @@ export const projectQualityChecklists = pgTable("project_quality_checklists", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const projectCommunicationPlans = pgTable("project_communication_plans", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    info: text("info").notNull(), // "O que será comunicado"
+    stakeholders: text("stakeholders").notNull(), // "Para Quem"
+    frequency: text("frequency").notNull(), // "Quando"
+    medium: text("medium").notNull(), // "Meio"
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectMeetings = pgTable("project_meetings", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    subject: text("subject").notNull(), // "Assunto"
+    date: timestamp("date").notNull(), // "Data"
+    decisions: text("decisions").notNull(), // "Principais Decisões"
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const procurementSuppliers = pgTable("procurement_suppliers", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    name: text("name").notNull(),
+    itemService: text("item_service").notNull(),
+    contact: text("contact").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const procurementContracts = pgTable("procurement_contracts", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    description: text("description").notNull(),
+    value: text("value").notNull(),
+    validity: timestamp("validity"), // Changed to timestamp to match date picker usage
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
