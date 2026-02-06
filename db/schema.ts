@@ -204,3 +204,42 @@ export const projectCharters = pgTable("project_charters", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const projectMilestones = pgTable("project_milestones", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    name: text("name").notNull(),
+    expectedDate: timestamp("expected_date").notNull(),
+    phase: text("phase").notNull(), // Iniciação, Planejamento, Execução, Monitoramento, Encerramento
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectDependencies = pgTable("project_dependencies", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    predecessor: text("predecessor").notNull(),
+    successor: text("successor").notNull(),
+    type: text("type").notNull(), // TI (Término-Início), II (Início-Início), TT (Término-Término)
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectQualityMetrics = pgTable("project_quality_metrics", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    name: text("name").notNull(),
+    target: text("target").notNull(),
+    currentValue: text("current_value").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectQualityChecklists = pgTable("project_quality_checklists", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    item: text("item").notNull(),
+    completed: boolean("completed").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

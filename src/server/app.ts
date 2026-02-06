@@ -11,6 +11,8 @@ import tasksRouter from './routes/tasks'
 import appointmentsRouter from './routes/appointments'
 import storageRouter from './routes/storage'
 import projectCharterRouter from './routes/project-charter'
+import scheduleRouter from './routes/schedule'
+import qualityRouter from './routes/quality'
 
 const app = new Hono().basePath('/api')
 
@@ -27,6 +29,8 @@ app.route('/tasks', tasksRouter)
 app.route('/appointments', appointmentsRouter)
 app.route('/storage', storageRouter)
 app.route('/project-charter', projectCharterRouter)
+app.route('/schedule', scheduleRouter)
+app.route('/quality', qualityRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })

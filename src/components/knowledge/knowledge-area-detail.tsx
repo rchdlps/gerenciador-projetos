@@ -6,6 +6,8 @@ import { Providers } from "@/components/providers"
 import { ChangeControlSection } from "./change-control-section"
 import { NotesSection } from "./notes-section"
 import { TAPSection } from "./tap-section"
+import { ScheduleSection } from "./schedule-section"
+import { QualitySection } from "./quality-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
 import { toast } from "sonner"
@@ -113,6 +115,12 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             {/* TAP Section - Only for integration */}
             {area === 'integracao' && <TAPSection projectId={projectId} />}
 
+            {/* Schedule Section - Only for schedule */}
+            {area === 'cronograma' && <ScheduleSection projectId={projectId} />}
+
+            {/* Quality Section - Only for quality */}
+            {area === 'qualidade' && <QualitySection projectId={projectId} />}
+
             {/* Notes Section */}
             <NotesSection
                 projectId={projectId}
@@ -120,22 +128,24 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                 initialContent={ka.content || ""}
             />
 
-            {/* Change Control Section */}
-            <ChangeControlSection
-                projectId={projectId}
-                area={area}
-                kaId={ka.id}
-                changes={ka.changes}
-                onDelete={async (id) => {
-                    if (confirm("Excluir este registro?")) {
-                        const res = await api['knowledge-areas'].changes[':id'].$delete({ param: { id } })
-                        if (res.ok) {
-                            queryClient.invalidateQueries({ queryKey: ['ka-detail', projectId, area] })
-                            toast.success("Registro removido")
+            {/* Change Control Section - Hidden for schedule and quality */}
+            {area !== 'cronograma' && area !== 'qualidade' && (
+                <ChangeControlSection
+                    projectId={projectId}
+                    area={area}
+                    kaId={ka.id}
+                    changes={ka.changes}
+                    onDelete={async (id) => {
+                        if (confirm("Excluir este registro?")) {
+                            const res = await api['knowledge-areas'].changes[':id'].$delete({ param: { id } })
+                            if (res.ok) {
+                                queryClient.invalidateQueries({ queryKey: ['ka-detail', projectId, area] })
+                                toast.success("Registro removido")
+                            }
                         }
-                    }
-                }}
-            />
+                    }}
+                />
+            )}
 
             {/* Attachments Section */}
             <Card className="border-t-4 border-slate-600">

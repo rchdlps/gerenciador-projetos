@@ -98,6 +98,103 @@ async function seed() {
                     console.log(`      ➕ 2 mudanças semeadas.`);
                 }
             }
+
+            // 4. Seed Schedule Specifics (Milestones & Dependencies)
+            const existingMilestones = await db.select().from(schema.projectMilestones).where(eq(schema.projectMilestones.projectId, project.id));
+            if (existingMilestones.length === 0) {
+                await db.insert(schema.projectMilestones).values([
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        name: "Aprovação do Plano de Projeto",
+                        expectedDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+                        phase: "Planejamento"
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        name: "Kick-off da Execução",
+                        expectedDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+                        phase: "Planejamento"
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        name: "Entrega do Primeiro Protótipo",
+                        expectedDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+                        phase: "Execução"
+                    }
+                ]);
+                console.log("📅 3 marcos semeados.");
+            }
+
+            const existingDeps = await db.select().from(schema.projectDependencies).where(eq(schema.projectDependencies.projectId, project.id));
+            if (existingDeps.length === 0) {
+                await db.insert(schema.projectDependencies).values([
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        predecessor: "Definição de Requisitos",
+                        successor: "Desenvolvimento do Backend",
+                        type: "TI"
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        predecessor: "Design de Interface",
+                        successor: "Desenvolvimento do Frontend",
+                        type: "TI"
+                    }
+                ]);
+                // ... existing logs ...
+            }
+
+            // 5. Seed Quality Specifics (Metrics & Checklist)
+            const existingMetrics = await db.select().from(schema.projectQualityMetrics).where(eq(schema.projectQualityMetrics.projectId, project.id));
+            if (existingMetrics.length === 0) {
+                await db.insert(schema.projectQualityMetrics).values([
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        name: "Taxa de Defeitos",
+                        target: "< 2%",
+                        currentValue: "1.5%"
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        name: "Cobertura de Testes",
+                        target: "> 80%",
+                        currentValue: "75%"
+                    }
+                ]);
+                console.log("⭐ 2 métricas de qualidade semeadas.");
+            }
+
+            const existingChecklist = await db.select().from(schema.projectQualityChecklists).where(eq(schema.projectQualityChecklists.projectId, project.id));
+            if (existingChecklist.length === 0) {
+                await db.insert(schema.projectQualityChecklists).values([
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        item: "Revisão de código concluída",
+                        completed: true
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        item: "Testes unitários aprovados",
+                        completed: false
+                    },
+                    {
+                        id: nanoid(),
+                        projectId: project.id,
+                        item: "Documentação técnica atualizada",
+                        completed: false
+                    }
+                ]);
+                console.log("✅ 3 itens de checklist semeados.");
+            }
         }
         console.log("\n✨ Semeação concluída com sucesso!");
     } catch (e) {
