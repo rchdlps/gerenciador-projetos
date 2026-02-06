@@ -59,50 +59,8 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
             await queryClient.cancelQueries({ queryKey: ['board', projectId] })
             const previousBoard = queryClient.getQueryData(['board', projectId])
 
-            // Optimistically update
-            queryClient.setQueryData(['board', projectId], (old: BoardColumn[] = []) => {
-                const newColumns = old.map(col => ({
-                    ...col,
-                    cards: [...col.cards] // shallow copy
-                }));
-
-                newItems.forEach(item => {
-                    // Remove from old location
-                    newColumns.forEach(c => {
-                        c.cards = c.cards.filter(card => card.id !== item.id)
-                    })
-                })
-
-                // Add to new location with correct order
-                newItems.forEach(item => {
-                    const col = newColumns.find(c => c.id === item.status)
-                    if (col) {
-                        // Insert at correct index if possible, or push
-                        // Since we are iterating items which might be ordered by index, let's just push? 
-                        // No, we need to respect the order property.
-                        // But for simplicity in optimistic update, we can trust the re-fetch or reconstruct based on order.
-                        // Let's reconstruct the target column cards array.
-
-                        // BUT: newItems only contains modified items.
-                        // If we move card A to pos 0, card B becomes pos 1. B is also in newItems.
-                        // So we should just rebuild the target column cards from newItems if they belong there? No.
-                        // Valid Strategy: 
-                        // 1. Remove all items present in newItems from the columns.
-                        // 2. Insert items back into their target columns at correct index (order).
-
-                        // But we don't have the full objects in newItems, only IDs.
-                        // We need the card objects.
-                        // This is getting complex for optimistic update without full object.
-
-                        // Alternative: Rely on the local state calculation done in handleDragEnd.
-                        // In handleDragEnd we calculate newColumns.
-                        // We can pass THAT to the mutation or use it to setQueryData instantly.
-                    }
-                })
-
-                return newColumns
-            })
-
+            // Optimistically update is already handled in handleDragEnd/handleDragOver
+            // We just need to snapshot here for rollback
             return { previousBoard }
         },
         onError: (err, newTodo, context) => {
@@ -284,7 +242,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
 
             <DndContext
                 sensors={sensors}
-                collisionDetection={pointerWithin}
+                collisionDetection={closestCorners}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
