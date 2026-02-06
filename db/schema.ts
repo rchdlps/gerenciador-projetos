@@ -183,3 +183,14 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
         references: [users.id],
     }),
 }));
+
+export const knowledgeAreaChanges = pgTable("knowledge_area_changes", {
+    id: text("id").primaryKey(),
+    knowledgeAreaId: text("knowledge_area_id").notNull().references(() => knowledgeAreas.id, { onDelete: 'cascade' }),
+    description: text("description").notNull(),
+    type: text("type").notNull(), // 'Escopo', 'Cronograma', 'Custos', etc.
+    status: text("status").notNull(), // 'Solicitado', 'Aprovado', 'Rejeitado', etc.
+    date: timestamp("date").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

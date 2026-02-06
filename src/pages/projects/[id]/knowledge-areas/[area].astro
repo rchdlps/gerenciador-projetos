@@ -1,0 +1,47 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { KnowledgeAreaDetail } from "@/components/knowledge/knowledge-area-detail";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { auth } from "@/lib/auth";
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) return Astro.redirect("/login");
+
+const { id, area } = Astro.params;
+if (!id || !area) return Astro.redirect("/");
+
+const AREA_TITLES: Record<string, string> = {
+    integracao: "Integração",
+    escopo: "Escopo",
+    cronograma: "Cronograma",
+    custos: "Custos",
+    qualidade: "Qualidade",
+    recursos: "Recursos",
+    comunicacao: "Comunicação",
+    riscos: "Riscos",
+    aquisicoes: "Aquisições",
+    partes: "Partes Interessadas",
+};
+
+const title = AREA_TITLES[area] || "Área de Conhecimento";
+---
+
+<DashboardLayout title={`${title} - Áreas de Conhecimento`}>
+    <div class="space-y-6">
+        <div class="flex items-center gap-2">
+            <Button variant="ghost" class="pl-0 hover:bg-transparent" asChild>
+                <a href={`/projects/${id}/knowledge-areas`} class="flex items-center gap-2 text-primary font-semibold">
+                    <ArrowLeft class="h-4 w-4" /> Voltar para Áreas de Conhecimento
+                </a>
+            </Button>
+        </div>
+
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
+            <p class="text-slate-500">Documente e gerencie as informações de {title.toLowerCase()}.</p>
+        </div>
+
+        <KnowledgeAreaDetail client:load projectId={id} area={area} />
+    </div>
+</DashboardLayout>

@@ -22,7 +22,7 @@ app.post('/presigned-url',
         fileType: z.string(),
         fileSize: z.number(),
         entityId: z.string(),
-        entityType: z.enum(['task', 'project', 'comment'])
+        entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
         const session = await getSession(c)
@@ -47,7 +47,7 @@ app.post('/confirm',
         fileSize: z.number(),
         key: z.string(),
         entityId: z.string(),
-        entityType: z.enum(['task', 'project', 'comment'])
+        entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
         const session = await getSession(c)

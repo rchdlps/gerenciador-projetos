@@ -342,7 +342,7 @@ function SortableCard({ card }: { card: BoardCard }) {
 
             <div className="flex items-center justify-between mt-3">
                 <div className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${priorityColors[card.priority] || 'bg-gray-100'}`}>
-                    {card.priority}
+                    {card.priority === 'high' ? 'Alta' : card.priority === 'medium' ? 'Média' : card.priority === 'low' ? 'Baixa' : card.priority === 'urgent' ? 'Urgente' : card.priority}
                 </div>
                 {card.assignee && (
                     <div className="flex items-center gap-1" title={card.assignee.name}>

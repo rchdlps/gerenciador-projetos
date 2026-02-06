@@ -99,7 +99,7 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                         <div className="flex flex-col gap-2 items-end ml-2">
                             <Badge variant="outline">{statusLabels[task.status as keyof typeof statusLabels] || task.status}</Badge>
                             <div className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${priorityColors[task.priority as keyof typeof priorityColors] || 'bg-gray-100'}`}>
-                                {task.priority}
+                                {task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Média' : task.priority === 'low' ? 'Baixa' : task.priority === 'urgent' ? 'Urgente' : task.priority}
                             </div>
                         </div>
                     </div>

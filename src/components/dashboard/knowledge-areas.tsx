@@ -64,91 +64,30 @@ export function KnowledgeAreas({ projectId }: { projectId: string }) {
 }
 
 function KnowledgeAreaCard({ projectId, areaDef, initialContent }: { projectId: string, areaDef: any, initialContent: string }) {
-    const queryClient = useQueryClient()
     const Icon = areaDef.icon
-    const [content, setContent] = useState(initialContent)
-    const [open, setOpen] = useState(false)
-
-    const mutation = useMutation({
-        mutationFn: async (newContent: string) => {
-            const res = await api['knowledge-areas'][':projectId'][':area'].$put({
-                param: { projectId, area: areaDef.id },
-                json: { content: newContent }
-            })
-            if (!res.ok) throw new Error()
-            return res.json()
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['knowledge-areas', projectId] })
-            setOpen(false)
-        }
-    })
-
-    const handleSave = () => {
-        mutation.mutate(content)
-    }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <div className="relative group cursor-pointer" onClick={() => setOpen(true)}>
-                <div className="bg-[#1d4e46] hover:bg-[#256056] text-white rounded-lg p-4 flex items-center justify-between transition-all shadow-md hover:shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-white/10 p-2 rounded-lg">
-                            <Icon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-lg">{areaDef.title}</h3>
-                            <p className="text-xs text-white/70">{areaDef.desc}</p>
-                        </div>
+        <a href={`/projects/${projectId}/knowledge-areas/${areaDef.id}`} className="relative group cursor-pointer block">
+            <div className="bg-[#1d4e46] hover:bg-[#256056] text-white rounded-lg p-4 flex items-center justify-between transition-all shadow-md hover:shadow-lg">
+                <div className="flex items-center gap-4">
+                    <div className="bg-white/10 p-2 rounded-lg">
+                        <Icon className="w-6 h-6 text-white" />
                     </div>
+                    <div>
+                        <h3 className="font-bold text-lg">{areaDef.title}</h3>
+                        <p className="text-xs text-white/70">{areaDef.desc}</p>
+                    </div>
+                </div>
 
-                    <div className="flex items-center gap-2">
-                        {/* "Clique para abrir" badge - usually hidden or on hover, or always visible based on design */}
-                        <div className="hidden group-hover:flex items-center px-2 py-1 bg-yellow-500/90 text-black text-[10px] font-bold rounded-full uppercase tracking-wide animate-in fade-in">
-                            Clique para abrir
-                        </div>
-                        <div className="bg-sky-400/20 p-2 rounded-full group-hover:bg-sky-400/40 transition-colors">
-                            <Search className="w-5 h-5 text-sky-300 group-hover:text-white" />
-                        </div>
+                <div className="flex items-center gap-2">
+                    <div className="hidden group-hover:flex items-center px-2 py-1 bg-yellow-500/90 text-black text-[10px] font-bold rounded-full uppercase tracking-wide animate-in fade-in">
+                        Clique para detalhar
+                    </div>
+                    <div className="bg-sky-400/20 p-2 rounded-full group-hover:bg-sky-400/40 transition-colors">
+                        <Search className="w-5 h-5 text-sky-300 group-hover:text-white" />
                     </div>
                 </div>
             </div>
-
-            <DialogContent className="sm:max-w-[700px]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-xl">
-                        <div className="bg-primary/10 p-2 rounded">
-                            <Icon className="w-6 h-6 text-primary" />
-                        </div>
-                        {areaDef.title}
-                    </DialogTitle>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
-                    <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                        {areaDef.desc}
-                    </p>
-
-                    <div className="space-y-2">
-                        <label className="text-sm font-semibold">Conteúdo e Definições</label>
-                        <Textarea
-                            placeholder={`Descreva os detalhes de ${areaDef.title} para este projeto...`}
-                            className="min-h-[300px] resize-y"
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                    <Button onClick={handleSave} disabled={mutation.isPending}>
-                        {mutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        <Save className="w-4 h-4 mr-2" />
-                        Salvar Alterações
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
+        </a>
     )
 }
