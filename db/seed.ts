@@ -372,6 +372,25 @@ async function seed() {
                     });
                 }
             }
+
+            // Appointments
+            const appointmentEvents = [
+                { desc: "Reunião de Kick-off", dayOffset: 0 },
+                { desc: "Apresentação de Status", dayOffset: 5 },
+                { desc: "Workshop com Stakeholders", dayOffset: 10 }
+            ];
+
+            for (const apt of appointmentEvents) {
+                const aptDate = new Date();
+                aptDate.setDate(aptDate.getDate() + apt.dayOffset);
+
+                await db.insert(appointments).values({
+                    id: nanoid(),
+                    projectId,
+                    description: apt.desc,
+                    date: aptDate
+                });
+            }
         }
 
         console.log('✅ Seeding complete!');

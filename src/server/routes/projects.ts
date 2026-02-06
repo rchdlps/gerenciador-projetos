@@ -55,6 +55,9 @@ app.post('/',
         const sessionUser = c.get('user')
         const { name, description, organizationId } = c.req.valid('json')
 
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+
         // Verify user has access to this organization
         const membership = await db.query.memberships.findFirst({
             where: and(
@@ -63,14 +66,14 @@ app.post('/',
             )
         })
 
-        if (!membership) {
-            // Check for super_admin if we want admins to create anywhere, but for now stick to scope.
-            // Just renaming user -> sessionUser for consistency if desired, but not strictly needed.
+        const isSuperAdmin = user && user.globalRole === 'super_admin'
+
+        if (!membership && !isSuperAdmin) {
             return c.json({ error: 'Forbidden: You do not have access to this organization' }, 403)
         }
 
         // Optional: Check if role allows creation (e.g. viewer cannot create)
-        if (membership.role === 'viewer') {
+        if (membership && membership.role === 'viewer' && !isSuperAdmin) {
             return c.json({ error: 'Forbidden: Viewers cannot create projects' }, 403)
         }
 

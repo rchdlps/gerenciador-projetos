@@ -59,6 +59,12 @@ app.get('/', async (c) => {
     }
 
     const results = await appointmentsQuery
+    console.log(`[DEBUG] Appointments Request:`, {
+        userId: session.user.id,
+        role: user?.globalRole,
+        // orgIds: orgIds || 'super_admin',
+        count: results.length
+    })
     return c.json(results)
 })
 
@@ -79,6 +85,12 @@ app.get('/:projectId', async (c) => {
         .from(appointments)
         .where(eq(appointments.projectId, projectId))
         .orderBy(desc(appointments.date))
+
+    console.log(`[DEBUG] Project Appointments:`, {
+        projectId,
+        count: projectAppointments.length,
+        first: projectAppointments[0]
+    })
 
     return c.json(projectAppointments)
 })

@@ -8,13 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, ArrowRight, Folder, Landmark, Building2 } from "lucide-react"
+import { Plus, ArrowRight, Folder, Landmark, Building2, Search, Filter } from "lucide-react"
 
 type Project = {
     id: string
     name: string
     description: string | null
     updatedAt: string
+    organizationId?: string
 }
 
 type Organization = {
@@ -30,6 +31,8 @@ export function ProjectList() {
     const [name, setName] = useState("")
     const [desc, setDesc] = useState("")
     const [selectedOrg, setSelectedOrg] = useState<string>("")
+    const [searchTerm, setSearchTerm] = useState("")
+    const [filterOrg, setFilterOrg] = useState("all")
 
     // Fetch User Organizations
     const { data: organizations, isLoading: isLoadingOrgs } = useQuery<Organization[]>({
@@ -87,10 +90,23 @@ export function ProjectList() {
         return org ? `${org.code} - ${org.name}` : "Outra Secretaria";
     }
 
+    // Local Search & Filter
+    const filteredProjects = projects?.filter(p => {
+        const term = searchTerm.toLowerCase()
+        const matchesSearch = p.name.toLowerCase().includes(term) ||
+            (p.description?.toLowerCase() || "").includes(term)
+
+        const matchesOrg = filterOrg === "all" ||
+            (filterOrg === "personal" && !p.organizationId) ||
+            p.organizationId === filterOrg
+
+        return matchesSearch && matchesOrg
+    })
+
     const groupedProjects: Record<string, Project[]> = {};
-    if (projects) {
-        projects.forEach(p => {
-            const orgId = (p as any).organizationId || 'personal';
+    if (filteredProjects) {
+        filteredProjects.forEach(p => {
+            const orgId = p.organizationId || 'personal';
             if (!groupedProjects[orgId]) groupedProjects[orgId] = [];
             groupedProjects[orgId].push(p);
         });
@@ -148,6 +164,39 @@ export function ProjectList() {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 bg-muted/20 p-4 rounded-lg border">
+                <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Buscar projetos por nome ou descrição..."
+                        className="pl-9 bg-background"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="w-full sm:w-[300px]">
+                    <Select value={filterOrg} onValueChange={setFilterOrg}>
+                        <SelectTrigger className="bg-background">
+                            <div className="flex items-center gap-2 w-full overflow-hidden">
+                                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="truncate">
+                                    <SelectValue placeholder="Filtrar por Secretaria" />
+                                </span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todas as Secretarias</SelectItem>
+                            {organizations?.map((org) => (
+                                <SelectItem key={org.id} value={org.id}>
+                                    {org.code} - {org.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {Object.keys(groupedProjects).length === 0 ? (
