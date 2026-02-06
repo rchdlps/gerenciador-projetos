@@ -1,0 +1,15 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { ProjectPage } from "@/components/dashboard/project-page";
+import { auth } from "@/lib/auth";
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) return Astro.redirect("/login");
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/");
+---
+
+<DashboardLayout title="Detalhes do Projeto">
+    <ProjectPage client:load id={id} />
+</DashboardLayout>

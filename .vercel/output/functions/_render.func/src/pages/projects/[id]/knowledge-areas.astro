@@ -1,0 +1,32 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { KnowledgeAreasPage } from "@/components/dashboard/knowledge-areas-page";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { auth } from "@/lib/auth";
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) return Astro.redirect("/login");
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/");
+---
+
+<DashboardLayout title="Áreas de Conhecimento">
+    <div class="space-y-6">
+        <div class="flex items-center gap-2">
+            <Button variant="ghost" class="pl-0 hover:bg-transparent" asChild>
+                <a href={`/projects/${id}`} class="flex items-center gap-2 text-primary font-semibold">
+                    <ArrowLeft class="h-4 w-4" /> Voltar para o Projeto
+                </a>
+            </Button>
+        </div>
+
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Áreas de Conhecimento</h1>
+            <p class="text-slate-500">Gerencie e documente os aspectos técnicos do projeto.</p>
+        </div>
+
+        <KnowledgeAreasPage client:load projectId={id} />
+    </div>
+</DashboardLayout>
