@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { createPortal } from "react-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
@@ -18,6 +18,7 @@ interface BoardCard {
     content: string // Fallback
     priority: string
     status: string
+    order: number
     assignee?: {
         name: string
         image: string
@@ -34,6 +35,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
     const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
     const [activeCard, setActiveCard] = useState<BoardCard | null>(null)
+    const activeColumnId = useRef<string | null>(null)
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -45,7 +47,12 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         queryFn: async () => {
             const res = await api.board[':projectId'].$get({ param: { projectId } })
             if (!res.ok) throw new Error()
-            return res.json()
+            const data = await res.json() as BoardColumn[]
+            // Ensure cards are sorted by order
+            return data.map(col => ({
+                ...col,
+                cards: col.cards.sort((a, b) => a.order - b.order)
+            }))
         }
     })
 
@@ -81,6 +88,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
             const card = col.cards.find(c => c.id === active.id);
             if (card) {
                 setActiveCard(card);
+                activeColumnId.current = col.id;
                 return;
             }
         }
@@ -140,6 +148,8 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         const { active, over } = event;
         setActiveId(null);
         setActiveCard(null);
+        const sourceColumnId = activeColumnId.current;
+        activeColumnId.current = null;
 
         if (!over) return;
 
@@ -215,6 +225,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
         // We only really need to send updates for the modified columns
         // For simplicity, let's send updates for all cards in modified columns (source and dest)
         const columnsToUpdate = new Set([sourceColumn.id, destColumn.id]);
+        if (sourceColumnId) columnsToUpdate.add(sourceColumnId);
 
         newColumns.forEach(col => {
             if (columnsToUpdate.has(col.id)) {
