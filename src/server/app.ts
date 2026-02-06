@@ -18,23 +18,25 @@ const app = new Hono().basePath('/api')
 
 app.use('*', logger())
 
-app.route('/projects', projectsRouter)
-app.route('/stakeholders', stakeholdersRouter)
-app.route('/board', boardRouter)
-app.route('/knowledge-areas', knowledgeAreasRouter)
-app.route('/organizations', organizationsRouter)
-app.route('/admin', adminRouter)
-app.route('/phases', phasesRouter)
-app.route('/tasks', tasksRouter)
-app.route('/appointments', appointmentsRouter)
-app.route('/storage', storageRouter)
-app.route('/project-charter', projectCharterRouter)
-app.route('/schedule', scheduleRouter)
-app.route('/quality', qualityRouter)
+// Register Routes
+const apiRoutes = app
+    .route('/projects', projectsRouter)
+    .route('/stakeholders', stakeholdersRouter)
+    .route('/board', boardRouter)
+    .route('/knowledge-areas', knowledgeAreasRouter)
+    .route('/organizations', organizationsRouter)
+    .route('/admin', adminRouter)
+    .route('/phases', phasesRouter)
+    .route('/tasks', tasksRouter)
+    .route('/appointments', appointmentsRouter)
+    .route('/storage', storageRouter)
+    .route('/project-charter', projectCharterRouter)
+    .route('/schedule', scheduleRouter)
+    .route('/quality', qualityRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })
 })
 
-export type AppType = typeof app
+export type AppType = typeof apiRoutes
 export default app
