@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { stakeholders, projects, users } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -73,6 +74,16 @@ app.post('/:projectId',
             email
         }).returning()
 
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'CREATE',
+            resource: 'stakeholder',
+            resourceId: id,
+            metadata: { name, role, level, projectId }
+        })
+
         return c.json(newStakeholder)
     }
 )
@@ -110,6 +121,16 @@ app.put('/:id',
             .where(eq(stakeholders.id, id))
             .returning()
 
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'UPDATE',
+            resource: 'stakeholder',
+            resourceId: id,
+            metadata: { name, role, level }
+        })
+
         return c.json(updated)
     }
 )
@@ -135,6 +156,17 @@ app.delete('/:id', async (c) => {
     }
 
     await db.delete(stakeholders).where(eq(stakeholders.id, id))
+
+    // Audit log
+    await createAuditLog({
+        userId: session.user.id,
+        organizationId: project.organizationId,
+        action: 'DELETE',
+        resource: 'stakeholder',
+        resourceId: id,
+        metadata: { name: stakeholder.name, projectId: project.id }
+    })
+
     return c.json({ success: true })
 })
 

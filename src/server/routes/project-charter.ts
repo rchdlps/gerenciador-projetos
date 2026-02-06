@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { projectCharters, projects, users } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -73,6 +74,17 @@ app.put('/:projectId',
                 })
                 .where(eq(projectCharters.id, existing.id))
                 .returning()
+
+            // Audit log for UPDATE
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'UPDATE',
+                resource: 'project_charter',
+                resourceId: existing.id,
+                metadata: { projectId }
+            })
+
             return c.json(updated)
         } else {
             const [created] = await db.insert(projectCharters).values({
@@ -80,6 +92,17 @@ app.put('/:projectId',
                 projectId,
                 ...data
             }).returning()
+
+            // Audit log for CREATE
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'CREATE',
+                resource: 'project_charter',
+                resourceId: created.id,
+                metadata: { projectId }
+            })
+
             return c.json(created)
         }
     }

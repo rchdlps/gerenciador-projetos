@@ -169,6 +169,18 @@ async function seed() {
                     organizationId: m.orgId,
                     role: m.role as any
                 });
+
+                // Audit log for membership creation
+                await db.insert(auditLogs).values({
+                    id: nanoid(),
+                    userId: userId, // Use the created user as creator for now
+                    organizationId: m.orgId,
+                    action: p.globalRole === 'super_admin' ? 'CREATE' : 'UPDATE',
+                    resource: p.globalRole === 'super_admin' ? 'user' : 'membership',
+                    resourceId: userId,
+                    metadata: JSON.stringify({ email: p.email, name: p.name, orgRole: m.role }),
+                    createdAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000) // 35 days ago
+                });
             }
             console.log(`👤 Created ${p.name} (${p.email}) with password 'password123'`);
         }
@@ -262,15 +274,28 @@ async function seed() {
                 }
             }
 
-            // Audit Log
+            // Audit Logs - Organization creation (simulate admin creating orgs)
+            await db.insert(auditLogs).values({
+                id: nanoid(),
+                userId: adminUser.id,
+                organizationId: p.orgId,
+                action: 'CREATE',
+                resource: 'organization',
+                resourceId: p.orgId,
+                metadata: JSON.stringify({ name: p.name, source: 'seed', action: 'initial_setup' }),
+                createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
+            });
+
+            // Audit Log - Project creation
             await db.insert(auditLogs).values({
                 id: nanoid(),
                 userId: p.userId,
                 organizationId: p.orgId,
                 action: 'CREATE',
-                resource: 'PROJECT',
+                resource: 'project',
                 resourceId: projectId,
-                metadata: JSON.stringify({ name: p.name, source: 'seed' })
+                metadata: JSON.stringify({ name: p.name, description: p.description }),
+                createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) // 20 days ago
             });
 
             // Stakeholders
@@ -293,6 +318,18 @@ async function seed() {
                     role: st.role,
                     level: st.level,
                     email: `${st.name.toLowerCase().replace(/ /g, '.')}@example.com`
+                });
+
+                // Audit log for stakeholder creation
+                await db.insert(auditLogs).values({
+                    id: nanoid(),
+                    userId: p.userId,
+                    organizationId: p.orgId,
+                    action: 'CREATE',
+                    resource: 'stakeholder',
+                    resourceId: stId,
+                    metadata: JSON.stringify({ name: st.name, role: st.role, level: st.level, projectId }),
+                    createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) // 15 days ago
                 });
             }
 
@@ -352,6 +389,18 @@ async function seed() {
                     order: phaseOrder++
                 });
 
+                // Audit log for phase creation
+                await db.insert(auditLogs).values({
+                    id: nanoid(),
+                    userId: p.userId,
+                    organizationId: p.orgId,
+                    action: 'CREATE',
+                    resource: 'phase',
+                    resourceId: phaseId,
+                    metadata: JSON.stringify({ name: phase.name, projectId }),
+                    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) // 14 days ago
+                });
+
                 let taskOrder = 0;
                 for (const task of phase.tasks) {
                     const taskDate = new Date();
@@ -359,20 +408,52 @@ async function seed() {
 
                     // Assign a random stakeholder
                     const randomStakeholderId = createdStakeholderIds[Math.floor(Math.random() * createdStakeholderIds.length)];
+                    const taskId = nanoid();
 
                     await db.insert(tasks).values({
-                        id: nanoid(),
+                        id: taskId,
                         phaseId,
                         title: task.title,
                         description: task.description,
                         priority: task.priority,
                         status: task.status,
                         assigneeId: p.userId,
-                        stakeholderId: randomStakeholderId, // Assigning random stakeholder
+                        stakeholderId: randomStakeholderId,
                         order: taskOrder++,
                         startDate: taskDate,
-                        endDate: taskDate // Check if calendar uses startDate or endDate. Usually EndDate implies due date.
+                        endDate: taskDate
                     });
+
+                    // Audit log for task creation
+                    await db.insert(auditLogs).values({
+                        id: nanoid(),
+                        userId: p.userId,
+                        organizationId: p.orgId,
+                        action: 'CREATE',
+                        resource: 'task',
+                        resourceId: taskId,
+                        metadata: JSON.stringify({ title: task.title, status: task.status, projectId }),
+                        createdAt: new Date(Date.now() - (13 - phaseOrder) * 24 * 60 * 60 * 1000) // Varied timestamps
+                    });
+
+                    // Add some UPDATE audit logs for tasks that are done or in_progress
+                    if (task.status === 'done' || task.status === 'in_progress') {
+                        await db.insert(auditLogs).values({
+                            id: nanoid(),
+                            userId: p.userId,
+                            organizationId: p.orgId,
+                            action: 'UPDATE',
+                            resource: 'task',
+                            resourceId: taskId,
+                            metadata: JSON.stringify({
+                                title: task.title,
+                                status: task.status,
+                                changes: ['status'],
+                                previousStatus: 'todo'
+                            }),
+                            createdAt: new Date(Date.now() - (10 - phaseOrder) * 24 * 60 * 60 * 1000)
+                        });
+                    }
                 }
             }
 

@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { projects, memberships, users, projectPhases } from '../../../db/schema'
 import { eq, desc, inArray, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
-import { logAction } from '@/lib/audit'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -107,11 +107,11 @@ app.post('/',
         }
 
         // Audit Log
-        await logAction({
+        await createAuditLog({
             userId: sessionUser.id,
             organizationId,
             action: 'CREATE',
-            resource: 'PROJECT',
+            resource: 'project',
             resourceId: id,
             metadata: { name }
         })

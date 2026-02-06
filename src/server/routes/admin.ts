@@ -2,9 +2,10 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { users, organizations, memberships, globalRolesEnum } from '../../../db/schema'
+import { users, organizations, memberships, globalRolesEnum, auditLogs } from '../../../db/schema'
 import { eq, like, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -228,6 +229,16 @@ app.post('/users',
             }
         }
 
+        // Audit log for user creation or membership change
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: organizationId || null,
+            action: existingUser ? 'UPDATE' : 'CREATE',
+            resource: existingUser ? 'membership' : 'user',
+            resourceId: userId,
+            metadata: { email, name, orgRole, organizationId }
+        })
+
         return c.json({ success: true, userId })
     }
 )
@@ -319,5 +330,114 @@ app.patch('/users/:id',
         return c.json({ success: true })
     }
 )
+
+// GET /api/admin/audit-logs
+// Fetch audit logs with user information, filtering, pagination, and search
+app.get('/audit-logs', async (c) => {
+    const session = await getSession(c)
+    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+    // Get query parameters
+    const page = parseInt(c.req.query('page') || '1')
+    const limit = Math.min(parseInt(c.req.query('limit') || '20'), 100) // Max 100
+    const action = c.req.query('action') // CREATE, UPDATE, DELETE
+    const resource = c.req.query('resource')
+    const search = c.req.query('search') // User name or email
+    const dateFrom = c.req.query('dateFrom') // ISO date string
+    const dateTo = c.req.query('dateTo')
+    const organizationId = c.req.query('organizationId')
+
+    const offset = (page - 1) * limit
+
+    // Check if user is super admin
+    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
+    const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+
+    // Build dynamic where conditions
+    const conditions: any[] = []
+
+    if (action) {
+        conditions.push(eq(auditLogs.action, action))
+    }
+
+    if (resource) {
+        conditions.push(eq(auditLogs.resource, resource))
+    }
+
+    if (dateFrom) {
+        conditions.push(sql`${auditLogs.createdAt} >= ${new Date(dateFrom)}`)
+    }
+
+    if (dateTo) {
+        conditions.push(sql`${auditLogs.createdAt} <= ${new Date(dateTo)}`)
+    }
+
+    if (search) {
+        conditions.push(
+            sql`${users.name} ILIKE ${`%${search}%`} OR ${users.email} ILIKE ${`%${search}%`}`
+        )
+    }
+
+    if (organizationId) {
+        conditions.push(eq(auditLogs.organizationId, organizationId))
+    }
+
+    // Non-super admins can only see logs from their organizations
+    if (!isSuperAdmin) {
+        const myMemberships = await db.select({ orgId: memberships.organizationId })
+            .from(memberships)
+            .where(eq(memberships.userId, session.user.id))
+
+        const myOrgIds = myMemberships.map(m => m.orgId)
+        if (myOrgIds.length > 0) {
+            conditions.push(inArray(auditLogs.organizationId, myOrgIds))
+        } else {
+            // No orgs = no logs
+            return c.json({ logs: [], pagination: { page, limit, total: 0, totalPages: 0 } })
+        }
+    }
+
+    // Build where clause
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+
+    // Get total count
+    const [{ count }] = await db.select({
+        count: sql<number>`count(*)::int`
+    })
+        .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .where(whereClause)
+
+    // Fetch paginated logs
+    const logs = await db.select({
+        id: auditLogs.id,
+        action: auditLogs.action,
+        resource: auditLogs.resource,
+        resourceId: auditLogs.resourceId,
+        metadata: auditLogs.metadata,
+        createdAt: auditLogs.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+        organizationId: auditLogs.organizationId
+    })
+        .from(auditLogs)
+        .leftJoin(users, eq(auditLogs.userId, users.id))
+        .where(whereClause)
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(limit)
+        .offset(offset)
+
+    const totalPages = Math.ceil(count / limit)
+
+    return c.json({
+        logs,
+        pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages
+        }
+    })
+})
 
 export default app

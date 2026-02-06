@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { appointments, projects, users, memberships } from '../../../db/schema'
 import { eq, desc, and, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -120,6 +121,16 @@ app.post('/',
             date: new Date(date)
         }).returning()
 
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'CREATE',
+            resource: 'appointment',
+            resourceId: id,
+            metadata: { description, date, projectId }
+        })
+
         return c.json(newAppointment)
     }
 )
@@ -130,7 +141,25 @@ app.delete('/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Get appointment info before deletion
+    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id))
+    const [project] = appointment ? await db.select().from(projects).where(eq(projects.id, appointment.projectId)) : [null]
+
     await db.delete(appointments).where(eq(appointments.id, id))
+
+    // Audit log
+    if (appointment) {
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project?.organizationId || null,
+            action: 'DELETE',
+            resource: 'appointment',
+            resourceId: id,
+            metadata: { description: appointment.description, projectId: appointment.projectId }
+        })
+    }
+
     return c.json({ success: true })
 })
 

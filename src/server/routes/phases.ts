@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { projectPhases, tasks, projects, users, stakeholders } from '../../../db/schema'
 import { eq, asc, desc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -113,6 +114,16 @@ app.post('/:projectId',
             order: nextOrder
         }).returning()
 
+        //Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'CREATE',
+            resource: 'phase',
+            resourceId: id,
+            metadata: { name, projectId }
+        })
+
         return c.json(newPhase)
     }
 )
@@ -194,6 +205,16 @@ app.patch('/:id',
             .where(eq(projectPhases.id, id))
             .returning()
 
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'UPDATE',
+            resource: 'phase',
+            resourceId: id,
+            metadata: { name, projectId: project.id }
+        })
+
         return c.json(updatedPhase)
     }
 )
@@ -223,6 +244,17 @@ app.delete('/:id', async (c) => {
     if (!isOwner && !isSuperAdmin) return c.json({ error: 'Forbidden' }, 403)
 
     await db.delete(projectPhases).where(eq(projectPhases.id, id))
+
+    // Audit log
+    await createAuditLog({
+        userId: session.user.id,
+        organizationId: project.organizationId,
+        action: 'DELETE',
+        resource: 'phase',
+        resourceId: id,
+        metadata: { name: phase.name, projectId: project.id }
+    })
+
     return c.json({ success: true })
 })
 

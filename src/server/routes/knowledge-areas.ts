@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { knowledgeAreas, projects, users, knowledgeAreaChanges } from '../../../db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -70,6 +71,17 @@ app.put('/:projectId/:area',
                 .set({ content, updatedAt: new Date() })
                 .where(eq(knowledgeAreas.id, existing.id))
                 .returning()
+
+            // Audit log for UPDATE
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'UPDATE',
+                resource: 'knowledge_area',
+                resourceId: existing.id,
+                metadata: { area, projectId }
+            })
+
             return c.json(updated)
         } else {
             const [created] = await db.insert(knowledgeAreas).values({
@@ -78,6 +90,17 @@ app.put('/:projectId/:area',
                 area,
                 content
             }).returning()
+
+            // Audit log for CREATE
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'CREATE',
+                resource: 'knowledge_area',
+                resourceId: created.id,
+                metadata: { area, projectId }
+            })
+
             return c.json(created)
         }
     }
@@ -143,6 +166,20 @@ app.post('/:areaId/changes',
             status: data.status,
             date: new Date(data.date)
         }).returning()
+
+        // Get knowledge area for project context
+        const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, areaId))
+        const [project] = ka ? await db.select().from(projects).where(eq(projects.id, ka.projectId)) : [null]
+
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project?.organizationId || null,
+            action: 'CREATE',
+            resource: 'knowledge_area_change',
+            resourceId: created.id,
+            metadata: { description: data.description, type: data.type, status: data.status }
+        })
 
         return c.json(created)
     }

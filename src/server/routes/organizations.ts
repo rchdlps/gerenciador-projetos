@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { organizations, memberships, users } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -108,6 +109,16 @@ app.post('/',
             role: 'secretario'
         })
 
+        // Audit log
+        await createAuditLog({
+            userId: user.id,
+            organizationId: id,
+            action: 'CREATE',
+            resource: 'organization',
+            resourceId: id,
+            metadata: { name, code }
+        })
+
         return c.json({ id, name, code })
     }
 )
@@ -143,6 +154,16 @@ app.put('/:id',
                 updatedAt: new Date()
             })
             .where(eq(organizations.id, id))
+
+        // Audit log
+        await createAuditLog({
+            userId: user.id,
+            organizationId: id,
+            action: 'UPDATE',
+            resource: 'organization',
+            resourceId: id,
+            metadata: { name, code, changes: ['name', 'code', 'logoUrl', 'secretario'] }
+        })
 
         return c.json({ id, name, code, logoUrl })
     }

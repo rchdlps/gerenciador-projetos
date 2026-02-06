@@ -7,6 +7,7 @@ import { attachments } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -68,6 +69,16 @@ app.post('/confirm',
             uploadedBy: session.user.id
         }).returning()
 
+        // Audit log for file upload
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: null, // Files don't have direct org association
+            action: 'CREATE',
+            resource: 'attachment',
+            resourceId: attachment.id,
+            metadata: { fileName: data.fileName, fileType: data.fileType, entityType: data.entityType, entityId: data.entityId }
+        })
+
         const signedUrl = await storage.getDownloadUrl(data.key)
 
         return c.json({ ...attachment, url: signedUrl })
@@ -113,6 +124,16 @@ app.delete('/:id', async (c) => {
 
     // Delete from DB
     await db.delete(attachments).where(eq(attachments.id, id))
+
+    // Audit log for file deletion
+    await createAuditLog({
+        userId: session.user.id,
+        organizationId: null,
+        action: 'DELETE',
+        resource: 'attachment',
+        resourceId: id,
+        metadata: { fileName: file.fileName, entityType: file.entityType, entityId: file.entityId }
+    })
 
     return c.json({ success: true })
 })

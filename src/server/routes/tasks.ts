@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { tasks, projectPhases, projects, users, memberships } from '../../../db/schema'
 import { eq, or, isNotNull, and, inArray, asc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
+import { createAuditLog } from '@/lib/audit-logger'
 
 const app = new Hono()
 
@@ -110,6 +111,20 @@ app.post('/',
             status: data.status || 'todo'
         }).returning()
 
+        // Get project info for audit log
+        const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, data.phaseId))
+        const [project] = phase ? await db.select().from(projects).where(eq(projects.id, phase.projectId)) : [null]
+
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project?.organizationId || null,
+            action: 'CREATE',
+            resource: 'task',
+            resourceId: id,
+            metadata: { title: data.title, status: data.status || 'todo', projectId: project?.id }
+        })
+
         return c.json(newTask)
     }
 )
@@ -179,6 +194,20 @@ app.patch('/:id',
             .where(eq(tasks.id, id))
             .returning()
 
+        // Get project info for audit log
+        const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, updatedTask.phaseId))
+        const [project] = phase ? await db.select().from(projects).where(eq(projects.id, phase.projectId)) : [null]
+
+        // Audit log
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project?.organizationId || null,
+            action: 'UPDATE',
+            resource: 'task',
+            resourceId: id,
+            metadata: { title: updateData.title, status: updateData.status, changes: Object.keys(updateData) }
+        })
+
         return c.json(updatedTask)
     }
 )
@@ -189,7 +218,26 @@ app.delete('/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Get task info before deletion for audit log
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id))
+    const [phase] = task ? await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId)) : [null]
+    const [project] = phase ? await db.select().from(projects).where(eq(projects.id, phase.projectId)) : [null]
+
     await db.delete(tasks).where(eq(tasks.id, id))
+
+    // Audit log
+    if (task) {
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project?.organizationId || null,
+            action: 'DELETE',
+            resource: 'task',
+            resourceId: id,
+            metadata: { title: task.title, projectId: project?.id }
+        })
+    }
+
     return c.json({ success: true })
 })
 
