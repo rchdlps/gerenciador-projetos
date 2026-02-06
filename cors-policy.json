@@ -1,0 +1,21 @@
+{
+    "CORSRules": [
+        {
+            "AllowedHeaders": [
+                "*"
+            ],
+            "AllowedMethods": [
+                "GET",
+                "PUT",
+                "POST",
+                "DELETE",
+                "HEAD"
+            ],
+            "AllowedOrigins": [
+                "https://gerenciador-projetos-two.vercel.app",
+                "http://localhost:4321"
+            ],
+            "ExposeHeaders": []
+        }
+    ]
+}
