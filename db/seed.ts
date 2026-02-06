@@ -6,20 +6,23 @@ if (!globalThis.crypto) {
     globalThis.crypto = webcrypto;
 }
 
-import { drizzle } from 'drizzle-orm/postgres-js';
+import { drizzle } from 'drizzle-orm/neon-serverless';
 import { eq } from 'drizzle-orm';
-import postgres from 'postgres';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import { nanoid } from 'nanoid';
 import { users, projects, stakeholders, boardColumns, boardCards, knowledgeAreas, organizations, memberships, auditLogs, accounts, sessions, projectPhases, tasks, appointments, attachments } from './schema';
 import * as schema from './schema';
 import { auth } from '../src/lib/auth';
+
+neonConfig.webSocketConstructor = ws;
 
 const connectionString = process.env.DATABASE_URL!;
 if (!connectionString) {
     throw new Error('DATABASE_URL is not defined in .env');
 }
 
-const client = postgres(connectionString, { prepare: false });
+const client = new Pool({ connectionString });
 const db = drizzle(client, { schema });
 
 async function seed() {
