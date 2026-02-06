@@ -25,17 +25,24 @@ app.post('/presigned-url',
         entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        try {
+            const session = await getSession(c)
+            if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
-        const { fileName, fileType, entityId } = c.req.valid('json')
+            const { fileName, fileType, entityId } = c.req.valid('json')
 
-        // Create a unique key: entityType/entityId/random-fileName
-        const key = `${entityId}/${nanoid()}-${fileName}`
+            // Create a unique key: entityType/entityId/random-fileName
+            const key = `${entityId}/${nanoid()}-${fileName}`
 
-        const url = await storage.getUploadUrl(key, fileType)
+            console.log(`[Storage] Generating presigned URL for ${key} in bucket region...`)
+            const url = await storage.getUploadUrl(key, fileType)
+            console.log(`[Storage] Success: ${url}`)
 
-        return c.json({ url, key })
+            return c.json({ url, key })
+        } catch (error: any) {
+            console.error('[Storage Error] Failed to generate presigned URL:', error)
+            return c.json({ error: error.message }, 500)
+        }
     }
 )
 
