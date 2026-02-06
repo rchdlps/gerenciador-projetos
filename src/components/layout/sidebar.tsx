@@ -1,4 +1,4 @@
-import { Home, LayoutDashboard, Settings, Layers, FolderDot, Building2, BookOpen, Calendar, ArrowLeft } from "lucide-react"
+import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 
@@ -45,12 +45,12 @@ export function Sidebar() {
                     </h3>
                     <div className="space-y-1">
                         <a href="/" className={getLinkClass(isActive("/"))}>
-                            <LayoutDashboard className={cn("w-4 h-4 group-hover:text-primary", isActive("/") ? "text-primary" : "text-muted-foreground")} />
-                            Dashboard
+                            <Briefcase className={cn("w-4 h-4 group-hover:text-primary", isActive("/") ? "text-primary" : "text-muted-foreground")} />
+                            Projetos
                         </a>
-                        <a href="/kanban" className={getLinkClass(isActive("/kanban"))}>
-                            <Layers className={cn("w-4 h-4 group-hover:text-primary", isActive("/kanban") ? "text-primary" : "text-muted-foreground")} />
-                            Minhas Tarefas
+                        <a href="/dashboard" className={getLinkClass(isActive("/dashboard"))}>
+                            <LayoutDashboard className={cn("w-4 h-4 group-hover:text-primary", isActive("/dashboard") ? "text-primary" : "text-muted-foreground")} />
+                            Dashboard
                         </a>
                     </div>
                 </div>
@@ -84,18 +84,6 @@ export function Sidebar() {
                     </div>
                 )}
 
-                {/* Hierarchy Section */}
-                <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2 flex justify-between items-center bg-slate-100 p-1.5 rounded">
-                        <span>Unidades (Orgs)</span>
-                        <Building2 className="w-3 h-3 text-slate-500" />
-                    </h3>
-                    <div className="space-y-1 mt-2">
-                        <div className="px-3 py-1.5 text-xs text-muted-foreground italic">
-                            Selecione no Dashboard
-                        </div>
-                    </div>
-                </div>
 
                 {/* Admin Section */}
                 <div>
