@@ -194,3 +194,13 @@ export const knowledgeAreaChanges = pgTable("knowledge_area_changes", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const projectCharters = pgTable("project_charters", {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
+    justification: text("justification"),
+    smartObjectives: text("smart_objectives"),
+    successCriteria: text("success_criteria"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

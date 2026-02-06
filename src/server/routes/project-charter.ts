@@ -1,0 +1,88 @@
+import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
+import { nanoid } from 'nanoid'
+import { db } from '@/lib/db'
+import { projectCharters, projects, users } from '../../../db/schema'
+import { eq, and } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
+
+const app = new Hono()
+
+const getSession = async (c: any) => {
+    return await auth.api.getSession({ headers: c.req.raw.headers });
+}
+
+// Get TAP for Project
+app.get('/:projectId', async (c) => {
+    const session = await getSession(c)
+    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+    const projectId = c.req.param('projectId')
+
+    // Verify Access
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    const [charter] = await db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId))
+
+    if (!charter) {
+        return c.json({
+            justification: "",
+            smartObjectives: "",
+            successCriteria: ""
+        })
+    }
+
+    return c.json(charter)
+})
+
+// Update/Upsert TAP
+app.put('/:projectId',
+    zValidator('json', z.object({
+        justification: z.string().optional(),
+        smartObjectives: z.string().optional(),
+        successCriteria: z.string().optional()
+    })),
+    async (c) => {
+        const session = await getSession(c)
+        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+        const projectId = c.req.param('projectId')
+        const data = c.req.valid('json')
+
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
+        // Check if exists
+        const [existing] = await db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId))
+
+        if (existing) {
+            const [updated] = await db.update(projectCharters)
+                .set({
+                    ...data,
+                    updatedAt: new Date()
+                })
+                .where(eq(projectCharters.id, existing.id))
+                .returning()
+            return c.json(updated)
+        } else {
+            const [created] = await db.insert(projectCharters).values({
+                id: nanoid(),
+                projectId,
+                ...data
+            }).returning()
+            return c.json(created)
+        }
+    }
+)
+
+export default app

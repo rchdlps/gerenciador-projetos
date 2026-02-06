@@ -1,10 +1,11 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { Loader2, Trash2, Paperclip, ChevronLeft, ChevronRight } from "lucide-react"
+import { Loader2, Trash2, Paperclip, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 import { Providers } from "@/components/providers"
 import { ChangeControlSection } from "./change-control-section"
 import { NotesSection } from "./notes-section"
+import { TAPSection } from "./tap-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
 import { toast } from "sonner"
@@ -109,6 +110,9 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            {/* TAP Section - Only for integration */}
+            {area === 'integracao' && <TAPSection projectId={projectId} />}
+
             {/* Notes Section */}
             <NotesSection
                 projectId={projectId}
@@ -160,4 +164,3 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
         </div>
     )
 }
-import { Calendar } from "lucide-react"
