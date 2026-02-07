@@ -13,8 +13,9 @@ export function Sidebar() {
         }
     }, [])
 
-    // Check if user is super admin
-    const isSuperAdmin = session?.user?.globalRole === 'super_admin'
+    // Check if user is super admin (globalRole is a custom field)
+    const user = session?.user as { globalRole?: string } | undefined
+    const isSuperAdmin = user?.globalRole === 'super_admin'
 
     const isActive = (path: string) => currentPath === path
 

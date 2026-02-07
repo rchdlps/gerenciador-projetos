@@ -116,10 +116,11 @@ test.describe('Authentication', () => {
     // Wait for page to be fully loaded
     await expect(page.locator('button:has-text("Sair")')).toBeVisible()
 
-    // Logout - click the "Sair" button
-    const logoutNavigationPromise = page.waitForURL(url => url.pathname === '/login', { timeout: 15000 })
+    // Logout - click the "Sair" button and wait for redirect
     await page.click('button:has-text("Sair")')
-    await logoutNavigationPromise
+
+    // Wait for navigation to login page
+    await page.waitForURL(url => url.pathname === '/login', { timeout: 15000 })
 
     // Should be on login page
     await expect(page).toHaveURL('/login')
