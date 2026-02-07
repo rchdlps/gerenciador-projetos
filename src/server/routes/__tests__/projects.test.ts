@@ -15,7 +15,9 @@ vi.mock('@/lib/db', () => ({
       })),
     })),
     insert: vi.fn(() => ({
-      values: vi.fn(() => Promise.resolve([{ id: 'new-project-id' }])),
+      values: vi.fn(() => ({
+        returning: vi.fn(() => Promise.resolve([{ id: 'new-project-id' }])),
+      })),
     })),
     query: {
       memberships: {
@@ -38,13 +40,13 @@ vi.mock('@/lib/audit-logger', () => ({
 }))
 
 describe('Projects API Routes', () => {
-  let app: Hono
+  let app: Hono<{ Variables: { user: any; session: any } }>
 
   beforeEach(async () => {
     vi.clearAllMocks()
     // Dynamically import the route after mocks are set up
     const projectsRouter = await import('../projects')
-    app = new Hono().route('/projects', projectsRouter.default)
+    app = new Hono<{ Variables: { user: any; session: any } }>().route('/projects', projectsRouter.default)
   })
 
   describe('GET /projects', () => {
@@ -69,14 +71,17 @@ describe('Projects API Routes', () => {
       })
 
       const mockProjects = [mockProject]
-      const mockSelect = vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => Promise.resolve(mockProjects)),
+      const mockSelect = vi.fn()
+        .mockReturnValueOnce({
+          from: vi.fn(() => ({
+            where: vi.fn(() => Promise.resolve([mockSuperAdmin])), // User lookup
           })),
-          orderBy: vi.fn(() => Promise.resolve(mockProjects)),
-        })),
-      }))
+        })
+        .mockReturnValueOnce({
+          from: vi.fn(() => ({
+            orderBy: vi.fn(() => Promise.resolve(mockProjects)), // Projects query
+          })),
+        })
 
       vi.mocked(db.select).mockImplementation(mockSelect as any)
 
@@ -85,7 +90,11 @@ describe('Projects API Routes', () => {
       })
 
       expect(result.status).toBe(200)
-      expect(result.data).toEqual(mockProjects)
+      expect(result.data).toEqual(mockProjects.map(p => ({
+        ...p,
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      })))
     })
 
     it('should return user projects based on organization membership', async () => {
@@ -101,9 +110,7 @@ describe('Projects API Routes', () => {
       const mockSelect = vi.fn()
         .mockReturnValueOnce({
           from: vi.fn(() => ({
-            where: vi.fn(() => ({
-              orderBy: vi.fn(() => Promise.resolve([mockUser])),
-            })),
+            where: vi.fn(() => Promise.resolve([mockUser])),
           })),
         })
         .mockReturnValueOnce({
@@ -183,7 +190,7 @@ describe('Projects API Routes', () => {
       }))
 
       vi.mocked(db.select).mockImplementation(mockSelect as any)
-      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(null)
+      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(undefined)
 
       const result = await testRoute(app, 'POST', '/projects', {
         headers: createAuthHeaders(),
@@ -248,7 +255,7 @@ describe('Projects API Routes', () => {
       }))
 
       vi.mocked(db.select).mockImplementation(mockSelect as any)
-      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(null) // No membership
+      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(undefined) // No membership
 
       const result = await testRoute(app, 'POST', '/projects', {
         headers: createAuthHeaders(),

@@ -37,7 +37,7 @@ export function KnowledgeAreas({ projectId }: { projectId: string }) {
     if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" aria-label="Áreas de Conhecimento">
             {/* Header Info */}
             <div className="bg-sky-50 border-l-4 border-[#1d4e46] p-4 rounded-r flex gap-3 text-sm text-[#1d4e46] items-start shadow-sm">
                 <Lightbulb className="w-5 h-5 shrink-0 text-yellow-600 mt-0.5" />

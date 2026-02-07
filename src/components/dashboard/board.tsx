@@ -7,7 +7,6 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Plus, GripVertical, Calendar, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -245,7 +244,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
     if (isLoading) return <div>Carregando Quadro...</div>
 
     return (
-        <div className="space-y-4 py-6">
+        <div className="space-y-4 py-6" aria-label="Quadro Scrumban">
             <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-foreground">Quadro Scrumban</h3>
                 {/* Removed Add Column as columns are fixed */}

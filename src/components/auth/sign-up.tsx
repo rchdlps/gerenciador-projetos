@@ -35,7 +35,7 @@ export default function SignUp() {
     return (
         <div className="space-y-6">
             <div className="space-y-2 text-center">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Novo Cadastro</h1>
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">Novo Cadastro</h2>
                 <p className="text-sm text-muted-foreground">
                     Crie sua credencial de acesso
                 </p>

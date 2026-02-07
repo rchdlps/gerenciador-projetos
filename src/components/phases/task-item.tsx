@@ -47,7 +47,7 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
     }
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
+        <div ref={setNodeRef} style={style} {...attributes} aria-label={`Tarefa: ${task.title}`}>
             <Card
                 className="mb-2 hover:shadow-md transition-shadow border-l-4 group"
                 style={{ borderLeftColor: task.status === 'done' ? '#10b981' : '#e5e7eb' }}

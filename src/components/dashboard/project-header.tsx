@@ -22,7 +22,7 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
     const diretoriaTecnicaName = organization?.diretoriaTecnica || "-"
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10" aria-label="Cabeçalho do Projeto">
             {/* Main Info Card - Clean Minimalist */}
             <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl overflow-hidden">
                 <CardContent className="p-8 lg:p-10 space-y-10">

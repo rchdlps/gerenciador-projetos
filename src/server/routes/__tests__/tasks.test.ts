@@ -39,12 +39,12 @@ vi.mock('@/lib/audit-logger', () => ({
 }))
 
 describe('Tasks API Routes', () => {
-  let app: Hono
+  let app: Hono<{ Variables: { user: any; session: any } }>
 
   beforeEach(async () => {
     vi.clearAllMocks()
     const tasksRouter = await import('../tasks')
-    app = new Hono().route('/tasks', tasksRouter.default)
+    app = new Hono<{ Variables: { user: any; session: any } }>().route('/tasks', tasksRouter.default)
   })
 
   describe('GET /tasks/dated', () => {
@@ -84,9 +84,7 @@ describe('Tasks API Routes', () => {
 
       const mockSelect = vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => Promise.resolve([mockSuperAdmin])),
-          })),
+          where: vi.fn(() => Promise.resolve([mockSuperAdmin])),
         })),
       }))
 

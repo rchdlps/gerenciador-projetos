@@ -88,11 +88,12 @@ export function TAPSection({ projectId }: { projectId: string }) {
 
                 {/* Justificativa */}
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
+                    <label htmlFor="tap-justification" className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
                         <TrendingUp className="w-4 h-4 text-orange-500" />
                         Justificativa do Projeto
                     </label>
                     <Textarea
+                        id="tap-justification"
                         placeholder="Por que este projeto é necessário?"
                         className="min-h-[100px] bg-white"
                         value={justification}
@@ -102,11 +103,12 @@ export function TAPSection({ projectId }: { projectId: string }) {
 
                 {/* Objetivos SMART */}
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
+                    <label htmlFor="tap-smart" className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
                         <Target className="w-4 h-4 text-orange-500" />
                         Objetivos SMART
                     </label>
                     <Textarea
+                        id="tap-smart"
                         placeholder="Específicos, Mensuráveis, Atingíveis, Relevantes e Temporais"
                         className="min-h-[100px] bg-white"
                         value={smartObjectives}
@@ -116,11 +118,12 @@ export function TAPSection({ projectId }: { projectId: string }) {
 
                 {/* Critérios de Sucesso */}
                 <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
+                    <label htmlFor="tap-criteria" className="text-sm font-bold text-slate-700 flex items-center gap-2 uppercase tracking-tight">
                         <CheckSquare className="w-4 h-4 text-green-600" />
                         Critérios de Sucesso
                     </label>
                     <Textarea
+                        id="tap-criteria"
                         placeholder="Como saberemos que o projeto foi bem-sucedido?"
                         className="min-h-[100px] bg-white"
                         value={successCriteria}

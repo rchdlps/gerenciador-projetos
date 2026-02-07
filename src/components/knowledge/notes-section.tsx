@@ -59,6 +59,8 @@ export function NotesSection({ projectId, area, initialContent }: { projectId: s
                 </div>
 
                 <Textarea
+                    id="notes-content"
+                    aria-label="Conteúdo das Notas"
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     placeholder="Adicione anotações gerais, observações importantes, decisões tomadas, lições aprendidas..."

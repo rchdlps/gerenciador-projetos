@@ -24,11 +24,11 @@ vi.mock('@/lib/db', () => ({
 }))
 
 describe('Auth Middleware', () => {
-  let app: Hono
+  let app: Hono<{ Variables: { user: any; session: any } }>
 
   beforeEach(() => {
     vi.clearAllMocks()
-    app = new Hono()
+    app = new Hono<{ Variables: { user: any; session: any } }>()
   })
 
   describe('getSession', () => {
@@ -55,7 +55,11 @@ describe('Auth Middleware', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.user).toEqual(mockUser)
+      expect(data.user).toEqual({
+        ...mockUser,
+        createdAt: mockUser.createdAt.toISOString(),
+        updatedAt: mockUser.updatedAt.toISOString(),
+      })
       expect(data.session).toHaveProperty('id', 'session-1')
     })
 
@@ -161,7 +165,7 @@ describe('Auth Middleware', () => {
         session: { id: 'session-1' } as any,
       })
 
-      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(null)
+      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(undefined)
 
       app.use('*', requireAuth)
       app.use('/:orgId/*', requireOrgAccess())
@@ -187,7 +191,7 @@ describe('Auth Middleware', () => {
         session: { id: 'session-1' } as any,
       })
 
-      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(null)
+      vi.mocked(db.query.memberships.findFirst).mockResolvedValue(undefined)
 
       app.use('*', requireAuth)
       app.use('/:orgId/*', requireOrgAccess())

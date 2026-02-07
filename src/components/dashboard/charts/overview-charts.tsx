@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2, PieChart as PieChartIcon, Target, Activity } from "lucide-react"
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'] // indigo, emerald, amber, pink, violet
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#14b8a6'] // indigo, emerald, amber, pink, teal
 const STATUS_COLORS = {
     "Em Andamento": "#6366f1", // indigo-500
     "Concluídos": "#10b981",   // emerald-500
@@ -83,7 +83,7 @@ export function OverviewCharts() {
                     <Card className="hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-violet-500" />
+                                <Activity className="w-4 h-4 text-teal-500" />
                                 Status Geral dos Projetos
                             </CardTitle>
                         </CardHeader>

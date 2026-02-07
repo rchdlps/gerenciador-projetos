@@ -29,6 +29,11 @@ aws
 # test coverage
 coverage/
 .nyc_output/
+check_output.txt
+security_verify.txt
+ux_verify.txt
+security_full_report.txt
+ux_full_report.txt
 
 # Playwright
 playwright-report/

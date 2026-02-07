@@ -39,7 +39,7 @@ export default function SignIn() {
     return (
         <div className="space-y-6">
             <div className="space-y-2 text-center">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">Acesso ao Sistema</h1>
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">Acesso ao Sistema</h2>
                 <p className="text-sm text-muted-foreground">
                     Entre com suas credenciais institucionais
                 </p>

@@ -36,7 +36,7 @@ const PHASE_COLORS = [
     { border: 'border-l-emerald-500', bar: 'bg-emerald-500' },
     { border: 'border-l-blue-500', bar: 'bg-blue-500' },
     { border: 'border-l-indigo-500', bar: 'bg-indigo-500' },
-    { border: 'border-l-violet-500', bar: 'bg-violet-500' },
+    { border: 'border-l-teal-500', bar: 'bg-teal-500' },
     { border: 'border-l-rose-500', bar: 'bg-rose-500' },
     { border: 'border-l-amber-500', bar: 'bg-amber-500' },
 ]

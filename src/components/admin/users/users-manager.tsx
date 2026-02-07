@@ -169,7 +169,7 @@ export function UsersManager() {
                                     {isSuperAdmin && (
                                         <TableCell>
                                             {user.globalRole === 'super_admin' ? (
-                                                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200">
+                                                <Badge className="bg-teal-100 text-teal-800 hover:bg-teal-200 border-teal-200">
                                                     <Shield className="mr-1 h-3 w-3" /> Super Admin
                                                 </Badge>
                                             ) : (

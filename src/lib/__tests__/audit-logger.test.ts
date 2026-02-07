@@ -6,7 +6,7 @@ vi.mock('../db', () => ({
   db: {
     insert: vi.fn(() => ({
       values: vi.fn(() => Promise.resolve()),
-    })),
+    })) as unknown as any,
   },
 }))
 
@@ -25,7 +25,7 @@ describe('audit-logger', () => {
       const { db } = await import('../db')
       const mockInsert = vi.fn(() => ({
         values: vi.fn(() => Promise.resolve()),
-      }))
+      })) as unknown as any
       db.insert = mockInsert
 
       await createAuditLog({
@@ -56,7 +56,7 @@ describe('audit-logger', () => {
       const { db } = await import('../db')
       const mockInsert = vi.fn(() => ({
         values: vi.fn(() => Promise.resolve()),
-      }))
+      })) as unknown as any
       db.insert = mockInsert
 
       await createAuditLog({
@@ -78,7 +78,7 @@ describe('audit-logger', () => {
       const { db } = await import('../db')
       const mockInsert = vi.fn(() => ({
         values: vi.fn(() => Promise.resolve()),
-      }))
+      })) as unknown as any
       db.insert = mockInsert
 
       await createAuditLog({
@@ -100,7 +100,7 @@ describe('audit-logger', () => {
       const { db } = await import('../db')
       const mockInsert = vi.fn(() => ({
         values: vi.fn(() => Promise.reject(new Error('Database error'))),
-      }))
+      })) as unknown as any
       db.insert = mockInsert
 
       // Should not throw
@@ -118,7 +118,7 @@ describe('audit-logger', () => {
       const { db } = await import('../db')
       const mockInsert = vi.fn(() => ({
         values: vi.fn(() => Promise.resolve()),
-      }))
+      })) as unknown as any
       db.insert = mockInsert
 
       const actions: Array<'CREATE' | 'UPDATE' | 'DELETE'> = ['CREATE', 'UPDATE', 'DELETE']

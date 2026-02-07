@@ -35,7 +35,7 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async 
     })
 
     if (!session) {
-        throw new HTTPException(401, { message: 'Unauthorized' })
+        return c.json({ error: 'Unauthorized' }, 401)
     }
 
     c.set('user', session.user)
