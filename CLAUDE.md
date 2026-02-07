@@ -1,0 +1,464 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Neon)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (MinIO/Hetzner).
+
+The application manages projects across multiple organizations (secretarias), with role-based access control, knowledge area tracking based on project management methodologies (PMBoK-inspired), task management, stakeholders, calendaring, procurement, communication plans, quality metrics, and comprehensive audit logging.
+
+## Common Commands
+
+### Development
+```bash
+npm run dev              # Start development server at localhost:4321
+npm run build            # Build for production
+npm run preview          # Preview production build locally
+npm run lint             # Run Astro type checking
+```
+
+### Database
+```bash
+npx drizzle-kit generate         # Generate migrations from schema
+npx drizzle-kit push             # Push schema changes to database
+npx drizzle-kit studio           # Open Drizzle Studio GUI
+npx tsx db/seed.ts               # Seed database with sample data
+npx tsx scripts/seed-knowledge.ts # Seed knowledge areas only
+```
+
+### Testing
+```bash
+npm test                 # Run unit and integration tests in watch mode
+npm run test:ui          # Open Vitest UI for interactive testing
+npm run test:run         # Run tests once (CI mode)
+npm run test:coverage    # Run tests with coverage report
+npm run test:e2e         # Run end-to-end tests with Playwright
+npm run test:e2e:ui      # Open Playwright UI for interactive E2E testing
+npm run test:e2e:debug   # Run E2E tests in debug mode
+```
+
+## Architecture Overview
+
+### Hybrid Astro + React Architecture
+
+**Routing & Pages:** Astro file-based routing in `src/pages/`. Astro pages are server-rendered shells that hydrate React components.
+
+**API Layer:** All API routes go through `src/pages/api/[...path].ts`, which forwards requests to the Hono app (`src/server/app.ts`). The Hono app registers route modules from `src/server/routes/*.ts`.
+
+**Components:** React components in `src/components/` use client-side interactivity. They call the API via `@tanstack/react-query` (see `src/lib/api-client.ts`).
+
+### Authentication Flow
+
+- **Library:** `better-auth` with Drizzle adapter
+- **Configuration:** `src/lib/auth.ts` sets up email/password auth
+- **API Endpoints:** `src/pages/api/auth/[...all].ts` handles auth routes
+- **Middleware:** `src/server/middleware/auth.ts` provides:
+  - `getSession`: Optionally loads session
+  - `requireAuth`: Enforces authentication
+  - `requireOrgAccess(role?)`: Checks organization membership and role hierarchy
+- **User Roles:**
+  - **Global Roles:** `super_admin` (full access) | `user` (normal)
+  - **Organization Roles:** `secretario` > `gestor` > `viewer` (hierarchical permissions)
+
+### Multi-Tenancy Model
+
+**Organizations** represent Secretarias. **Memberships** link users to organizations with roles. Users can belong to multiple organizations.
+
+**Project Access:** Projects belong to an organization. Users access projects via their organization memberships. Super admins bypass all restrictions.
+
+### Database Schema
+
+**Core Tables:**
+- `organizations`: Secretarias with metadata (name, code, logoUrl, leaders)
+- `users`: User accounts (managed by better-auth)
+- `memberships`: User-Organization-Role junction table
+- `projects`: Projects linked to organizations
+- `project_phases`: Phases within a project (Iniciação, Planejamento, etc.)
+- `tasks`: Tasks within phases (with assignees, stakeholders, priorities, status)
+- `stakeholders`: Project stakeholders (name, role, level)
+- `board_columns` / `board_cards`: Kanban boards for projects
+- `knowledge_areas`: PMBoK-style knowledge area content (escopo, cronograma, custos, etc.)
+- `appointments`: Calendar events per project
+- `audit_logs`: Audit trail for all key actions
+
+**Extended Tables:**
+- `project_charters`: TAP (Termo de Abertura do Projeto) with justification, SMART objectives, success criteria
+- `project_milestones`: Key milestones with expected dates and phases
+- `project_dependencies`: Task dependencies (predecessor → successor)
+- `project_quality_metrics`: Quality KPIs (target vs current value)
+- `project_quality_checklists`: Checklist items for quality gates
+- `project_communication_plans`: Communication strategies per project
+- `project_meetings`: Meeting records with decisions
+- `procurement_suppliers`: Supplier registry per project
+- `procurement_contracts`: Contract tracking (value, status, validity)
+- `knowledge_area_changes`: Change control records for knowledge areas
+- `attachments`: File metadata for S3-stored files
+
+**Schema Location:** `db/schema.ts` (single-file Drizzle schema with relations)
+
+### API Route Patterns
+
+All Hono routes follow a consistent pattern:
+
+1. **Import:** Use Hono, zValidator, db, and schemas
+2. **Middleware:** Apply `requireAuth` or `requireOrgAccess(role?)` at route or app level
+3. **Validation:** Use `zValidator('json', schema)` for request body validation with Zod
+4. **Authorization:** Check user's organization membership/role (or super_admin bypass)
+5. **Database Operations:** Use Drizzle ORM queries
+6. **Audit Logging:** Call `createAuditLog()` for CREATE/UPDATE/DELETE actions (non-blocking)
+7. **Response:** Return JSON with proper status codes
+
+**Example Routes:**
+- `GET /api/projects` - List projects user has access to (via memberships)
+- `POST /api/projects` - Create project (checks org access and role)
+- `GET /api/projects/:id` - Get single project (checks access)
+- Nested resources: `/api/projects/:projectId/stakeholders`, `/api/tasks/:id`, etc.
+
+**Route Organization:**
+- `src/server/routes/projects.ts` - Project CRUD
+- `src/server/routes/tasks.ts` - Task management
+- `src/server/routes/phases.ts` - Phase management
+- `src/server/routes/stakeholders.ts` - Stakeholder CRUD
+- `src/server/routes/board.ts` - Kanban board columns/cards
+- `src/server/routes/knowledge-areas.ts` - Knowledge area content management
+- `src/server/routes/admin.ts` - Admin endpoints (user/org management, audit logs)
+- `src/server/routes/storage.ts` - S3 pre-signed URL generation
+- And more: appointments, schedule, quality, communication, procurement, project-charter
+
+### File Upload Flow
+
+**Storage:** S3-compatible (MinIO/Hetzner Object Storage)
+
+**Process:**
+1. Client requests pre-signed upload URL from `POST /api/storage/upload-url`
+2. Server generates pre-signed PUT URL and returns it
+3. Client uploads file directly to S3 using pre-signed URL (bypasses server)
+4. Client sends file metadata to create `attachments` record
+5. To download: Request pre-signed GET URL from `GET /api/storage/download-url?key=...`
+
+**Key File:** `src/lib/storage.ts` (S3 client, pre-signed URL helpers)
+
+### State Management
+
+**Client-side:** `@tanstack/react-query` for server state (fetching, caching, mutations)
+
+**API Client:** `src/lib/api-client.ts` exports typed Hono client
+
+**Example Usage:**
+```tsx
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { client } from '@/lib/api-client'
+
+const { data: projects } = useQuery({
+  queryKey: ['projects'],
+  queryFn: async () => {
+    const res = await client.api.projects.$get()
+    return res.json()
+  }
+})
+```
+
+### Audit Logging
+
+**Function:** `createAuditLog()` in `src/lib/audit-logger.ts`
+
+**Usage:** Call after CREATE/UPDATE/DELETE operations in API routes. Non-blocking (errors logged but don't fail the operation).
+
+**Fields:**
+- `userId`: Who performed the action
+- `organizationId`: Context (optional)
+- `action`: CREATE | UPDATE | DELETE
+- `resource`: Type (e.g., 'project', 'task', 'user')
+- `resourceId`: ID of the affected resource
+- `metadata`: JSON object with additional context
+
+## Important Conventions
+
+### Type Safety
+
+- Use Drizzle's `$inferSelect` and `$inferInsert` for database types
+- Hono provides type-safe API routes via `AppType` export
+- Components should define explicit prop types
+
+### Error Handling
+
+- Use `HTTPException` from `hono/http-exception` for API errors
+- Return proper HTTP status codes (401, 403, 404, 500)
+- Audit logging errors should not fail the main operation
+
+### Access Control
+
+- **Super Admin Bypass:** Always check `user.globalRole === 'super_admin'` to allow full access
+- **Organization Access:** Use `requireOrgAccess()` middleware or manually check memberships
+- **Role Hierarchy:** `secretario` > `gestor` > `viewer`
+- **Viewer Restrictions:** Viewers can read but not create/update/delete
+
+### Database Queries
+
+- Use Drizzle query builder (prefer `db.query.*` for relations)
+- For complex queries, use `db.select().from().where()`
+- Always handle cascading deletes via schema foreign keys or manual cleanup
+- Use transactions for multi-table operations
+
+### Component Patterns
+
+- **Astro Pages:** Server-rendered shells, minimal interactivity
+- **React Components:** Client-side interactivity, use `client:load` directive in Astro
+- **UI Components:** Located in `src/components/ui/` (Radix UI + Tailwind)
+- **Feature Components:** Organized by feature (dashboard, phases, knowledge, admin)
+
+## Environment Variables
+
+See `.env.example` for required variables:
+
+- `DATABASE_URL`: Neon PostgreSQL connection string
+- `BETTER_AUTH_SECRET`: Auth secret key
+- `BETTER_AUTH_URL`: Base URL for auth callbacks
+- `S3_ENDPOINT`: S3-compatible storage endpoint
+- `S3_REGION`: Region (use `us-east-1` for compatibility)
+- `S3_ACCESS_KEY` / `S3_SECRET_KEY`: Storage credentials
+- `S3_BUCKET_NAME`: Bucket name
+
+## Database Seeding
+
+**Full Seed:** `npx tsx db/seed.ts`
+
+Creates:
+- 5 Organizations (SMPO, DEMO, SMS, SME, SMOB)
+- 4 Users with different roles (super_admin, org members)
+- 15 Projects (3 per organization)
+- Phases, Tasks, Stakeholders, Board Columns/Cards
+- Knowledge Areas, Appointments, Audit Logs
+- TAP, Milestones, Dependencies, Quality Metrics/Checklists
+- Communication Plans, Meetings, Procurement Suppliers/Contracts
+
+**Default Credentials:** All seeded users have password `password123`
+
+**Example Users:**
+- `admin@cuiaba.mt.gov.br` - Super Admin
+- `saude@cuiaba.mt.gov.br` - Gestor Saúde
+- `obras@cuiaba.mt.gov.br` - Gestor Obras
+- `educacao@cuiaba.mt.gov.br` - Fiscal Educação (viewer role)
+
+## Key Features
+
+### Knowledge Areas
+
+Based on PMBoK methodology, each project can have rich markdown content for:
+- **Escopo** (Scope)
+- **Cronograma** (Schedule)
+- **Custos** (Costs)
+- **Qualidade** (Quality)
+- **Comunicação** (Communication)
+- **Riscos** (Risks)
+- **Aquisições** (Procurement)
+
+Each area supports markdown editing and change tracking via `knowledge_area_changes` table.
+
+### TAP (Termo de Abertura do Projeto)
+
+Project Charter with:
+- **Justification:** Why the project exists, strategic alignment
+- **SMART Objectives:** Specific, Measurable, Achievable, Relevant, Time-bound goals
+- **Success Criteria:** Mandatory, desirable, and acceptance criteria
+
+### Quality Management
+
+- **Metrics:** Track KPIs with target vs current values
+- **Checklists:** Quality gates and checklist items (completed/pending)
+
+### Procurement
+
+- **Suppliers:** Registry of suppliers per project
+- **Contracts:** Track contracts with value, status, validity dates
+
+### Communication
+
+- **Communication Plans:** Define what info, to whom, how often, via which medium
+- **Meetings:** Record meeting subjects, dates, and key decisions
+
+### Audit Trail
+
+Every significant action (create project, update task, delete stakeholder, etc.) is logged to `audit_logs` with full metadata for compliance and tracking.
+
+## Deployment
+
+**Platform:** Vercel (configured in `astro.config.mjs`)
+
+**Adapter:** `@astrojs/vercel` with `maxDuration: 60` for serverless functions
+
+**Build:** `npm run build` produces output in `dist/`
+
+**Database:** Neon serverless PostgreSQL (WebSocket-based pooling)
+
+## Testing Strategy
+
+This project uses a comprehensive 3-tier testing approach:
+
+### 1. Unit Tests (Vitest)
+
+**Location:** `src/**/__tests__/*.test.ts`
+
+**Purpose:** Test individual functions, utilities, and helper modules in isolation.
+
+**Examples:**
+- `src/lib/__tests__/utils.test.ts` - Test `cn()` class merger and `formatBytes()` utility
+- `src/lib/__tests__/audit-logger.test.ts` - Test audit logging with mocked database
+
+**Running:**
+```bash
+npm test                    # Watch mode
+npm run test:run            # Single run
+npm run test:coverage       # With coverage report
+```
+
+**Best Practices:**
+- Mock external dependencies (db, auth, storage)
+- Test edge cases and error handling
+- Use descriptive test names
+- Keep tests focused and independent
+
+### 2. API Integration Tests (Vitest + Hono)
+
+**Location:** `src/server/routes/__tests__/*.test.ts`, `src/server/middleware/__tests__/*.test.ts`
+
+**Purpose:** Test API routes with mocked authentication and database to ensure correct behavior, authorization, and validation.
+
+**Examples:**
+- `src/server/routes/__tests__/projects.test.ts` - Test project CRUD, org access control, super admin bypass
+- `src/server/routes/__tests__/tasks.test.ts` - Test task management, date filtering, org membership
+- `src/server/middleware/__tests__/auth.test.ts` - Test auth middleware, role hierarchy, session handling
+
+**Test Utilities:**
+- `src/test/mocks.ts` - Mock factories for users, organizations, projects, sessions, db
+- `src/test/helpers.ts` - Test helpers like `testRoute()`, `createAuthHeaders()`, `generateTestId()`
+- `src/test/setup.ts` - Vitest setup with mocked environment variables
+
+**Best Practices:**
+- Mock `@/lib/auth` to control session state
+- Mock `@/lib/db` to avoid database dependencies
+- Test authorization (super_admin bypass, role hierarchy, org access)
+- Test validation errors (Zod schemas)
+- Verify audit log calls for CREATE/UPDATE/DELETE actions
+- Use `testRoute()` helper for cleaner test code
+
+**Example Test Pattern:**
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { testRoute, createAuthHeaders } from '../../../test/helpers'
+import { mockUser, mockSuperAdmin } from '../../../test/mocks'
+
+vi.mock('@/lib/auth', () => ({
+  auth: { api: { getSession: vi.fn() } }
+}))
+
+describe('API Route', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should allow access for authenticated user', async () => {
+    const { auth } = await import('@/lib/auth')
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: mockUser,
+      session: { id: 'session-1' }
+    })
+
+    const result = await testRoute(app, 'GET', '/endpoint', {
+      headers: createAuthHeaders()
+    })
+
+    expect(result.status).toBe(200)
+  })
+})
+```
+
+### 3. End-to-End Tests (Playwright)
+
+**Location:** `e2e/*.spec.ts`
+
+**Purpose:** Test critical user flows in a real browser environment against the running application.
+
+**Examples:**
+- `e2e/auth.spec.ts` - Login, logout, registration, session persistence, authorization
+- `e2e/projects.spec.ts` - Project CRUD, tasks, stakeholders, kanban board, access control
+
+**Configuration:** `playwright.config.ts` - Runs dev server automatically before tests
+
+**Running:**
+```bash
+npm run test:e2e           # Run all E2E tests headlessly
+npm run test:e2e:ui        # Interactive UI mode
+npm run test:e2e:debug     # Debug mode with inspector
+```
+
+**Best Practices:**
+- Use seeded test data (from `db/seed.ts`)
+- Test with different user roles (admin, gestor, viewer)
+- Use data-testid attributes for stable selectors
+- Handle async operations with proper waits
+- Test both success and error paths
+- Clean up created test data or use isolated test environments
+
+**Seeded Test Credentials:**
+- `admin@cuiaba.mt.gov.br` / `password123` - Super Admin (full access)
+- `saude@cuiaba.mt.gov.br` / `password123` - Gestor Saúde (org-specific access)
+- `obras@cuiaba.mt.gov.br` / `password123` - Gestor Obras
+- `educacao@cuiaba.mt.gov.br` / `password123` - Fiscal Educação (viewer role)
+
+### Test Database Setup
+
+**For Integration Tests:**
+1. Set `TEST_DATABASE_URL` environment variable to a separate test database
+2. Run migrations: `npx drizzle-kit push`
+3. Seed with test data: `npx tsx db/seed.ts`
+4. Tests use mocked db by default, but can connect to real test DB if needed
+
+**For E2E Tests:**
+1. Ensure development database is seeded: `npx tsx db/seed.ts`
+2. Run dev server: `npm run dev`
+3. Playwright will use the running dev server
+
+### Coverage Goals
+
+- **Unit Tests:** 80%+ coverage for utilities and helpers
+- **Integration Tests:** All API routes with auth/validation/error cases
+- **E2E Tests:** Critical user journeys (auth, project creation, task management)
+
+### Continuous Integration
+
+Add to `.github/workflows/test.yml`:
+```yaml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm ci
+      - run: npm run test:run
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+```
+
+### Adding New Tests
+
+**When adding a new API route:**
+1. Create test file in `src/server/routes/__tests__/`
+2. Mock auth and db
+3. Test: authentication, authorization, validation, success/error cases
+4. Verify audit logging if applicable
+
+**When adding a new utility:**
+1. Create test file in `src/lib/__tests__/`
+2. Test all branches and edge cases
+3. Mock external dependencies
+
+**When adding a new user flow:**
+1. Create or update E2E spec in `e2e/`
+2. Use seeded test users
+3. Test happy path and error handling
+4. Verify UI feedback (success messages, errors)
