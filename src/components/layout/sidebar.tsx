@@ -1,15 +1,20 @@
 import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { authClient } from "@/lib/auth-client"
 
 export function Sidebar() {
     const [currentPath, setCurrentPath] = useState("")
+    const { data: session } = authClient.useSession()
 
     useEffect(() => {
         if (typeof window !== "undefined") {
             setCurrentPath(window.location.pathname)
         }
     }, [])
+
+    // Check if user is super admin
+    const isSuperAdmin = session?.user?.globalRole === 'super_admin'
 
     const isActive = (path: string) => currentPath === path
 
@@ -85,22 +90,24 @@ export function Sidebar() {
                 )}
 
 
-                {/* Admin Section */}
-                <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
-                        Administração
-                    </h3>
-                    <div className="space-y-1">
-                        <a href="/admin" className={getLinkClass(currentPath === "/admin")}>
-                            <Building2 className={cn("w-4 h-4 group-hover:text-primary", currentPath === "/admin" ? "text-primary" : "text-muted-foreground")} />
-                            Gestão de Secretarias
-                        </a>
-                        <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
-                            <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
-                            Gerenciar Usuários
-                        </a>
+                {/* Admin Section - Only visible to super_admin */}
+                {isSuperAdmin && (
+                    <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                            Administração
+                        </h3>
+                        <div className="space-y-1">
+                            <a href="/admin" className={getLinkClass(currentPath === "/admin")}>
+                                <Building2 className={cn("w-4 h-4 group-hover:text-primary", currentPath === "/admin" ? "text-primary" : "text-muted-foreground")} />
+                                Gestão de Secretarias
+                            </a>
+                            <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
+                                <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
+                                Gerenciar Usuários
+                            </a>
+                        </div>
                     </div>
-                </div>
+                )}
 
             </nav>
 
