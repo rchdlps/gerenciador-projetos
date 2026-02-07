@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Circle, Clock, Eye, Check, Calendar, Pencil } from "lucide-react"
+import { Search, Circle, Clock, Eye, Check, Calendar, Pencil, AlertTriangle } from "lucide-react"
 import { TaskDialog } from "@/components/phases/task-dialog"
 
 interface BoardColumn {
@@ -21,8 +21,12 @@ interface TaskStatsProps {
 export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
     const [searchOpen, setSearchOpen] = useState(false)
     const [searchQuery, setSearchQuery] = useState("")
+    const [overdueOpen, setOverdueOpen] = useState(false)
+    const [overdueSearchQuery, setOverdueSearchQuery] = useState("")
     const [editingTask, setEditingTask] = useState<any>(null)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
+
+    const now = useMemo(() => new Date(), [])
 
     // Flatten all tasks from columns
     const allTasks = useMemo(() => {
@@ -40,6 +44,27 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
             task.description?.toLowerCase().includes(query)
         )
     }, [allTasks, searchQuery])
+
+    // Get overdue tasks (non-done tasks past their end date)
+    const overdueTasks = useMemo(() => {
+        return allTasks.filter(task => {
+            if (task.columnId === 'done') return false
+            if (!task.endDate) return false
+            const end = new Date(task.endDate)
+            end.setHours(23, 59, 59, 999)
+            return end < now
+        })
+    }, [allTasks, now])
+
+    // Filter overdue tasks by search query
+    const filteredOverdueTasks = useMemo(() => {
+        if (!overdueSearchQuery.trim()) return overdueTasks
+        const query = overdueSearchQuery.toLowerCase()
+        return overdueTasks.filter(task =>
+            task.title?.toLowerCase().includes(query) ||
+            task.description?.toLowerCase().includes(query)
+        )
+    }, [overdueTasks, overdueSearchQuery])
 
     const statusConfig: Record<string, { label: string; icon: typeof Circle; color: string }> = {
         todo: { label: "Não Iniciada", icon: Circle, color: "bg-slate-100 text-slate-700" },
@@ -62,8 +87,6 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
     let total = 0
     let completed = 0
     let inProgress = 0
-    let overdue = 0
-    const now = new Date()
 
     columns.forEach(col => {
         total += col.cards.length
@@ -72,20 +95,6 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
             completed += col.cards.length
         } else if (col.id === 'in_progress') {
             inProgress += col.cards.length
-        }
-
-        // Check for overdue in non-completed columns
-        if (col.id !== 'done') {
-            col.cards.forEach(card => {
-                if (card.endDate) {
-                    const end = new Date(card.endDate)
-                    end.setHours(23, 59, 59, 999)
-
-                    if (end < now) {
-                        overdue++
-                    }
-                }
-            })
         }
     })
 
@@ -109,8 +118,10 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
         },
         {
             label: "ATRASADAS",
-            value: overdue,
-            color: "text-red-500"
+            value: overdueTasks.length,
+            color: "text-red-500",
+            clickable: true,
+            isOverdue: true
         }
     ]
 
@@ -120,16 +131,19 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
                 {stats.map((stat, idx) => (
                     <Card
                         key={idx}
-                        className={`shadow-none border rounded-lg ${stat.clickable ? 'cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all' : ''}`}
-                        onClick={stat.clickable ? () => setSearchOpen(true) : undefined}
+                        className={`shadow-none border rounded-lg ${stat.clickable ? 'cursor-pointer hover:border-emerald-300 hover:shadow-md transition-all' : ''} ${stat.isOverdue && stat.value > 0 ? 'border-red-200' : ''}`}
+                        onClick={stat.clickable ? () => stat.isOverdue ? setOverdueOpen(true) : setSearchOpen(true) : undefined}
                     >
                         <CardContent className="p-4 pt-4">
                             <div className="flex items-center justify-between">
                                 <div className="text-xs font-semibold text-muted-foreground uppercase mb-1">
                                     {stat.label}
                                 </div>
-                                {stat.clickable && (
+                                {stat.clickable && !stat.isOverdue && (
                                     <Search className="w-4 h-4 text-muted-foreground" />
+                                )}
+                                {stat.isOverdue && stat.value > 0 && (
+                                    <AlertTriangle className="w-4 h-4 text-red-500" />
                                 )}
                             </div>
                             <div className={`text-2xl font-bold ${stat.color}`}>
@@ -220,6 +234,88 @@ export function TaskStats({ columns, isLoading, projectId }: TaskStatsProps) {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Overdue Tasks Modal */}
+            <Dialog open={overdueOpen} onOpenChange={setOverdueOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="w-5 h-5" />
+                            Tarefas Atrasadas ({overdueTasks.length})
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Buscar tarefas atrasadas..."
+                            value={overdueSearchQuery}
+                            onChange={(e) => setOverdueSearchQuery(e.target.value)}
+                            className="pl-10"
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 min-h-[300px] max-h-[50vh]">
+                        {filteredOverdueTasks.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                                {overdueSearchQuery ? `Nenhuma tarefa encontrada para "${overdueSearchQuery}"` : "Nenhuma tarefa atrasada! 🎉"}
+                            </div>
+                        ) : (
+                            filteredOverdueTasks.map(task => {
+                                const status = statusConfig[task.columnId] || statusConfig.todo
+                                const StatusIcon = status.icon
+                                const endDate = new Date(task.endDate)
+                                const daysOverdue = Math.floor((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24))
+                                return (
+                                    <div
+                                        key={task.id}
+                                        className="p-3 border border-red-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors cursor-pointer group"
+                                        onClick={() => {
+                                            setEditingTask(task)
+                                            setEditDialogOpen(true)
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-medium truncate">
+                                                        {task.title}
+                                                    </h4>
+                                                    <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                                {task.description && (
+                                                    <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                                                        {task.description}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        <Calendar className="w-3 h-3" />
+                                                        <span>
+                                                            {task.startDate ? new Date(task.startDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '...'}
+                                                            {' - '}
+                                                            <span className="text-red-600 font-medium">{endDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                                                        {daysOverdue} {daysOverdue === 1 ? 'dia' : 'dias'} atrasado
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <Badge variant="outline" className={`shrink-0 ${status.color}`}>
+                                                <StatusIcon className="w-3 h-3 mr-1" />
+                                                {status.label}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Task Edit Dialog */}
             <TaskDialog
                 open={editDialogOpen}
