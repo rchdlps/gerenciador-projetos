@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Building2, User, UserCheck, CheckCircle2, Layout, Activity, Pencil } from "lucide-react"
+import { Building2, User, UserCheck, CheckCircle2, Layout, Activity, Pencil, Briefcase } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface ProjectHeaderProps {
     project: any
@@ -43,20 +44,10 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
             return res.json()
         },
         onSuccess: () => {
-            // Invalidate queries to refresh data
             queryClient.invalidateQueries({ queryKey: ['project', project.id] })
-            // Also invalidate list if needed
             queryClient.invalidateQueries({ queryKey: ['projects'] })
             setIsEditOpen(false)
             toast.success("Projeto atualizado com sucesso!")
-            // Force reload if needed to reflect server-side prop changes (since we are in Astro island)
-            // But react-query handle client state. The prop 'project' comes from server.
-            // We might need to reload page if the parent doesn't re-render.
-            // For now, let's assume client-side navigation or hydration handles it,
-            // or simplest: window.location.reload() if props are static.
-            // Ideally we should use client-side fetching for the header details or
-            // make the header fully client-rendered.
-            // Given it's passed as props, updating it requires parent re-render or page reload.
             window.location.reload()
         },
         onError: () => {
@@ -64,23 +55,37 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
         }
     })
 
-    // Calculate progress percentage
     const progressPercentage = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0
-
-    // We now prioritize Organization fields for these roles, but could fallback to Stakeholders if needed.
-    // For now, let's purely use Organization fields as per the request.
     const secretarioName = organization?.secretario || "-"
     const secretariaAdjuntaName = organization?.secretariaAdjunta || "-"
     const diretoriaTecnicaName = organization?.diretoriaTecnica || "-"
 
+    const getInitials = (name: string) => {
+        if (!name || name === "-") return "-"
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase()
+    }
+
+    const formatName = (name: string) => {
+        if (!name || name === "-") return "-"
+        const parts = name.toLowerCase().split(' ').map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        if (parts.length > 2) {
+            return `${parts[0]} ${parts[parts.length - 1]}`
+        }
+        return parts.join(' ')
+    }
+
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10" aria-label="Cabeçalho do Projeto">
-            {/* Main Info Card - Clean Minimalist */}
-            <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-300 rounded-xl overflow-hidden relative group/card">
-                <div className="absolute top-4 right-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-stretch" aria-label="Cabeçalho do Projeto">
+            <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden relative group/card flex flex-col h-full">
+                <div className="absolute top-4 right-4 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 ease-in-out z-10">
                     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors">
                                 <Pencil className="h-4 w-4" />
                             </Button>
                         </DialogTrigger>
@@ -142,122 +147,138 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                     </Dialog>
                 </div>
 
-                <CardContent className="p-8 lg:p-10 space-y-10">
-                    {/* Organization Section */}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2 text-primary font-bold text-[11px] uppercase tracking-[0.15em]">
-                            <Building2 className="w-4 h-4 text-primary/60" />
-                            Órgão Responsável
+                <CardContent className="p-8 flex flex-col h-full justify-between gap-8">
+                    <div className="space-y-6">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <span className="inline-flex items-center rounded-md border border-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors bg-slate-50 text-slate-600">
+                                    {project.type || "Projeto"}
+                                </span>
+                                <span className={`inline-flex items-center rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                        status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                            'bg-sky-50 text-sky-700 border-sky-200'
+                                    }`}>
+                                    {status === 'em_andamento' ? 'Em Andamento' :
+                                        status === 'concluido' ? 'Concluído' :
+                                            status === 'suspenso' ? 'Suspenso' :
+                                                status === 'cancelado' ? 'Cancelado' : status}
+                                </span>
+                            </div>
+
+                            <h1 className="text-3xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                                {project.name}
+                            </h1>
                         </div>
-                        <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                            {organization?.name || "Órgão não definido"}
-                        </h2>
-                        <div className="flex gap-2 mt-2">
-                            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                                {project.type || "Projeto"}
-                            </span>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent ${status === 'concluido' ? 'bg-green-100 text-green-800' :
-                                    status === 'suspenso' ? 'bg-yellow-100 text-yellow-800' :
-                                        status === 'cancelado' ? 'bg-red-100 text-red-800' :
-                                            'bg-blue-100 text-blue-800'
-                                }`}>
-                                {status === 'em_andamento' ? 'Em Andamento' :
-                                    status === 'concluido' ? 'Concluído' :
-                                        status === 'suspenso' ? 'Suspenso' :
-                                            status === 'cancelado' ? 'Cancelado' : status}
-                            </span>
-                        </div>
+
+                        {project.description && (
+                            <p className="text-base text-slate-600 max-w-4xl leading-relaxed">
+                                {project.description}
+                            </p>
+                        )}
                     </div>
 
-                    <Separator className="bg-slate-100" />
+                    <div className="space-y-8">
+                        <Separator className="bg-slate-100" />
 
-                    {/* Roles Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                        {/* Secretário */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.15em]">
-                                <User className="w-3.5 h-3.5" />
-                                Secretário
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                            {/* Organization Section */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sky-700 font-bold text-[11px] uppercase tracking-[0.2em]">
+                                    <Building2 className="w-4 h-4" />
+                                    Órgão Responsável
+                                </div>
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                                    {organization?.name || "Órgão não definido"}
+                                </h2>
                             </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={secretarioName}>
-                                {secretarioName}
-                            </p>
-                        </div>
 
-                        {/* Secretária Adjunta */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.15em]">
-                                <UserCheck className="w-3.5 h-3.5" />
-                                Secretaria Adjunta
-                            </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={secretariaAdjuntaName}>
-                                {secretariaAdjuntaName}
-                            </p>
-                        </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-2">
+                                {/* Secretário */}
+                                <div className="space-y-1 group">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1 group-hover:text-slate-600 transition-colors">
+                                        Secretário(a)
+                                    </p>
+                                    <div className="flex flex-col">
+                                        <p className="font-bold text-slate-900 text-sm leading-none" title={secretarioName}>
+                                            {formatName(secretarioName)}
+                                        </p>
+                                    </div>
+                                </div>
 
-                        {/* Diretora Técnica */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.15em]">
-                                <Activity className="w-3.5 h-3.5" />
-                                Diretoria Técnica
+                                {/* Secretária Adjunta */}
+                                <div className="space-y-1 group">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1 group-hover:text-slate-600 transition-colors">
+                                        Sec. Adjunto(a)
+                                    </p>
+                                    <div className="flex flex-col">
+                                        <p className="font-bold text-slate-900 text-sm leading-none" title={secretariaAdjuntaName}>
+                                            {formatName(secretariaAdjuntaName)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Diretora Técnica */}
+                                <div className="space-y-1 group">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1 group-hover:text-slate-600 transition-colors">
+                                        Dir. Técnica
+                                    </p>
+                                    <div className="flex flex-col">
+                                        <p className="font-bold text-slate-900 text-sm leading-none" title={diretoriaTecnicaName}>
+                                            {formatName(diretoriaTecnicaName)}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                            <p className="font-bold text-lg text-slate-900 truncate" title={diretoriaTecnicaName}>
-                                {diretoriaTecnicaName}
-                            </p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Status Cards Column */}
-            <div className="space-y-6">
-                {/* Progress Card - Clean */}
-                <Card className="bg-slate-50 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl group">
+            <div className="flex flex-col gap-6 h-full">
+                <Card className="bg-slate-50/50 border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group overflow-hidden flex-1 flex flex-col justify-center">
                     <CardContent className="p-8">
                         <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2 text-slate-500 font-bold text-[11px] uppercase tracking-[0.15em]">
+                            <div className="flex items-center gap-2 text-slate-500 font-bold text-[11px] uppercase tracking-[0.2em]">
                                 <Layout className="w-4 h-4" />
                                 Progresso
                             </div>
-                            <span className="text-4xl font-black text-primary tracking-tighter">
+                            <span className="text-5xl font-black text-sky-700 tracking-tighter">
                                 {progressPercentage}%
                             </span>
                         </div>
 
-                        <div className="h-4 w-full bg-slate-200 rounded-full overflow-hidden mb-8 shadow-inner">
+                        <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden mb-8">
                             <div
-                                className="h-full bg-primary rounded-full transition-all duration-1000 ease-out"
+                                className="h-full bg-sky-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(3,105,161,0.3)]"
                                 style={{ width: `${progressPercentage}%` }}
                             />
                         </div>
 
-                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
+                        <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                             <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 bg-primary rounded-full" />
-                                {completedPhases} concluídas
+                                <div className="w-2 h-2 bg-sky-600 rounded-full animate-pulse" />
+                                {completedPhases} fases concluídas
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 bg-slate-300 rounded-full" />
-                                {totalPhases} fases no projeto
+                            <div className="flex items-center gap-2 text-slate-400">
+                                {totalPhases} total
                             </div>
                         </div>
-
                     </CardContent>
                 </Card>
 
-                {/* Phases Count Card - Clean */}
-                <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl">
+                <Card className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl flex-1 flex flex-col justify-center">
                     <CardContent className="p-8 flex items-center justify-between">
                         <div>
                             <div className="text-4xl font-black text-slate-900 tracking-tighter leading-none mb-2">
-                                {completedPhases} / {totalPhases}
+                                {completedPhases} <span className="text-slate-300">/</span> {totalPhases}
                             </div>
                             <div className="text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
                                 Fases do Cronograma
                             </div>
                         </div>
-                        <div className="flex items-center justify-center w-14 h-14 bg-primary/5 rounded-2xl border border-primary/10">
-                            <CheckCircle2 className="w-7 h-7 text-primary" />
+                        <div className="flex items-center justify-center w-14 h-14 bg-emerald-50 rounded-2xl border border-emerald-100 text-emerald-600 transition-transform group-hover:scale-110 duration-300">
+                            <CheckCircle2 className="w-7 h-7" />
                         </div>
                     </CardContent>
                 </Card>

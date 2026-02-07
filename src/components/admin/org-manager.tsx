@@ -40,11 +40,14 @@ export function OrgManager() {
     const [secretariaAdjunta, setSecretariaAdjunta] = useState("")
     const [diretoriaTecnica, setDiretoriaTecnica] = useState("")
 
-    const { data: organizations, isLoading } = useQuery<Organization[]>({
+    const { data: organizations, isLoading, error } = useQuery<Organization[]>({
         queryKey: ['organizations'],
         queryFn: async () => {
             const res = await api.organizations.$get()
-            if (!res.ok) throw new Error("Failed to fetch")
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(`Status: ${res.status} - ${text}`)
+            }
             return res.json()
         }
     })
@@ -119,7 +122,8 @@ export function OrgManager() {
         org.code.toLowerCase().includes(searchTerm.toLowerCase())
     )
 
-    if (isLoading) return <div>Carregando...</div>
+    if (isLoading) return <div>Carregando dados da API...</div>
+    if (error) return <div className="p-4 text-red-500 bg-red-50 rounded">Erro ao carregar: {(error as Error).message}</div>
 
     return (
         <div className="space-y-8 max-w-7xl mx-auto p-6">
