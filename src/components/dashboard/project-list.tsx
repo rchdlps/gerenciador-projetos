@@ -37,6 +37,7 @@ export function ProjectList() {
     const [selectedOrg, setSelectedOrg] = useState<string>("")
     const [searchTerm, setSearchTerm] = useState("")
     const [filterOrg, setFilterOrg] = useState("all")
+    const [filterStatus, setFilterStatus] = useState("all")
 
     // Fetch User Organizations
     const { data: organizations, isLoading: isLoadingOrgs } = useQuery<Organization[]>({
@@ -108,7 +109,9 @@ export function ProjectList() {
             (filterOrg === "personal" && !p.organizationId) ||
             p.organizationId === filterOrg
 
-        return matchesSearch && matchesOrg
+        const matchesStatus = filterStatus === "all" || p.status === filterStatus
+
+        return matchesSearch && matchesOrg && matchesStatus
     })
 
     const groupedProjects: Record<string, Project[]> = {};
@@ -186,6 +189,9 @@ export function ProjectList() {
                                         <SelectItem value="concluido">Concluído</SelectItem>
                                         <SelectItem value="suspenso">Suspenso</SelectItem>
                                         <SelectItem value="cancelado">Cancelado</SelectItem>
+                                        <SelectItem value="recorrente">Recorrente</SelectItem>
+                                        <SelectItem value="proposta">Proposta</SelectItem>
+                                        <SelectItem value="planejamento">Planejamento</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -239,6 +245,50 @@ export function ProjectList() {
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="w-full sm:w-[200px]">
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <SelectTrigger className="bg-background">
+                            <div className="flex items-center gap-2 w-full overflow-hidden">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${filterStatus === 'em_andamento' ? 'bg-sky-500' :
+                                        filterStatus === 'concluido' ? 'bg-emerald-500' :
+                                            filterStatus === 'suspenso' ? 'bg-amber-500' :
+                                                filterStatus === 'cancelado' ? 'bg-rose-500' :
+                                                    filterStatus === 'recorrente' ? 'bg-violet-500' :
+                                                        filterStatus === 'proposta' ? 'bg-slate-500' :
+                                                            filterStatus === 'planejamento' ? 'bg-cyan-500' :
+                                                                'bg-muted-foreground'
+                                    }`} />
+                                <span className="truncate">
+                                    <SelectValue placeholder="Filtrar por Status" />
+                                </span>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos os Status</SelectItem>
+                            <SelectItem value="em_andamento">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-sky-500" /> Em Andamento</span>
+                            </SelectItem>
+                            <SelectItem value="concluido">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Concluído</span>
+                            </SelectItem>
+                            <SelectItem value="suspenso">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500" /> Suspenso</span>
+                            </SelectItem>
+                            <SelectItem value="cancelado">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-rose-500" /> Cancelado</span>
+                            </SelectItem>
+                            <SelectItem value="recorrente">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-violet-500" /> Recorrente</span>
+                            </SelectItem>
+                            <SelectItem value="proposta">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-slate-500" /> Proposta</span>
+                            </SelectItem>
+                            <SelectItem value="planejamento">
+                                <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500" /> Planejamento</span>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {Object.keys(groupedProjects).length === 0 ? (
@@ -272,7 +322,7 @@ export function ProjectList() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                 {orgProjects.map(project => (
-                                    <Card key={project.id} className="group relative overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1 border-border/50 bg-card h-full flex flex-col">
+                                    <Card key={project.id} className="group relative transition-all hover:shadow-xl hover:-translate-y-1 border-border/50 bg-card h-full flex flex-col">
                                         <div className="absolute top-0 left-0 w-1 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                                         <CardHeader className="pb-2 flex-grow">
                                             <div className="flex justify-between items-start">
@@ -285,12 +335,30 @@ export function ProjectList() {
                                                 {project.description}
                                             </CardDescription>
                                         </CardHeader>
-                                        <CardContent className="pb-2 mt-auto">
-                                            <div className="flex items-center text-xs text-muted-foreground gap-1">
-                                                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                                                Ativo
-                                                <span className="mx-2">•</span>
-                                                {new Date(project.updatedAt).toLocaleDateString('pt-BR')}
+                                        <CardContent className="pb-10 pt-2 mt-auto">
+                                            <div className="flex items-center text-xs text-muted-foreground gap-2 mb-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${project.status === 'em_andamento' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                                    project.status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                        project.status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                            project.status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                                project.status === 'recorrente' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                                                                    project.status === 'proposta' ? 'bg-slate-50 text-slate-700 border-slate-200' :
+                                                                        project.status === 'planejamento' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' :
+                                                                            'bg-gray-50 text-gray-700 border-gray-200'
+                                                    }`}>
+                                                    {
+                                                        project.status === 'em_andamento' ? 'Em Andamento' :
+                                                            project.status === 'concluido' ? 'Concluído' :
+                                                                project.status === 'suspenso' ? 'Suspenso' :
+                                                                    project.status === 'cancelado' ? 'Cancelado' :
+                                                                        project.status === 'recorrente' ? 'Recorrente' :
+                                                                            project.status === 'proposta' ? 'Proposta' :
+                                                                                project.status === 'planejamento' ? 'Planejamento' :
+                                                                                    project.status
+                                                    }
+                                                </span>
+                                                <span>•</span>
+                                                <span>{new Date(project.updatedAt).toLocaleDateString('pt-BR')}</span>
                                             </div>
                                         </CardContent>
                                         <CardFooter className="pt-4 border-t border-border/30 bg-muted/20">

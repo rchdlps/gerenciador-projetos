@@ -40,7 +40,11 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                     status
                 }
             })
-            if (!res.ok) throw new Error("Failed to update")
+            if (!res.ok) {
+                const errorText = await res.text()
+                console.error('[ProjectHeader] Update failed:', res.status, errorText)
+                throw new Error(`Failed to update: ${res.status} - ${errorText}`)
+            }
             return res.json()
         },
         onSuccess: () => {
@@ -50,8 +54,9 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
             toast.success("Projeto atualizado com sucesso!")
             window.location.reload()
         },
-        onError: () => {
-            toast.error("Erro ao atualizar projeto")
+        onError: (error: Error) => {
+            console.error('[ProjectHeader] Mutation error:', error)
+            toast.error(`Erro ao atualizar projeto: ${error.message}`)
         }
     })
 
@@ -129,6 +134,9 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                                             <SelectItem value="concluido">Concluído</SelectItem>
                                             <SelectItem value="suspenso">Suspenso</SelectItem>
                                             <SelectItem value="cancelado">Cancelado</SelectItem>
+                                            <SelectItem value="recorrente">Recorrente</SelectItem>
+                                            <SelectItem value="proposta">Proposta</SelectItem>
+                                            <SelectItem value="planejamento">Planejamento</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -155,14 +163,20 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                                     {project.type || "Projeto"}
                                 </span>
                                 <span className={`inline-flex items-center rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                    status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                        status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                            'bg-sky-50 text-sky-700 border-sky-200'
+                                        status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                            status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                status === 'recorrente' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                                                    status === 'proposta' ? 'bg-slate-50 text-slate-700 border-slate-200' :
+                                                        status === 'planejamento' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' :
+                                                            'bg-sky-50 text-sky-700 border-sky-200'
                                     }`}>
                                     {status === 'em_andamento' ? 'Em Andamento' :
                                         status === 'concluido' ? 'Concluído' :
                                             status === 'suspenso' ? 'Suspenso' :
-                                                status === 'cancelado' ? 'Cancelado' : status}
+                                                status === 'cancelado' ? 'Cancelado' :
+                                                    status === 'recorrente' ? 'Recorrente' :
+                                                        status === 'proposta' ? 'Proposta' :
+                                                            status === 'planejamento' ? 'Planejamento' : status}
                                 </span>
                             </div>
 

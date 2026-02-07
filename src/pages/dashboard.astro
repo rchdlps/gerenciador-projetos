@@ -72,6 +72,9 @@ const statusLabels: Record<string, string> = {
     concluido: "Concluído",
     suspenso: "Suspenso",
     cancelado: "Cancelado",
+    recorrente: "Recorrente",
+    proposta: "Proposta",
+    planejamento: "Planejamento",
 };
 
 Object.keys(statusLabels).forEach((key) => projectsByStatusMap.set(key, 0));
@@ -116,6 +119,7 @@ const projectsByOrg = Array.from(orgStats.entries()).map(([name, stats]) => ({
 
 const completionRate = {
     completed: projectsByStatusMap.get("concluido") || 0,
+    recorrente: projectsByStatusMap.get("recorrente") || 0,
     total: allProjects.length,
 };
 
@@ -139,12 +143,40 @@ if (projectsByOrg.length === 0) {
                     Visão geral e desempenho do sistema.
                 </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
                 <span
                     class="text-xs font-medium px-3 py-1 bg-slate-100 text-slate-600 rounded-full"
                 >
-                    Última atualização: Hoje, 14:30
+                    Atualizado: {
+                        new Date().toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                        })
+                    }
                 </span>
+                <a
+                    href="/dashboard"
+                    class="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-full transition-colors border border-sky-200"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path
+                            d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8"
+                        ></path>
+                        <path d="M21 3v5h-5"></path>
+                    </svg>
+                    Atualizar
+                </a>
             </div>
         </div>
 
@@ -170,7 +202,7 @@ if (projectsByOrg.length === 0) {
                         >
                         <FileText className="h-4 w-4 text-indigo-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-10">
                         <div class="flex items-baseline space-x-2">
                             <div class="text-3xl font-bold text-slate-800">
                                 {projectsCount.count}
@@ -204,7 +236,7 @@ if (projectsByOrg.length === 0) {
                         >
                         <Activity className="h-4 w-4 text-violet-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-10">
                         <div class="flex items-baseline space-x-2">
                             <div class="text-3xl font-bold text-slate-800">
                                 {activeTasksCount}
@@ -238,7 +270,7 @@ if (projectsByOrg.length === 0) {
                         >
                         <Users className="h-4 w-4 text-amber-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-10">
                         <div class="flex items-baseline space-x-2">
                             <div class="text-3xl font-bold text-slate-800">
                                 {usersCount.count}
@@ -272,7 +304,7 @@ if (projectsByOrg.length === 0) {
                         >
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pb-10">
                         <div class="flex items-baseline space-x-2">
                             <div class="text-3xl font-bold text-slate-800">
                                 {completedTasksCount}
