@@ -7,7 +7,7 @@ test.describe('Authentication', () => {
   })
 
   test('should redirect unauthenticated users to login', async ({ page }) => {
-    await page.goto('/dashboard')
+    await page.goto('/')
 
     // Should be redirected to login page
     await expect(page).toHaveURL(/\/login/)
@@ -37,12 +37,14 @@ test.describe('Authentication', () => {
     await page.goto('/login')
 
     // Use seeded test user credentials
-    await page.fill('input[type="email"]', 'admin@cuiaba.mt.gov.br')
-    await page.fill('input[type="password"]', 'password123')
-    await page.click('button[type="submit"]')
+    await page.locator('input[type="email"]').fill('admin@cuiaba.mt.gov.br')
+    await page.locator('input[type="password"]').fill('password123')
 
-    // Should redirect to dashboard after successful login
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    // Wait for navigation after clicking submit
+    await Promise.all([
+      page.waitForURL(/^\/$|^\/dashboard$/, { timeout: 10000 }),
+      page.locator('button[type="submit"]:has-text("Entrar")').click()
+    ])
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
@@ -78,11 +80,13 @@ test.describe('Authentication', () => {
   test('should logout successfully', async ({ page }) => {
     // Login first
     await page.goto('/login')
-    await page.fill('input[type="email"]', 'admin@cuiaba.mt.gov.br')
-    await page.fill('input[type="password"]', 'password123')
-    await page.click('button[type="submit"]')
+    await page.locator('input[type="email"]').fill('admin@cuiaba.mt.gov.br')
+    await page.locator('input[type="password"]').fill('password123')
 
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await Promise.all([
+      page.waitForURL(/^\/$|^\/dashboard$/, { timeout: 10000 }),
+      page.locator('button[type="submit"]:has-text("Entrar")').click()
+    ])
 
     // Logout
     // This assumes there's a logout button/menu - adjust selector as needed
@@ -95,17 +99,19 @@ test.describe('Authentication', () => {
   test('should persist session on page reload', async ({ page }) => {
     // Login
     await page.goto('/login')
-    await page.fill('input[type="email"]', 'admin@cuiaba.mt.gov.br')
-    await page.fill('input[type="password"]', 'password123')
-    await page.click('button[type="submit"]')
+    await page.locator('input[type="email"]').fill('admin@cuiaba.mt.gov.br')
+    await page.locator('input[type="password"]').fill('password123')
 
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await Promise.all([
+      page.waitForURL(/^\/$|^\/dashboard$/, { timeout: 10000 }),
+      page.locator('button[type="submit"]:has-text("Entrar")').click()
+    ])
 
     // Reload page
     await page.reload()
 
     // Should still be on dashboard (session persisted)
-    await expect(page).toHaveURL(/\/dashboard/)
+    await expect(page).toHaveURL(/^\/$|^\/dashboard$/)
   })
 })
 
@@ -113,14 +119,17 @@ test.describe('Authorization', () => {
   test.beforeEach(async ({ page }) => {
     // Login as regular user
     await page.goto('/login')
-    await page.fill('input[type="email"]', 'saude@cuiaba.mt.gov.br')
-    await page.fill('input[type="password"]', 'password123')
-    await page.click('button[type="submit"]')
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await page.locator('input[type="email"]').fill('saude@cuiaba.mt.gov.br')
+    await page.locator('input[type="password"]').fill('password123')
+
+    await Promise.all([
+      page.waitForURL(/^\/$|^\/dashboard$/, { timeout: 10000 }),
+      page.locator('button[type="submit"]:has-text("Entrar")').click()
+    ])
   })
 
   test('should hide admin menu for non-admin users', async ({ page }) => {
-    await page.goto('/dashboard')
+    await page.goto('/')
 
     // Admin menu should not be visible
     const adminLink = page.locator('a[href="/admin"]')
@@ -132,10 +141,13 @@ test.describe('Authorization', () => {
     await page.click('button:has-text("Sair"), button:has-text("Logout")')
 
     await page.goto('/login')
-    await page.fill('input[type="email"]', 'admin@cuiaba.mt.gov.br')
-    await page.fill('input[type="password"]', 'password123')
-    await page.click('button[type="submit"]')
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10000 })
+    await page.locator('input[type="email"]').fill('admin@cuiaba.mt.gov.br')
+    await page.locator('input[type="password"]').fill('password123')
+
+    await Promise.all([
+      page.waitForURL(/^\/$|^\/dashboard$/, { timeout: 10000 }),
+      page.locator('button[type="submit"]:has-text("Entrar")').click()
+    ])
 
     // Admin link should be visible
     const adminLink = page.locator('a[href="/admin"]')
