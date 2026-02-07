@@ -16,6 +16,8 @@ type Project = {
     description: string | null
     updatedAt: string
     organizationId?: string
+    type: string
+    status: string
 }
 
 type Organization = {
@@ -30,6 +32,8 @@ export function ProjectList() {
     const [isOpen, setIsOpen] = useState(false)
     const [name, setName] = useState("")
     const [desc, setDesc] = useState("")
+    const [type, setType] = useState("Projeto")
+    const [status, setStatus] = useState("em_andamento")
     const [selectedOrg, setSelectedOrg] = useState<string>("")
     const [searchTerm, setSearchTerm] = useState("")
     const [filterOrg, setFilterOrg] = useState("all")
@@ -69,7 +73,9 @@ export function ProjectList() {
                 json: {
                     name,
                     description: desc,
-                    organizationId: selectedOrg
+                    organizationId: selectedOrg,
+                    type,
+                    status
                 }
             })
             if (!res.ok) throw new Error("Failed to create")
@@ -80,6 +86,8 @@ export function ProjectList() {
             setIsOpen(false)
             setName("")
             setDesc("")
+            setType("Projeto")
+            setStatus("em_andamento")
         }
     })
 
@@ -148,6 +156,40 @@ export function ProjectList() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
+                                <Label htmlFor="type">Tipo de Projeto</Label>
+                                <Select value={type} onValueChange={setType}>
+                                    <SelectTrigger id="type">
+                                        <SelectValue placeholder="Selecione o Tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Obra">Obra</SelectItem>
+                                        <SelectItem value="Trabalho Social">Trabalho Social</SelectItem>
+                                        <SelectItem value="Programa">Programa</SelectItem>
+                                        <SelectItem value="Serviço">Serviço</SelectItem>
+                                        <SelectItem value="Aquisição">Aquisição</SelectItem>
+                                        <SelectItem value="Evento">Evento</SelectItem>
+                                        <SelectItem value="Estudo">Estudo</SelectItem>
+                                        <SelectItem value="Capacitação">Capacitação</SelectItem>
+                                        <SelectItem value="Inovação">Inovação</SelectItem>
+                                        <SelectItem value="TIC">TIC</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="status">Status Inicial</Label>
+                                <Select value={status} onValueChange={setStatus}>
+                                    <SelectTrigger id="status">
+                                        <SelectValue placeholder="Selecione o Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                                        <SelectItem value="concluido">Concluído</SelectItem>
+                                        <SelectItem value="suspenso">Suspenso</SelectItem>
+                                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="name">Nome do Projeto</Label>
                                 <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="ex: Implantação de ERP" />
                             </div>
@@ -158,7 +200,7 @@ export function ProjectList() {
                         </div>
                         <DialogFooter>
                             <Button variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
-                            <Button onClick={() => createProject.mutate()} disabled={createProject.isPending || !selectedOrg}>
+                            <Button onClick={() => createProject.mutate()} disabled={createProject.isPending || !selectedOrg || !name}>
                                 {createProject.isPending ? 'Criando...' : 'Criar Projeto'}
                             </Button>
                         </DialogFooter>

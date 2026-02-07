@@ -12,31 +12,19 @@ const STATUS_COLORS = {
     "Atrasados": "#f43f5e"     // rose-500
 }
 
-const dataType = [
-    { name: 'Programa', value: 400 },
-    { name: 'Serviço', value: 300 },
-    { name: 'Aquisição', value: 300 },
-    { name: 'Evento', value: 200 },
-    { name: 'Obra', value: 278 },
-];
+interface OverviewChartsProps {
+    projectsByType: { name: string; value: number }[];
+    projectsByStatus: { name: string; value: number }[];
+    projectsByOrg: { name: string; progress: number }[];
+    completionRate: { completed: number; total: number };
+}
 
-const dataStatus = [
-    { name: 'Em Andamento', value: 45 },
-    { name: 'Concluídos', value: 20 },
-    { name: 'Atrasados', value: 10 },
-];
+export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg, completionRate }: OverviewChartsProps) {
+    const { completed, total } = completionRate;
+    // Prevent division by zero
+    const completionPercentage = total > 0 ? (completed / total) * 100 : 0;
+    const dashOffset = 440 - (440 * (completionPercentage / 100));
 
-const dataSecretariats = [
-    { name: 'SME', progress: 80 },
-    { name: 'SMS', progress: 45 },
-    { name: 'SMOB', progress: 60 },
-    { name: 'SMPO', progress: 90 },
-    { name: 'DEMO', progress: 30 },
-    { name: 'SMT', progress: 50 },
-    { name: 'SAD', progress: 70 },
-];
-
-export function OverviewCharts() {
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Section 1: Detailed Analysis */}
@@ -59,7 +47,7 @@ export function OverviewCharts() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
-                                            data={dataType}
+                                            data={projectsByType}
                                             cx="50%"
                                             cy="50%"
                                             innerRadius={60}
@@ -67,7 +55,7 @@ export function OverviewCharts() {
                                             paddingAngle={5}
                                             dataKey="value"
                                         >
-                                            {dataType.map((entry, index) => (
+                                            {projectsByType.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
@@ -92,15 +80,15 @@ export function OverviewCharts() {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
-                                            data={dataStatus}
+                                            data={projectsByStatus}
                                             cx="50%"
                                             cy="50%"
                                             outerRadius={80}
                                             fill="#8884d8"
                                             dataKey="value"
                                         >
-                                            {dataStatus.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name as keyof typeof STATUS_COLORS]} />
+                                            {projectsByStatus.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name as keyof typeof STATUS_COLORS] || COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
                                         <Tooltip />
@@ -139,13 +127,13 @@ export function OverviewCharts() {
                                         stroke="#10b981" // emerald-500
                                         strokeWidth="15"
                                         strokeDasharray={440}
-                                        strokeDashoffset={440 - (440 * 0.1)} // 10% progress
+                                        strokeDashoffset={dashOffset}
                                         strokeLinecap="round"
                                         className="transition-all duration-1000 ease-out"
                                     />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-4xl font-bold text-slate-800">20/200</span>
+                                    <span className="text-4xl font-bold text-slate-800">{completed}/{total}</span>
                                     <span className="text-xs text-slate-500 uppercase tracking-widest mt-1">Concluídos</span>
                                 </div>
                             </div>
@@ -170,7 +158,7 @@ export function OverviewCharts() {
                     <CardContent>
                         <div className="h-[300px] w-full min-h-[300px] min-w-[200px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dataSecretariats}>
+                                <BarChart data={projectsByOrg}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                     <XAxis
                                         dataKey="name"
@@ -197,7 +185,7 @@ export function OverviewCharts() {
                                         name="Progresso (%)"
                                     >
                                         {
-                                            dataSecretariats.map((entry, index) => (
+                                            projectsByOrg.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.progress < 50 ? '#fbbf24' : '#34d399'} />
                                             ))
                                         }

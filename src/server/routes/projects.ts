@@ -49,11 +49,13 @@ app.post('/',
     zValidator('json', z.object({
         name: z.string().min(1),
         description: z.string().optional(),
-        organizationId: z.string().min(1)
+        organizationId: z.string().min(1),
+        type: z.string().optional().default('Projeto'),
+        status: z.string().optional().default('em_andamento')
     })),
     async (c) => {
         const sessionUser = c.get('user')
-        const { name, description, organizationId } = c.req.valid('json')
+        const { name, description, organizationId, type, status } = c.req.valid('json')
 
         // Fetch full user to check role
         const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
@@ -84,7 +86,9 @@ app.post('/',
             name,
             description,
             userId: sessionUser.id, // Creator
-            organizationId
+            organizationId,
+            type,
+            status
         }).returning()
 
         // Standard Phases
@@ -113,10 +117,71 @@ app.post('/',
             action: 'CREATE',
             resource: 'project',
             resourceId: id,
-            metadata: { name }
+            metadata: { name, type, status }
         })
 
         return c.json(newProject)
+    }
+)
+
+app.patch('/:id',
+    zValidator('json', z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        type: z.string().optional(),
+        status: z.string().optional()
+    })),
+    async (c) => {
+        const sessionUser = c.get('user')
+        const id = c.req.param('id')
+        const { name, description, type, status } = c.req.valid('json')
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+
+        // Get project to check permission
+        const [project] = await db.select().from(projects).where(eq(projects.id, id))
+        if (!project) return c.json({ error: 'Not found' }, 404)
+
+        // Verify access
+        if (project.organizationId) {
+            const isSuperAdmin = user && user.globalRole === 'super_admin'
+            if (!isSuperAdmin) {
+                const membership = await db.query.memberships.findFirst({
+                    where: and(
+                        eq(memberships.userId, sessionUser.id),
+                        eq(memberships.organizationId, project.organizationId)
+                    )
+                })
+                // Only admin/gestor/secretario can update? Or anyone with access?
+                // Let's assume 'viewer' cannot update.
+                if (!membership || membership.role === 'viewer') {
+                    return c.json({ error: 'Forbidden' }, 403)
+                }
+            }
+        } else {
+            // Personal project
+            if (project.userId !== sessionUser.id && user?.globalRole !== 'super_admin') {
+                return c.json({ error: 'Forbidden' }, 403)
+            }
+        }
+
+        const [updatedProject] = await db.update(projects)
+            .set({ name, description, type, status, updatedAt: new Date() })
+            .where(eq(projects.id, id))
+            .returning()
+
+        // Audit Log
+        await createAuditLog({
+            userId: sessionUser.id,
+            organizationId: project.organizationId,
+            action: 'UPDATE',
+            resource: 'project',
+            resourceId: id,
+            metadata: { name, type, status }
+        })
+
+        return c.json(updatedProject)
     }
 )
 

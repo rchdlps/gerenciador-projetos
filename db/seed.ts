@@ -218,6 +218,8 @@ async function seed() {
                 description: "Migração e implantação do novo sistema integrado de gestão administrativa e financeira.",
                 orgId: demoId,
                 userId: adminUser.id,
+                type: "TIC",
+                projectStatus: "em_andamento",
                 status: ["Planejamento", "Execução", "Homologação"],
                 cards: ["Mapeamento de Processos", "Treinamento de Key Users", "Migração de Dados Legados"]
             },
@@ -226,6 +228,8 @@ async function seed() {
                 description: "Redesign completo do portal de transparência com novas funcionalidades de busca e visualização.",
                 orgId: demoId,
                 userId: adminUser.id,
+                type: "TIC",
+                projectStatus: "concluido", // COMPLETED PROJECT
                 status: ["Design", "Desenvolvimento", "Deploy"],
                 cards: ["Wireframes", "API de Dados Abertos", "Dashboard Interativo"]
             },
@@ -234,6 +238,8 @@ async function seed() {
                 description: "Aplicativo móvel para serviços municipais, agendamentos e acompanhamento de protocolos.",
                 orgId: demoId,
                 userId: adminUser.id,
+                type: "TIC",
+                projectStatus: "em_andamento",
                 status: ["Pesquisa", "Prototipação", "Lançamento"],
                 cards: ["Design System", "Integração SSO", "Push Notifications"]
             },
@@ -244,6 +250,8 @@ async function seed() {
                 description: "Atualização das diretrizes de expansão urbana, zoneamento e saneamento para os próximos 10 anos.",
                 orgId: smpoId,
                 userId: adminUser.id,
+                type: "Legislativo",
+                projectStatus: "em_andamento",
                 status: ["Audiências Públicas", "Redação", "Aprovação"],
                 cards: ["Convocação de Audiência Sul", "Estudo de Impacto Ambiental", "Mapa Interativo"]
             },
@@ -252,6 +260,8 @@ async function seed() {
                 description: "Elaboração do PPA com metas, indicadores e orçamento para o quadriênio.",
                 orgId: smpoId,
                 userId: adminUser.id,
+                type: "Legislativo",
+                projectStatus: "planejamento",
                 status: ["Diagnóstico", "Metas", "Validação"],
                 cards: ["Coleta de Dados", "Oficinas Setoriais", "Sistema de Monitoramento"]
             },
@@ -260,6 +270,8 @@ async function seed() {
                 description: "Plataforma de acompanhamento de indicadores sociais, econômicos e ambientais do município.",
                 orgId: smpoId,
                 userId: adminUser.id,
+                type: "TIC",
+                projectStatus: "suspenso",
                 status: ["Pesquisa", "Desenvolvimento", "Operação"],
                 cards: ["Definição de KPIs", "ETL de Dados", "Dashboards Públicos"]
             },
@@ -270,6 +282,8 @@ async function seed() {
                 description: "Logística e distribuição de vacinas contra Gripe, Dengue e COVID-19 atualizada.",
                 orgId: smsId,
                 userId: saudeUser.id,
+                type: "Serviço",
+                projectStatus: "em_andamento",
                 status: ["Logística", "Comunicação", "Execução"],
                 cards: ["Aquisição de Seringas", "Campanha TV/Rádio", "Postos Itinerantes"]
             },
@@ -278,6 +292,8 @@ async function seed() {
                 description: "Reforma e ampliação da Unidade de Pronto Atendimento com novos leitos e equipamentos.",
                 orgId: smsId,
                 userId: saudeUser.id,
+                type: "Obra",
+                projectStatus: "em_andamento",
                 status: ["Projeto", "Licitação", "Execução"],
                 cards: ["Projeto Arquitetônico", "Aquisição de Equipamentos", "Contratação de Profissionais"]
             },
@@ -286,6 +302,8 @@ async function seed() {
                 description: "Implementação de sistema de agendamento de consultas e exames via web e aplicativo.",
                 orgId: smsId,
                 userId: saudeUser.id,
+                type: "TIC",
+                projectStatus: "concluido", // COMPLETED PROJECT
                 status: ["Análise", "Desenvolvimento", "Implantação"],
                 cards: ["Integração eSUS", "App Mobile", "Central de Atendimento"]
             },
@@ -296,6 +314,8 @@ async function seed() {
                 description: "Implantação de laboratórios de informática e tablets educacionais em 50 escolas municipais.",
                 orgId: smeId,
                 userId: educacaoUser?.id || adminUser.id,
+                type: "TIC",
+                projectStatus: "em_andamento",
                 status: ["Planejamento", "Aquisição", "Instalação"],
                 cards: ["Diagnóstico de Infraestrutura", "Licitação de Equipamentos", "Capacitação de Professores"]
             },
@@ -304,6 +324,8 @@ async function seed() {
                 description: "Adequação de espaços físicos, climatização e acessibilidade nas creches da rede municipal.",
                 orgId: smeId,
                 userId: educacaoUser?.id || adminUser.id,
+                type: "Obra",
+                projectStatus: "planejamento",
                 status: ["Projetos", "Contratação", "Obras"],
                 cards: ["Levantamento de Demandas", "Processo Licitatório", "Fiscalização de Obras"]
             },
@@ -312,6 +334,8 @@ async function seed() {
                 description: "Programa de capacitação para 2.000 professores da rede municipal em metodologias ativas.",
                 orgId: smeId,
                 userId: educacaoUser?.id || adminUser.id,
+                type: "Eventos",
+                projectStatus: "em_andamento",
                 status: ["Planejamento", "Execução", "Avaliação"],
                 cards: ["Parcerias Universitárias", "Módulos EAD", "Certificação"]
             },
@@ -322,6 +346,8 @@ async function seed() {
                 description: "Pavimentação de 15km de vias urbanas com drenagem pluvial e sinalização.",
                 orgId: smobId,
                 userId: obrasUser.id,
+                type: "Obra",
+                projectStatus: "em_andamento",
                 status: ["Projetos", "Terraplanagem", "Asfaltamento"],
                 cards: ["Topografia", "Drenagem Pluvial", "Sinalização Viária"]
             },
@@ -330,6 +356,8 @@ async function seed() {
                 description: "Modernização do parque com novos equipamentos, iluminação LED e paisagismo.",
                 orgId: smobId,
                 userId: obrasUser.id,
+                type: "Obra",
+                projectStatus: "concluido", // COMPLETED PROJECT
                 status: ["Design", "Contratação", "Execução"],
                 cards: ["Projeto Paisagístico", "Mobiliário Urbano", "Sistema de Irrigação"]
             },
@@ -338,6 +366,8 @@ async function seed() {
                 description: "Construção de nova ponte ligando os bairros Jardim das Américas e Boa Esperança.",
                 orgId: smobId,
                 userId: obrasUser.id,
+                type: "Obra",
+                projectStatus: "em_andamento",
                 status: ["Estudos", "Fundações", "Superestrutura"],
                 cards: ["Estudo Hidrológico", "Projeto Estrutural", "Licenciamento Ambiental"]
             }
@@ -353,6 +383,8 @@ async function seed() {
                 description: p.description,
                 userId: p.userId,
                 organizationId: p.orgId,
+                type: p.type, // Added
+                status: p.projectStatus // Added
             });
 
             // Board - Create Columns
@@ -405,11 +437,11 @@ async function seed() {
                 action: 'CREATE',
                 resource: 'project',
                 resourceId: projectId,
-                metadata: JSON.stringify({ name: p.name, description: p.description }),
+                metadata: JSON.stringify({ name: p.name, description: p.description, type: p.type, status: p.projectStatus }),
                 createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) // 20 days ago
             });
 
-            // Stakeholders
+            // ... (Stakeholders logic remains same) ...
             const demoStakeholders = [
                 { name: "Dr. João Silva", role: "Secretário", level: "patrocinador" },
                 { name: "Maria Oliveira", role: "Gerente de Projeto", level: "gerente" },
@@ -521,13 +553,16 @@ async function seed() {
                     const randomStakeholderId = createdStakeholderIds[Math.floor(Math.random() * createdStakeholderIds.length)];
                     const taskId = nanoid();
 
+                    // FORCE DONE status if project is completed
+                    const forcedStatus = p.projectStatus === "concluido" ? "done" : task.status;
+
                     await db.insert(tasks).values({
                         id: taskId,
                         phaseId,
                         title: task.title,
                         description: task.description,
                         priority: task.priority,
-                        status: task.status,
+                        status: forcedStatus, // Use forced status
                         assigneeId: p.userId,
                         stakeholderId: randomStakeholderId,
                         order: taskOrder++,

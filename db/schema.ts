@@ -88,6 +88,8 @@ export const projects = pgTable("projects", {
     description: text("description"),
     userId: text("user_id").notNull().references(() => users.id),
     organizationId: text("organization_id").references(() => organizations.id),
+    type: text("type").notNull().default('Projeto'), // 'Obra', 'Trabalho Social', 'Programa', etc.
+    status: text("status").notNull().default('em_andamento'), // 'em_andamento', 'concluido', 'suspenso', 'cancelado'
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -286,3 +288,44 @@ export const procurementContracts = pgTable("procurement_contracts", {
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// RELATIONS
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+    organization: one(organizations, {
+        fields: [projects.organizationId],
+        references: [organizations.id],
+    }),
+    user: one(users, {
+        fields: [projects.userId],
+        references: [users.id],
+    }),
+    phases: many(projectPhases),
+}));
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+    projects: many(projects),
+    members: many(memberships),
+}));
+
+export const projectPhasesRelations = relations(projectPhases, ({ one, many }) => ({
+    project: one(projects, {
+        fields: [projectPhases.projectId],
+        references: [projects.id],
+    }),
+    tasks: many(tasks),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+    phase: one(projectPhases, {
+        fields: [tasks.phaseId],
+        references: [projectPhases.id],
+    }),
+    assignee: one(users, {
+        fields: [tasks.assigneeId],
+        references: [users.id],
+    }),
+    stakeholder: one(stakeholders, {
+        fields: [tasks.stakeholderId],
+        references: [stakeholders.id],
+    }),
+}));

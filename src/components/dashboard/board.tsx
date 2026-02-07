@@ -1,8 +1,21 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { DndContext, DragOverlay, closestCorners, pointerWithin, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable, type DragEndEvent, type UniqueIdentifier } from '@dnd-kit/core';
+import {
+    DndContext,
+    DragOverlay,
+    closestCorners,
+    pointerWithin,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    useDroppable,
+    type DragEndEvent,
+    type UniqueIdentifier,
+    type CollisionDetection
+} from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,9 +50,24 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
     const activeColumnId = useRef<string | null>(null)
 
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5, // Prevent accidental drags
+            },
+        }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     )
+
+    // Custom collision detection to handle empty columns better
+    const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
+        // First, check if pointer is strictly within a droppable (works best for empty containers)
+        const pointerCollisions = pointerWithin(args);
+        if (pointerCollisions.length > 0) {
+            return pointerCollisions;
+        }
+        // Fallback to closest corners for smoother sorting when near items
+        return closestCorners(args);
+    }, []);
 
     const { data: serverColumns = [], isLoading } = useQuery<BoardColumn[]>({
         queryKey: ['board', projectId],
@@ -252,7 +280,7 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
 
             <DndContext
                 sensors={sensors}
-                collisionDetection={closestCorners}
+                collisionDetection={collisionDetectionStrategy}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
