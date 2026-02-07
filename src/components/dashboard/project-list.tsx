@@ -250,13 +250,13 @@ export function ProjectList() {
                         <SelectTrigger className="bg-background">
                             <div className="flex items-center gap-2 w-full overflow-hidden">
                                 <span className={`w-2 h-2 rounded-full shrink-0 ${filterStatus === 'em_andamento' ? 'bg-sky-500' :
-                                        filterStatus === 'concluido' ? 'bg-emerald-500' :
-                                            filterStatus === 'suspenso' ? 'bg-amber-500' :
-                                                filterStatus === 'cancelado' ? 'bg-rose-500' :
-                                                    filterStatus === 'recorrente' ? 'bg-violet-500' :
-                                                        filterStatus === 'proposta' ? 'bg-slate-500' :
-                                                            filterStatus === 'planejamento' ? 'bg-cyan-500' :
-                                                                'bg-muted-foreground'
+                                    filterStatus === 'concluido' ? 'bg-emerald-500' :
+                                        filterStatus === 'suspenso' ? 'bg-amber-500' :
+                                            filterStatus === 'cancelado' ? 'bg-rose-500' :
+                                                filterStatus === 'recorrente' ? 'bg-violet-500' :
+                                                    filterStatus === 'proposta' ? 'bg-slate-500' :
+                                                        filterStatus === 'planejamento' ? 'bg-cyan-500' :
+                                                            'bg-muted-foreground'
                                     }`} />
                                 <span className="truncate">
                                     <SelectValue placeholder="Filtrar por Status" />
@@ -315,7 +315,7 @@ export function ProjectList() {
                                         {getOrgName(orgId === 'personal' ? null : orgId)}
                                     </h3>
                                     <p className="text-xs text-muted-foreground">
-                                        {orgProjects.length} projetos ativos
+                                        {orgProjects.length} projetos cadastrados
                                     </p>
                                 </div>
                             </div>
