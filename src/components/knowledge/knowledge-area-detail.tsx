@@ -15,6 +15,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import CommunicationView from "../projects/knowledge-areas/communication/communication-view"
 import ProcurementView from "./procurement-view"
+import ScopeView from "./scope-view"
+import CostView from "./cost-view"
+import ResourceView from "./resource-view"
+import RiskView from "./risk-view"
+import StakeholderView from "./stakeholder-view"
 
 export function KnowledgeAreaDetail({ projectId, area }: { projectId: string, area: string }) {
     return (
@@ -129,8 +134,23 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             {/* Procurement Section - Only for procurement */}
             {area === 'aquisicoes' && <ProcurementView projectId={projectId} />}
 
-            {/* Notes Section - Hidden for communication and procurement */}
-            {area !== 'comunicacao' && area !== 'aquisicoes' && (
+            {/* Scope Section - Only for scope */}
+            {area === 'escopo' && <ScopeView projectId={projectId} />}
+
+            {/* Cost Section - Only for costs */}
+            {area === 'custos' && <CostView projectId={projectId} />}
+
+            {/* Resource Section - Only for resources */}
+            {area === 'recursos' && <ResourceView projectId={projectId} />}
+
+            {/* Risk Section - Only for risks */}
+            {area === 'riscos' && <RiskView projectId={projectId} />}
+
+            {/* Stakeholder Section - Only for stakeholders */}
+            {area === 'partes' && <StakeholderView projectId={projectId} />}
+
+            {/* Notes Section - Hidden for communication, procurement, escopo, custos, recursos, riscos, and partes */}
+            {area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && (
                 <NotesSection
                     projectId={projectId}
                     area={area}
@@ -138,8 +158,8 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                 />
             )}
 
-            {/* Change Control Section - Hidden for schedule, quality, communication and procurement */}
-            {area !== 'cronograma' && area !== 'qualidade' && area !== 'comunicacao' && area !== 'aquisicoes' && (
+            {/* Change Control Section - Hidden for schedule, quality, communication, procurement, escopo, custos, recursos, riscos, and partes */}
+            {area !== 'cronograma' && area !== 'qualidade' && area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && (
                 <ChangeControlSection
                     projectId={projectId}
                     area={area}
@@ -157,30 +177,32 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                 />
             )}
 
-            {/* Attachments Section */}
-            <Card className="border-t-4 border-slate-600">
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                    <div className="bg-slate-600 p-2 rounded">
-                        <Paperclip className="w-5 h-5 text-white" />
-                    </div>
-                    <CardTitle className="text-lg font-bold text-slate-800">Documentos Anexados ({attachments.length})</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="bg-slate-50 border-l-4 border-slate-400 p-3 text-sm text-slate-800 flex gap-2">
-                        <Paperclip className="w-4 h-4 shrink-0 mt-0.5" />
-                        <p>
-                            <span className="font-bold">Anexe documentos relevantes:</span> Contratos, planilhas, apresentações, imagens, PDFs, ou qualquer arquivo que complemente as informações desta área.
-                        </p>
-                    </div>
+            {/* Attachments Section - Hidden for escopo, custos, recursos, riscos, and partes (handled internally) */}
+            {area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && (
+                <Card className="border-t-4 border-slate-600">
+                    <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                        <div className="bg-slate-600 p-2 rounded">
+                            <Paperclip className="w-5 h-5 text-white" />
+                        </div>
+                        <CardTitle className="text-lg font-bold text-slate-800">Documentos Anexados ({attachments.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="bg-slate-50 border-l-4 border-slate-400 p-3 text-sm text-slate-800 flex gap-2">
+                            <Paperclip className="w-4 h-4 shrink-0 mt-0.5" />
+                            <p>
+                                <span className="font-bold">Anexe documentos relevantes:</span> Contratos, planilhas, apresentações, imagens, PDFs, ou qualquer arquivo que complemente as informações desta área.
+                            </p>
+                        </div>
 
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList
-                        attachments={attachments}
-                        onDelete={handleDeleteAttachment}
-                        isDeleting={isDeletingAttachment}
-                    />
-                </CardContent>
-            </Card>
+                        <FileUpload onUpload={handleUpload} />
+                        <AttachmentList
+                            attachments={attachments}
+                            onDelete={handleDeleteAttachment}
+                            isDeleting={isDeletingAttachment}
+                        />
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }
