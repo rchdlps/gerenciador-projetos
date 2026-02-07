@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
+import { LogOut } from "lucide-react"
 
 export function Header() {
     const { data: session } = authClient.useSession()
@@ -43,12 +44,13 @@ export function Header() {
                     <Button
                         variant="secondary"
                         size="sm"
-                        className="font-medium shadow-none hover:bg-white/90 bg-secondary text-secondary-foreground border-none"
+                        className="font-medium shadow-none hover:bg-white/90 bg-secondary text-secondary-foreground border-none cursor-pointer gap-2"
                         onClick={async () => {
                             await authClient.signOut();
                             window.location.href = "/login";
                         }}
                     >
+                        <LogOut className="w-4 h-4" />
                         Sair
                     </Button>
                 </div>

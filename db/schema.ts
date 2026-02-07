@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey, integer, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const globalRolesEnum = pgEnum("global_roles", ["super_admin", "user"]);
@@ -22,6 +22,8 @@ export const memberships = pgTable("memberships", {
     role: orgRolesEnum("role").notNull(),
 }, (t) => ({
     pk: primaryKey({ columns: [t.userId, t.organizationId] }),
+    userIdIdx: index('membership_user_idx').on(t.userId),
+    orgIdIdx: index('membership_org_idx').on(t.organizationId),
 }));
 
 export const auditLogs = pgTable("audit_logs", {
@@ -33,7 +35,11 @@ export const auditLogs = pgTable("audit_logs", {
     resourceId: text("resource_id").notNull(),
     metadata: text("metadata"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    userActionIdx: index('audit_user_action_idx').on(t.userId, t.action),
+    resourceIdx: index('audit_resource_idx').on(t.resource, t.resourceId),
+    orgIdx: index('audit_org_idx').on(t.organizationId),
+}));
 
 export const users = pgTable("users", {
     id: text("id").primaryKey(),
@@ -56,7 +62,9 @@ export const sessions = pgTable("sessions", {
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
-});
+}, (t) => ({
+    userIdIdx: index('session_user_idx').on(t.userId),
+}));
 
 export const accounts = pgTable("accounts", {
     id: text("id").primaryKey(),
@@ -71,7 +79,9 @@ export const accounts = pgTable("accounts", {
     password: text("password"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    userIdIdx: index('account_user_idx').on(t.userId),
+}));
 
 export const verifications = pgTable("verifications", {
     id: text("id").primaryKey(),
@@ -92,7 +102,12 @@ export const projects = pgTable("projects", {
     status: text("status").notNull().default('em_andamento'), // 'em_andamento', 'concluido', 'suspenso', 'cancelado'
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    userIdIdx: index('project_user_idx').on(t.userId),
+    orgIdIdx: index('project_org_idx').on(t.organizationId),
+    statusIdx: index('project_status_idx').on(t.status),
+    typeIdx: index('project_type_idx').on(t.type),
+}));
 
 export const stakeholders = pgTable("stakeholders", {
     id: text("id").primaryKey(),
@@ -103,7 +118,9 @@ export const stakeholders = pgTable("stakeholders", {
     email: text("email"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('stakeholder_project_idx').on(t.projectId),
+}));
 
 export const boardColumns = pgTable("board_columns", {
     id: text("id").primaryKey(),
@@ -113,7 +130,9 @@ export const boardColumns = pgTable("board_columns", {
     color: text("color"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('board_col_project_idx').on(t.projectId),
+}));
 
 export const boardCards = pgTable("board_cards", {
     id: text("id").primaryKey(),
@@ -123,7 +142,9 @@ export const boardCards = pgTable("board_cards", {
     order: serial("order"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    columnIdIdx: index('board_card_col_idx').on(t.columnId),
+}));
 
 export const knowledgeAreas = pgTable("knowledge_areas", {
     id: text("id").primaryKey(),
@@ -132,7 +153,9 @@ export const knowledgeAreas = pgTable("knowledge_areas", {
     content: text("content"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('karea_project_idx').on(t.projectId),
+}));
 
 export const projectPhases = pgTable("project_phases", {
     id: text("id").primaryKey(),
@@ -142,7 +165,9 @@ export const projectPhases = pgTable("project_phases", {
     order: serial("order"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('phase_project_idx').on(t.projectId),
+}));
 
 export const tasks = pgTable("tasks", {
     id: text("id").primaryKey(),
@@ -158,14 +183,23 @@ export const tasks = pgTable("tasks", {
     order: serial("order"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    phaseIdIdx: index('task_phase_idx').on(t.phaseId),
+    assigneeIdIdx: index('task_assignee_idx').on(t.assigneeId),
+    statusIdx: index('task_status_idx').on(t.status),
+    priorityIdx: index('task_priority_idx').on(t.priority),
+}));
+
 export const appointments = pgTable("appointments", {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull().references(() => projects.id, { onDelete: 'cascade' }),
     description: text("description").notNull(),
     date: timestamp("date").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('appointment_project_idx').on(t.projectId),
+    dateIdx: index('appointment_date_idx').on(t.date),
+}));
 
 export const attachments = pgTable("attachments", {
     id: text("id").primaryKey(),
@@ -178,7 +212,10 @@ export const attachments = pgTable("attachments", {
     entityType: text("entity_type").notNull(), // 'task', 'project', 'comment'
     uploadedBy: text("uploaded_by").references(() => users.id).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+    entityIdx: index('attachment_entity_idx').on(t.entityId, t.entityType),
+    uploaderIdx: index('attachment_uploader_idx').on(t.uploadedBy),
+}));
 
 export const attachmentsRelations = relations(attachments, ({ one }) => ({
     user: one(users, {
@@ -196,7 +233,9 @@ export const knowledgeAreaChanges = pgTable("knowledge_area_changes", {
     date: timestamp("date").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    kaIdIdx: index('ka_change_ka_idx').on(t.knowledgeAreaId),
+}));
 
 export const projectCharters = pgTable("project_charters", {
     id: text("id").primaryKey(),
@@ -206,7 +245,9 @@ export const projectCharters = pgTable("project_charters", {
     successCriteria: text("success_criteria"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('charter_project_idx').on(t.projectId),
+}));
 
 export const projectMilestones = pgTable("project_milestones", {
     id: text("id").primaryKey(),
@@ -216,7 +257,9 @@ export const projectMilestones = pgTable("project_milestones", {
     phase: text("phase").notNull(), // Iniciação, Planejamento, Execução, Monitoramento, Encerramento
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('milestone_project_idx').on(t.projectId),
+}));
 
 export const projectDependencies = pgTable("project_dependencies", {
     id: text("id").primaryKey(),
@@ -226,7 +269,9 @@ export const projectDependencies = pgTable("project_dependencies", {
     type: text("type").notNull(), // TI (Término-Início), II (Início-Início), TT (Término-Término)
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('dependency_project_idx').on(t.projectId),
+}));
 
 export const projectQualityMetrics = pgTable("project_quality_metrics", {
     id: text("id").primaryKey(),
@@ -236,7 +281,9 @@ export const projectQualityMetrics = pgTable("project_quality_metrics", {
     currentValue: text("current_value").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('quality_metric_project_idx').on(t.projectId),
+}));
 
 export const projectQualityChecklists = pgTable("project_quality_checklists", {
     id: text("id").primaryKey(),
@@ -245,7 +292,9 @@ export const projectQualityChecklists = pgTable("project_quality_checklists", {
     completed: boolean("completed").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('quality_checklist_project_idx').on(t.projectId),
+}));
 
 export const projectCommunicationPlans = pgTable("project_communication_plans", {
     id: text("id").primaryKey(),
@@ -256,7 +305,9 @@ export const projectCommunicationPlans = pgTable("project_communication_plans", 
     medium: text("medium").notNull(), // "Meio"
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('comm_plan_project_idx').on(t.projectId),
+}));
 
 export const projectMeetings = pgTable("project_meetings", {
     id: text("id").primaryKey(),
@@ -266,7 +317,9 @@ export const projectMeetings = pgTable("project_meetings", {
     decisions: text("decisions").notNull(), // "Principais Decisões"
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('meeting_project_idx').on(t.projectId),
+}));
 
 export const procurementSuppliers = pgTable("procurement_suppliers", {
     id: text("id").primaryKey(),
@@ -276,7 +329,9 @@ export const procurementSuppliers = pgTable("procurement_suppliers", {
     contact: text("contact").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('supplier_project_idx').on(t.projectId),
+}));
 
 export const procurementContracts = pgTable("procurement_contracts", {
     id: text("id").primaryKey(),
@@ -287,7 +342,9 @@ export const procurementContracts = pgTable("procurement_contracts", {
     status: text("status").notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (t) => ({
+    projectIdIdx: index('contract_project_idx').on(t.projectId),
+}));
 
 // RELATIONS
 export const projectsRelations = relations(projects, ({ one, many }) => ({

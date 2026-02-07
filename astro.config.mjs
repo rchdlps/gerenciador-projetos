@@ -6,9 +6,18 @@ import tailwindcss from '@tailwindcss/vite';
 
 import vercel from '@astrojs/vercel';
 
+import sentry from "@sentry/astro";
+
 // https://astro.build/config
 export default defineConfig({
-  integrations: [react()],
+  integrations: [
+    react(),
+    sentry({
+      project: "javascript-astro",
+      org: "dexatec",
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
+  ],
   output: 'server',
 
   vite: {

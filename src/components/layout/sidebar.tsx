@@ -1,4 +1,4 @@
-import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft } from "lucide-react"
+import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
@@ -81,8 +81,8 @@ export function Sidebar() {
                                 Calendário
                             </a>
                             <div className="pt-2 mt-2 border-t border-blue-200/50">
-                                <a href="/" className="flex items-center gap-3 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors">
-                                    <ArrowLeft className="w-3 h-3" />
+                                <a href="/" className="flex items-center gap-3 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-white/50 rounded-md transition-colors cursor-pointer group">
+                                    <ArrowLeft className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" />
                                     Sair do Projeto
                                 </a>
                             </div>
@@ -109,6 +109,39 @@ export function Sidebar() {
                         </div>
                     </div>
                 )}
+
+                {/* Feedback Section */}
+                <div className="mt-auto pt-4 border-t border-border">
+                    <button
+                        onClick={async () => {
+                            try {
+                                const Sentry = await import("@sentry/astro");
+                                if (Sentry && Sentry.showReportDialog) {
+                                    const eventId = Sentry.captureMessage("User Initiated Feedback");
+                                    Sentry.showReportDialog({
+                                        eventId,
+                                        label: "Reportar Problema",
+                                        title: "Relatar um erro",
+                                        subtitle: "Descreva o que aconteceu para nos ajudar a melhorar.",
+                                        user: {
+                                            email: session?.user?.email || "anonimo@exemplo.com",
+                                            name: session?.user?.name || "Anônimo",
+                                        },
+                                    });
+                                } else {
+                                    alert("Erro: Integração Sentry incompleta.");
+                                }
+                            } catch (e) {
+                                console.error("Sentry load failed", e);
+                                alert("Erro ao carregar Sentry. Verifique sua conexão.");
+                            }
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 rounded-md transition-colors w-full group cursor-pointer"
+                    >
+                        <Bug className="w-4 h-4 group-hover:text-amber-700" />
+                        Reportar Problema
+                    </button>
+                </div>
 
             </nav>
 
