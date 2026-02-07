@@ -4,6 +4,7 @@ import { api } from "@/lib/api-client"
 import { PhaseAccordion } from "./phase-accordion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Plus, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
@@ -33,6 +34,7 @@ export function PhaseList({ projectId }: PhaseListProps) {
     const queryClient = useQueryClient()
     const [newPhaseOpen, setNewPhaseOpen] = useState(false)
     const [newPhaseName, setNewPhaseName] = useState("")
+    const [newPhaseDescription, setNewPhaseDescription] = useState("")
     const [creating, setCreating] = useState(false)
     const [activeId, setActiveId] = useState<string | null>(null)
     const [activeTask, setActiveTask] = useState<any>(null)
@@ -212,13 +214,14 @@ export function PhaseList({ projectId }: PhaseListProps) {
         try {
             const res = await api.phases[":projectId"].$post({
                 param: { projectId },
-                json: { name: newPhaseName }
+                json: { name: newPhaseName, description: newPhaseDescription || undefined }
             })
 
             if (!res.ok) throw new Error("Failed to create phase")
 
             toast.success("Fase criada com sucesso!")
             setNewPhaseName("")
+            setNewPhaseDescription("")
             setNewPhaseOpen(false)
             queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
         } catch (error) {
@@ -275,6 +278,16 @@ export function PhaseList({ projectId }: PhaseListProps) {
                                             value={newPhaseName}
                                             onChange={(e) => setNewPhaseName(e.target.value)}
                                             placeholder="Ex: Pós-Implementação"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description">Descrição</Label>
+                                        <Textarea
+                                            id="description"
+                                            value={newPhaseDescription}
+                                            onChange={(e) => setNewPhaseDescription(e.target.value)}
+                                            placeholder="Descreva os objetivos e atividades desta fase..."
+                                            rows={3}
                                         />
                                     </div>
                                 </div>

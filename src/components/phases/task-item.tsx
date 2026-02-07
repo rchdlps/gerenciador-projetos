@@ -1,11 +1,20 @@
 import { useState } from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { api } from "@/lib/api-client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { TaskDialog } from "./task-dialog"
-import { Calendar, User, GripVertical } from "lucide-react"
+import { Calendar, User, GripVertical, Check, Circle, Clock, Eye } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { toast } from "sonner"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface TaskItemProps {
     task: any // TODO: add type
@@ -15,6 +24,7 @@ interface TaskItemProps {
 
 export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
     const [open, setOpen] = useState(false)
+    const queryClient = useQueryClient()
 
     // Sortable Hook
     const {
@@ -39,12 +49,40 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
         urgent: "bg-red-100 text-red-800",
     }
 
-    const statusLabels = {
-        todo: "A Fazer",
-        in_progress: "Em Andamento",
-        review: "Em Revisão",
-        done: "Concluído"
+    const statusConfig = {
+        todo: { label: "Não Iniciada", icon: Circle, color: "bg-slate-100 text-slate-700 hover:bg-slate-200" },
+        in_progress: { label: "Em Andamento", icon: Clock, color: "bg-blue-100 text-blue-700 hover:bg-blue-200" },
+        review: { label: "Em Revisão", icon: Eye, color: "bg-amber-100 text-amber-700 hover:bg-amber-200" },
+        done: { label: "Concluído", icon: Check, color: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" }
     }
+
+    // Quick status update mutation
+    const updateStatusMutation = useMutation({
+        mutationFn: async (newStatus: string) => {
+            const res = await api.tasks[":id"].$patch({
+                param: { id: task.id },
+                json: { status: newStatus }
+            })
+            if (!res.ok) throw new Error("Failed to update status")
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
+            queryClient.invalidateQueries({ queryKey: ["board", projectId] })
+            toast.success("Status atualizado!")
+        },
+        onError: () => {
+            toast.error("Erro ao atualizar status")
+        }
+    })
+
+    const handleStatusChange = (newStatus: string) => {
+        if (newStatus !== task.status) {
+            updateStatusMutation.mutate(newStatus)
+        }
+    }
+
+    const currentStatus = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.todo
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} aria-label={`Tarefa: ${task.title}`}>
@@ -97,7 +135,32 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                         </div>
 
                         <div className="flex flex-col gap-2 items-end ml-2">
-                            <Badge variant="outline">{statusLabels[task.status as keyof typeof statusLabels] || task.status}</Badge>
+                            {/* Quick Status Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Badge
+                                        variant="outline"
+                                        className={`cursor-pointer transition-colors ${currentStatus.color}`}
+                                    >
+                                        <currentStatus.icon className="w-3 h-3 mr-1" />
+                                        {currentStatus.label}
+                                    </Badge>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                    {Object.entries(statusConfig).map(([key, config]) => (
+                                        <DropdownMenuItem
+                                            key={key}
+                                            onClick={() => handleStatusChange(key)}
+                                            className={`cursor-pointer ${task.status === key ? 'bg-slate-100' : ''}`}
+                                        >
+                                            <config.icon className={`w-4 h-4 mr-2 ${task.status === key ? 'text-emerald-600' : ''}`} />
+                                            {config.label}
+                                            {task.status === key && <Check className="w-4 h-4 ml-auto text-emerald-600" />}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
                             <div className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${priorityColors[task.priority as keyof typeof priorityColors] || 'bg-gray-100'}`}>
                                 {task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Média' : task.priority === 'low' ? 'Baixa' : task.priority === 'urgent' ? 'Urgente' : task.priority}
                             </div>

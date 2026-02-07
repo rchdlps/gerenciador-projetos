@@ -104,7 +104,7 @@ export function ProjectDetails({ id }: { id: string }) {
 
             {/* Tasks / Phases Section */}
             <div className="space-y-6">
-                <TaskStats columns={boardData} isLoading={isBoardLoading} />
+                <TaskStats columns={boardData} isLoading={isBoardLoading} projectId={id} />
 
                 <div className="flex items-center justify-between">
                     <h3 className="text-xl font-bold text-foreground">

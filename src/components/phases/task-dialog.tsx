@@ -181,6 +181,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
             }
 
             queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
+            queryClient.invalidateQueries({ queryKey: ["board", projectId] })
             onOpenChange(false)
         } catch (error) {
             toast.error("Erro ao salvar tarefa")
