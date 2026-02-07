@@ -13,7 +13,7 @@ import { AttachmentList, type Attachment } from "@/components/attachments/attach
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import CommunicationView from "../projects/knowledge-areas/communication/communication-view"
+import CommunicationView from "./communication-view"
 import ProcurementView from "./procurement-view"
 import ScopeView from "./scope-view"
 import CostView from "./cost-view"
@@ -122,6 +122,34 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             {/* TAP Section - Only for integration */}
             {area === 'integracao' && <TAPSection projectId={projectId} />}
 
+            {/* Integration-specific: Change Control comes before Notes */}
+            {area === 'integracao' && (
+                <ChangeControlSection
+                    projectId={projectId}
+                    area={area}
+                    kaId={ka.id}
+                    changes={ka.changes}
+                    onDelete={async (id) => {
+                        if (confirm("Excluir este registro?")) {
+                            const res = await api['knowledge-areas'].changes[':id'].$delete({ param: { id } })
+                            if (res.ok) {
+                                queryClient.invalidateQueries({ queryKey: ['ka-detail', projectId, area] })
+                                toast.success("Registro removido")
+                            }
+                        }
+                    }}
+                />
+            )}
+
+            {/* Integration-specific: Notes after Change Control */}
+            {area === 'integracao' && (
+                <NotesSection
+                    projectId={projectId}
+                    area={area}
+                    initialContent={ka.content || ""}
+                />
+            )}
+
             {/* Schedule Section - Only for schedule */}
             {area === 'cronograma' && <ScheduleSection projectId={projectId} />}
 
@@ -149,8 +177,8 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             {/* Stakeholder Section - Only for stakeholders */}
             {area === 'partes' && <StakeholderView projectId={projectId} />}
 
-            {/* Notes Section - Hidden for communication, procurement, escopo, custos, recursos, riscos, and partes */}
-            {area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && (
+            {/* Notes Section - Hidden for communication, procurement, escopo, custos, recursos, riscos, partes, and integracao */}
+            {area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && area !== 'integracao' && (
                 <NotesSection
                     projectId={projectId}
                     area={area}
@@ -158,8 +186,8 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                 />
             )}
 
-            {/* Change Control Section - Hidden for schedule, quality, communication, procurement, escopo, custos, recursos, riscos, and partes */}
-            {area !== 'cronograma' && area !== 'qualidade' && area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && (
+            {/* Change Control Section - Hidden for schedule, quality, communication, procurement, escopo, custos, recursos, riscos, partes, and integracao */}
+            {area !== 'cronograma' && area !== 'qualidade' && area !== 'comunicacao' && area !== 'aquisicoes' && area !== 'escopo' && area !== 'custos' && area !== 'recursos' && area !== 'riscos' && area !== 'partes' && area !== 'integracao' && (
                 <ChangeControlSection
                     projectId={projectId}
                     area={area}
