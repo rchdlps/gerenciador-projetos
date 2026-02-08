@@ -1,0 +1,191 @@
+---
+import Layout from "../../layouts/AuthLayout.astro";
+import { db } from "@/lib/db";
+import { invitations } from "db/schema";
+import { eq, and, gt } from "drizzle-orm";
+
+const { token } = Astro.params;
+
+if (!token) {
+    return Astro.redirect("/login");
+}
+
+const invite = await db.query.invitations.findFirst({
+    where: and(
+        eq(invitations.token, token),
+        eq(invitations.status, "pending"),
+        gt(invitations.expiresAt, new Date()),
+    ),
+    with: {
+        organization: true,
+        inviter: true,
+    },
+});
+
+const invalid = !invite;
+---
+
+<Layout title="Aceitar Convite">
+    <div class="w-full max-w-md space-y-8">
+        <div class="text-center">
+            {
+                invalid ? (
+                    <>
+                        <h2 class="mt-6 text-3xl font-bold tracking-tight text-foreground">
+                            Convite Inválido
+                        </h2>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            Este link de convite é inválido ou expirou.
+                        </p>
+                        <div class="mt-6">
+                            <a
+                                href="/login"
+                                class="font-medium text-primary hover:text-primary/90"
+                            >
+                                Voltar para o login
+                            </a>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <h2 class="mt-6 text-3xl font-bold tracking-tight text-foreground">
+                            Bem-vindo(a)!
+                        </h2>
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            Você foi convidado por{" "}
+                            <strong>{invite.inviter.name}</strong> para
+                            participar da organização{" "}
+                            <strong>{invite.organization?.name}</strong>.
+                        </p>
+
+                        <div class="mt-8 bg-card p-6 rounded-lg border shadow-sm text-left">
+                            <h3 class="text-lg font-medium mb-4">
+                                Complete seu cadastro
+                            </h3>
+                            <form id="register-form" class="space-y-4">
+                                <input
+                                    type="hidden"
+                                    name="token"
+                                    value={token}
+                                />
+                                <input
+                                    type="hidden"
+                                    name="email"
+                                    value={invite.email}
+                                />
+                                <input
+                                    type="hidden"
+                                    name="organizationId"
+                                    value={invite.organizationId}
+                                />
+                                <input
+                                    type="hidden"
+                                    name="inviteId"
+                                    value={invite.id}
+                                />
+
+                                <div>
+                                    <label
+                                        for="name"
+                                        class="block text-sm font-medium text-foreground"
+                                    >
+                                        Nome Completo
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        id="name"
+                                        required
+                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label
+                                        for="password"
+                                        class="block text-sm font-medium text-foreground"
+                                    >
+                                        Senha
+                                    </label>
+                                    <input
+                                        type="password"
+                                        name="password"
+                                        id="password"
+                                        required
+                                        minlength="8"
+                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    class="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 rounded-md font-medium transition-colors"
+                                >
+                                    Criar Conta e Aceitar
+                                </button>
+                            </form>
+                        </div>
+                    </>
+                )
+            }
+        </div>
+    </div>
+
+    <script>
+        import { authClient } from "@/lib/auth-client";
+
+        const form = document.getElementById(
+            "register-form",
+        ) as HTMLFormElement;
+
+        if (form) {
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const name = formData.get("name") as string;
+                const password = formData.get("password") as string;
+                const email = formData.get("email") as string;
+                const token = formData.get("token") as string;
+                const inviteId = formData.get("inviteId") as string;
+
+                try {
+                    // 1. Sign up/Create User
+                    const { data, error } = await authClient.signUp.email(
+                        {
+                            email,
+                            password,
+                            name,
+                        },
+                        {
+                            onRequest: () => {
+                                const btn = form.querySelector("button");
+                                if (btn) btn.textContent = "Criando conta...";
+                            },
+                            onSuccess: async () => {
+                                // 2. Mark invite as accepted (Call API)
+                                await fetch("/api/invitations/accept", {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({ token, inviteId }),
+                                });
+
+                                window.location.href = "/dashboard";
+                            },
+                            onError: (ctx) => {
+                                alert(ctx.error.message);
+                                const btn = form.querySelector("button");
+                                if (btn)
+                                    btn.textContent = "Criar Conta e Aceitar";
+                            },
+                        },
+                    );
+                } catch (err) {
+                    console.error(err);
+                    alert("Erro ao criar conta");
+                }
+            });
+        }
+    </script>
+</Layout>

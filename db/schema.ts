@@ -372,6 +372,36 @@ export const projectPhasesRelations = relations(projectPhases, ({ one, many }) =
     tasks: many(tasks),
 }));
 
+// ... (previous relations)
+
+export const invitations = pgTable("invitations", {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    role: text("role").notNull().default('user'),
+    organizationId: text("organization_id"), // Optional: invite to platform vs specific org
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    inviterId: text("inviter_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+    status: text("status").notNull().default('pending'), // 'pending', 'accepted'
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+    tokenIdx: index('invitation_token_idx').on(t.token),
+    emailIdx: index('invitation_email_idx').on(t.email),
+    orgIdIdx: index('invitation_org_idx').on(t.organizationId),
+}));
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+    inviter: one(users, {
+        fields: [invitations.inviterId],
+        references: [users.id],
+    }),
+    organization: one(organizations, {
+        fields: [invitations.organizationId],
+        references: [organizations.id],
+    }),
+}));
+
 export const tasksRelations = relations(tasks, ({ one }) => ({
     phase: one(projectPhases, {
         fields: [tasks.phaseId],
