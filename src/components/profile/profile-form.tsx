@@ -15,6 +15,7 @@ import {
     FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUpload } from "@/components/ui/file-upload"
@@ -39,12 +40,12 @@ const passwordSchema = z.object({
 
 // Schema for Email Change
 const emailSchema = z.object({
-    newEmail: z.string().email("Email inválido"),
+    newEmail: z.string().email("E-mail inválido"),
     currentPassword: z.string().min(1, "A senha atual é obrigatória para confirmar a mudança"),
 })
 
 export function ProfileForm() {
-    const { data: session } = authClient.useSession()
+    const { data: session, isPending, error } = authClient.useSession()
     const [uploading, setUploading] = useState(false)
 
     // Form 1: General Profile
@@ -55,6 +56,12 @@ export function ProfileForm() {
             image: session?.user?.image || "",
         },
     })
+
+    // ... (keep other forms initialized with defaultValues which don't depend on session immediately if we handle loading) 
+
+    // BUT wait, we need session to be ready for profileForm values to be correct?
+    // profileForm uses `values` prop which updates when session changes.
+    // So it should be fine to render if we handle isPending check early.
 
     // Form 2: Password
     const passwordForm = useForm<z.infer<typeof passwordSchema>>({
@@ -74,6 +81,30 @@ export function ProfileForm() {
             currentPassword: "",
         },
     })
+
+    if (isPending) {
+        return (
+            <div className="flex justify-center items-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="text-center py-10 text-red-500">
+                Erro ao carregar sessão: {error.message}
+            </div>
+        )
+    }
+
+    if (!session) {
+        return (
+            <div className="text-center py-10">
+                Você precisa estar logado para ver esta página.
+            </div>
+        )
+    }
 
     // --- Actions ---
 
@@ -139,7 +170,7 @@ export function ProfileForm() {
                     fileType: file.type,
                 }),
             })
-            if (!res.ok) throw new Error("Failed to init upload")
+            if (!res.ok) throw new Error("Falha ao iniciar upload")
             const { url, key } = await res.json()
 
             // 2. Upload to S3
@@ -164,7 +195,7 @@ export function ProfileForm() {
                 body: JSON.stringify({ key, entityId: session?.user.id, entityType: 'user_avatar' }),
             })
 
-            if (!confirmRes.ok) throw new Error("Failed to confirm upload")
+            if (!confirmRes.ok) throw new Error("Falha ao confirmar upload")
             const { publicUrl } = await confirmRes.json()
 
             profileForm.setValue("image", publicUrl)
@@ -178,7 +209,7 @@ export function ProfileForm() {
         }
     }
 
-    if (!session) return null
+
 
     return (
         <div className="max-w-4xl mx-auto py-10 space-y-8">
@@ -250,7 +281,7 @@ export function ProfileForm() {
                                             <FormItem>
                                                 <FormLabel>Senha Atual</FormLabel>
                                                 <FormControl>
-                                                    <Input type="password" {...field} />
+                                                    <PasswordInput placeholder="••••••••" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -263,7 +294,7 @@ export function ProfileForm() {
                                             <FormItem>
                                                 <FormLabel>Nova Senha</FormLabel>
                                                 <FormControl>
-                                                    <Input type="password" {...field} />
+                                                    <PasswordInput placeholder="••••••••" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -276,7 +307,7 @@ export function ProfileForm() {
                                             <FormItem>
                                                 <FormLabel>Confirmar Nova Senha</FormLabel>
                                                 <FormControl>
-                                                    <Input type="password" {...field} />
+                                                    <PasswordInput placeholder="••••••••" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -319,7 +350,7 @@ export function ProfileForm() {
                                             <FormItem>
                                                 <FormLabel>Senha Atual (Confirmação)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="password" {...field} />
+                                                    <PasswordInput placeholder="••••••••" {...field} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>

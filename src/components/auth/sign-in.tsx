@@ -2,9 +2,10 @@ import { useState } from "react"
 import { authClient } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
+import { Loader2, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 export default function SignIn() {
@@ -25,9 +26,15 @@ export default function SignIn() {
                 window.location.href = "/"
             },
             onError: (ctx) => {
-                setError(ctx.error.message)
+                let message = ctx.error.message || "Verifique suas credenciais e tente novamente."
+
+                if (message.includes("Invalid email or password") || message.includes("Invalid username or password")) {
+                    message = "E-mail ou senha incorretos."
+                }
+
+                setError(message)
                 toast.error("Erro ao entrar", {
-                    description: ctx.error.message || "Verifique suas credenciais e tente novamente."
+                    description: message
                 })
                 setLoading(false)
             }
@@ -70,9 +77,8 @@ export default function SignIn() {
                         <a href="/forgot-password" className="text-xs text-primary hover:underline font-medium">Esqueceu?</a>
                     </div>
                     <div className="relative">
-                        <Input
+                        <PasswordInput
                             id="password"
-                            type="password"
                             className="pl-10 h-11"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -80,7 +86,7 @@ export default function SignIn() {
                             required
                         />
                         <div className="absolute left-3 top-3 text-muted-foreground">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                            <Lock className="h-4 w-4" />
                         </div>
                     </div>
                 </div>
