@@ -24,11 +24,10 @@ interface CalendarViewProps {
     showProjectNames?: boolean
 }
 
-export function CalendarView({ date, setDate, tasks, appointments, showProjectNames }: CalendarViewProps) {
-    const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+export function CalendarView({ date, setDate, currentMonth, setCurrentMonth, tasks, appointments, showProjectNames }: CalendarViewProps & { currentMonth: Date, setCurrentMonth: (date: Date) => void }) {
 
-    const handlePreviousMonth = () => setCurrentMonth(prev => subMonths(prev, 1))
-    const handleNextMonth = () => setCurrentMonth(prev => addMonths(prev, 1))
+    const handlePreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
+    const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
 
     // Calculate calendar grid
     const calendarDays = useMemo(() => {
@@ -54,7 +53,14 @@ export function CalendarView({ date, setDate, tasks, appointments, showProjectNa
 
     const hasTask = (day: Date) => tasks.some(t => {
         if (!t) return false
-        const targetDate = t.startDate ? new Date(t.startDate) : (t.endDate ? new Date(t.endDate) : null)
+        const start = t.startDate ? new Date(t.startDate) : null
+        const end = t.endDate ? new Date(t.endDate) : null
+
+        if (start && end) {
+            return day >= start && day <= end || isSameDay(day, start) || isSameDay(day, end)
+        }
+
+        const targetDate = start || end
         return targetDate && isSameDay(targetDate, day)
     })
 

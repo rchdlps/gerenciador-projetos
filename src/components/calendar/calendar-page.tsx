@@ -2,8 +2,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { CalendarView } from "@/components/calendar/calendar-view"
-import { DayTaskList } from "@/components/calendar/day-task-list"
-import { AppointmentWidget } from "@/components/calendar/appointment-widget"
+import { CalendarRightPanel } from "@/components/calendar/calendar-right-panel"
 import { Providers } from "@/components/providers"
 
 
@@ -15,8 +14,16 @@ export function CalendarPage({ projectId }: { projectId?: string }) {
     )
 }
 
+
 function CalendarPageContent({ projectId }: { projectId?: string }) {
     const [date, setDate] = useState<Date | undefined>(new Date())
+    const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
+
+    const handleSetCurrentMonth = (newMonth: Date) => {
+        setCurrentMonth(newMonth)
+        setDate(undefined) // Clear selected date to show month view
+    }
+
 
     const { data: tasks = [] } = useQuery({
         queryKey: projectId ? ['board', projectId] : ['tasks', 'dated'],
@@ -57,6 +64,8 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
                 <CalendarView
                     date={date}
                     setDate={setDate}
+                    currentMonth={currentMonth}
+                    setCurrentMonth={handleSetCurrentMonth}
                     tasks={tasks}
                     appointments={appointments}
                     showProjectNames={!projectId}
@@ -65,14 +74,16 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
 
             {/* Right Panel: Day Details & Appointments */}
             <div className="md:col-span-1 h-full flex flex-col gap-6">
-                <div className="flex-1 min-h-0">
-                    <DayTaskList
+                <div className="flex-1 min-h-0 h-full">
+                    <CalendarRightPanel
                         date={date}
-                        tasks={tasks} // Keep tasks separate for the List
+                        currentMonth={currentMonth}
+                        tasks={tasks}
+                        appointments={appointments}
                         projectId={projectId}
+                        onClearDate={() => setDate(undefined)}
                     />
                 </div>
-                <AppointmentWidget projectId={projectId} />
             </div>
         </div>
     )

@@ -603,7 +603,7 @@ async function seed() {
                 }
             }
 
-            // Appointments (expanded)
+            // Appointments (expanded with bulk data for scrolling test)
             const appointmentEvents = [
                 { desc: "Reunião de Kick-off", dayOffset: 0 },
                 { desc: "Apresentação de Status Semanal", dayOffset: 7 },
@@ -613,9 +613,27 @@ async function seed() {
                 { desc: "Comitê de Governança", dayOffset: 35 }
             ];
 
+            // Generate extra random appointments for testing scrolling
+            for (let i = 1; i <= 25; i++) {
+                appointmentEvents.push({
+                    desc: `Reunião de Acompanhamento ${i}`,
+                    dayOffset: Math.floor(Math.random() * 45) // Random day in next 45 days
+                });
+            }
+            // Add some past appointments to test filtering
+            for (let i = 1; i <= 5; i++) {
+                appointmentEvents.push({
+                    desc: `Reunião Passada ${i}`,
+                    dayOffset: -Math.floor(Math.random() * 10) - 1 // Random day in past 10 days
+                });
+            }
+
+
             for (const apt of appointmentEvents) {
                 const aptDate = new Date();
                 aptDate.setDate(aptDate.getDate() + apt.dayOffset);
+                // Set random times for better visualization
+                aptDate.setHours(8 + Math.floor(Math.random() * 10), Math.floor(Math.random() * 4) * 15, 0, 0);
 
                 await db.insert(appointments).values({
                     id: nanoid(),
