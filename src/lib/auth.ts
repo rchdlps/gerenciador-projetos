@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import * as schema from "../../db/schema";
 import { sendRecoveryEmail } from "./email/client";
+import { APIError } from "better-auth";
 
 const baseURL = process.env.BETTER_AUTH_URL || (import.meta.env as any).BETTER_AUTH_URL || "http://localhost:4321";
 console.log("[Better Auth] Using Base URL:", baseURL);
@@ -47,6 +48,40 @@ export const auth = betterAuth({
                 type: "boolean",
                 required: false,
                 defaultValue: true
+            }
+        }
+    },
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    return {
+                        data: {
+                            ...user,
+                            isActive: true, // Default to true
+                            globalRole: "user" // Default role
+                        }
+                    }
+                }
+            }
+        },
+        session: {
+            create: {
+                before: async (session) => {
+                    const user = await db.query.users.findFirst({
+                        where: (users, { eq }) => eq(users.id, session.userId)
+                    });
+
+                    if (user && !user.isActive) {
+                        throw new APIError("BAD_REQUEST", {
+                            message: "Sua conta está inativa. Entre em contato com o administrador."
+                        });
+                    }
+
+                    return {
+                        data: session
+                    }
+                }
             }
         }
     },
