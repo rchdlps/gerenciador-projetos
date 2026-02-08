@@ -1,0 +1,61 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { OrgMembersWrapper } from "@/components/members/wrapper";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { users, memberships, sessions } from "../../db/schema";
+import { eq, and } from "drizzle-orm";
+
+// Get session
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) {
+    return Astro.redirect("/login");
+}
+
+// Fetch user's full info to check role
+const [currentUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id));
+
+const isSuperAdmin = currentUser?.globalRole === "super_admin";
+
+// Get active organization from session
+const [sessionData] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, session.session.id));
+
+const activeOrgId = sessionData?.activeOrganizationId || null;
+
+// Check user's role in active org
+let userRole: string | null = null;
+let canManage = false;
+
+if (activeOrgId) {
+    const [membership] = await db
+        .select()
+        .from(memberships)
+        .where(
+            and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, activeOrgId)
+            )
+        );
+
+    userRole = membership?.role || null;
+    canManage = isSuperAdmin || userRole === "secretario" || userRole === "gestor";
+} else if (isSuperAdmin) {
+    canManage = true;
+}
+---
+
+<DashboardLayout title="Membros da Organização">
+    <OrgMembersWrapper
+        client:only="react"
+        organizationId={activeOrgId}
+        canManage={canManage}
+        userRole={userRole}
+        isSuperAdmin={isSuperAdmin}
+    />
+</DashboardLayout>

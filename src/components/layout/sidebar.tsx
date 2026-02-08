@@ -1,11 +1,11 @@
-import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug } from "lucide-react"
+import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug, Users } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
 import { OrgSwitcher } from "./org-switcher"
 
-export function Sidebar({ user }: { user?: any }) {
-    const [currentPath, setCurrentPath] = useState("")
+export function Sidebar({ user, initialPath }: { user?: any, initialPath?: string }) {
+    const [currentPath, setCurrentPath] = useState(initialPath || "")
     const { data: session } = authClient.useSession()
 
     useEffect(() => {
@@ -63,6 +63,10 @@ export function Sidebar({ user }: { user?: any }) {
                         <a href="/dashboard" className={getLinkClass(isActive("/dashboard"))}>
                             <LayoutDashboard className={cn("w-4 h-4 group-hover:text-primary", isActive("/dashboard") ? "text-primary" : "text-muted-foreground")} />
                             Dashboard
+                        </a>
+                        <a href="/members" className={getLinkClass(isActive("/members"))}>
+                            <Users className={cn("w-4 h-4 group-hover:text-primary", isActive("/members") ? "text-primary" : "text-muted-foreground")} />
+                            Membros
                         </a>
                     </div>
                 </div>

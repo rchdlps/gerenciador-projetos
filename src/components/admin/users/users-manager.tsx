@@ -13,14 +13,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Search, Plus, UserCog, Shield, Building2 } from "lucide-react"
+import { Search, Plus, UserCog, Shield, Building2, Trash2, AlertTriangle } from "lucide-react"
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog"
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 // Add to existing imports
@@ -38,7 +41,50 @@ export function UsersManager() {
     const [page, setPage] = useState(1)
     const [dialogOpen, setDialogOpen] = useState(false)
     const [selectedUser, setSelectedUser] = useState<any>(null)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [userToDelete, setUserToDelete] = useState<any>(null)
     const queryClient = useQueryClient()
+
+    // Delete user mutation
+    const deleteMutation = useMutation({
+        mutationFn: async (userId: string) => {
+            const res = await api.admin.users[':id'].$delete({
+                param: { id: userId }
+            })
+            if (!res.ok) {
+                let errorMessage = 'Falha ao excluir usuário'
+                try {
+                    const err = await res.json() as { error: string }
+                    errorMessage = err.error || errorMessage
+                } catch {
+                    // Response is not JSON
+                    errorMessage = `Erro do servidor (${res.status})`
+                }
+                throw new Error(errorMessage)
+            }
+            return res.json()
+        },
+        onSuccess: () => {
+            toast.success('Usuário excluído com sucesso')
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+            setDeleteDialogOpen(false)
+            setUserToDelete(null)
+        },
+        onError: (error: Error) => {
+            toast.error(error.message)
+        }
+    })
+
+    const handleDelete = (user: any) => {
+        setUserToDelete(user)
+        setDeleteDialogOpen(true)
+    }
+
+    const confirmDelete = () => {
+        if (userToDelete) {
+            deleteMutation.mutate(userToDelete.id)
+        }
+    }
 
     // Fetch Users
     // Fetch Users
@@ -185,12 +231,25 @@ export function UsersManager() {
                                         </TableCell>
                                     )}
                                     <TableCell className="text-right">
-                                        <Button variant="ghost" size="sm" onClick={() => {
-                                            setSelectedUser(user)
-                                            setDialogOpen(true)
-                                        }}>
-                                            <UserCog className="h-4 w-4" />
-                                        </Button>
+                                        <div className="flex items-center justify-end gap-1">
+                                            <Button variant="ghost" size="sm" onClick={() => {
+                                                setSelectedUser(user)
+                                                setDialogOpen(true)
+                                            }} title="Editar usuário">
+                                                <UserCog className="h-4 w-4" />
+                                            </Button>
+                                            {isSuperAdmin && user.globalRole !== 'super_admin' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDelete(user)}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    title="Excluir usuário"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -198,6 +257,48 @@ export function UsersManager() {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                            Excluir Usuário
+                        </AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-2 text-sm text-muted-foreground">
+                                <p>
+                                    Tem certeza que deseja excluir o usuário <strong className="text-foreground">{userToDelete?.name}</strong> ({userToDelete?.email})?
+                                </p>
+                                <p className="text-red-600 font-medium">
+                                    Esta ação não pode ser desfeita. O usuário perderá acesso ao sistema e será removido de todas as organizações.
+                                </p>
+                                {userToDelete?.organizations?.length > 0 && (
+                                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+                                        <p className="font-medium">Organizações afetadas:</p>
+                                        <ul className="list-disc list-inside mt-1">
+                                            {userToDelete.organizations.map((org: any) => (
+                                                <li key={org.id}>{org.name}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? 'Excluindo...' : 'Excluir Usuário'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

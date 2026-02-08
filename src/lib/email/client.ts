@@ -83,6 +83,64 @@ export async function sendRecoveryEmail(to: string, resetLink: string) {
     });
 }
 
+export async function sendMemberAddedEmail(to: string, organizationName: string, role: string, loginLink: string) {
+    const roleLabels: Record<string, string> = {
+        viewer: 'Visualizador',
+        gestor: 'Editor',
+        secretario: 'Administrador'
+    };
+
+    const roleLabel = roleLabels[role] || role;
+
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Você foi adicionado a uma organização!</h2>
+            <p>Você foi adicionado à organização <strong>${organizationName}</strong> como <strong>${roleLabel}</strong>.</p>
+            <p>Clique no botão abaixo para acessar o sistema:</p>
+            <a href="${loginLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
+                Acessar Sistema
+            </a>
+            <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+            <p>${loginLink}</p>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: `Você foi adicionado à ${organizationName}`,
+        html,
+    });
+}
+
+export async function sendMemberInviteEmail(to: string, organizationName: string, role: string, inviteLink: string) {
+    const roleLabels: Record<string, string> = {
+        viewer: 'Visualizador',
+        gestor: 'Editor',
+        secretario: 'Administrador'
+    };
+
+    const roleLabel = roleLabels[role] || role;
+
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Você foi convidado!</h2>
+            <p>Você foi convidado para participar da organização <strong>${organizationName}</strong> como <strong>${roleLabel}</strong>.</p>
+            <p>Clique no botão abaixo para aceitar o convite e configurar sua conta:</p>
+            <a href="${inviteLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
+                Aceitar Convite
+            </a>
+            <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+            <p>${inviteLink}</p>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: `Convite para ${organizationName}`,
+        html,
+    });
+}
+
 export async function sendVerificationEmail(to: string, verificationLink: string) {
     const html = `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">

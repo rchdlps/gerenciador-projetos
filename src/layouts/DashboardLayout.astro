@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/sonner";
 
 import { auth } from "@/lib/auth";
 
+import app from "@/server/app";
+
 interface Props {
 	title: string;
 }
@@ -14,6 +16,24 @@ const { title } = Astro.props;
 const session = await auth.api.getSession({
 	headers: Astro.request.headers,
 });
+
+let orgSessionData = null;
+if (session?.user) {
+	try {
+		// Construct a request to the Hono app to get org session data
+		// We use a dummy domain but keep the path and headers (logic relies on headers/cookies)
+		const res = await app.request("http://localhost/api/org-session", {
+			headers: Astro.request.headers,
+			method: "GET",
+		});
+
+		if (res.ok) {
+			orgSessionData = await res.json();
+		}
+	} catch (error) {
+		console.error("Failed to fetch server-side org session:", error);
+	}
+}
 ---
 
 <!doctype html>
@@ -43,7 +63,12 @@ const session = await auth.api.getSession({
 	<body class="bg-background min-h-screen font-sans antialiased">
 		<Header client:load user={session?.user} />
 		<div class="flex">
-			<SidebarWithProvider client:load user={session?.user} />
+			<SidebarWithProvider
+				client:load
+				user={session?.user}
+				initialData={orgSessionData}
+				initialPath={Astro.url.pathname}
+			/>
 			<main class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8">
 				<slot />
 			</main>

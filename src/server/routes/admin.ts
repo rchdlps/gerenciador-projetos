@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { users, organizations, memberships, globalRolesEnum, auditLogs } from '../../../db/schema'
+import { users, organizations, memberships, globalRolesEnum, auditLogs, projects, sessions, accounts } from '../../../db/schema'
 import { eq, like, desc, sql, inArray, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -376,6 +376,72 @@ app.patch('/users/:id',
         return c.json({ success: true })
     }
 )
+
+// DELETE /api/admin/users/:id
+// Delete a user - Super Admin only
+app.delete('/users/:id', async (c) => {
+    const session = await getSession(c)
+    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+    const userIdToDelete = c.req.param('id')
+
+    // 1. Only Super Admin can delete users
+    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
+    if (currentUser?.globalRole !== 'super_admin') {
+        return c.json({ error: 'Apenas Super Admins podem excluir usuários' }, 403)
+    }
+
+    // 2. Cannot delete yourself
+    if (userIdToDelete === session.user.id) {
+        return c.json({ error: 'Você não pode excluir a si mesmo' }, 400)
+    }
+
+    // 3. Check if user exists
+    const [userToDelete] = await db.select().from(users).where(eq(users.id, userIdToDelete))
+    if (!userToDelete) {
+        return c.json({ error: 'Usuário não encontrado' }, 404)
+    }
+
+    // 4. Cannot delete another super_admin (safety measure)
+    if (userToDelete.globalRole === 'super_admin') {
+        return c.json({ error: 'Não é possível excluir outro Super Admin' }, 403)
+    }
+
+    // 5. Check for dependencies - projects created by this user
+    const userProjects = await db.select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.userId, userIdToDelete))
+
+    if (userProjects.length > 0) {
+        return c.json({
+            error: `Este usuário possui ${userProjects.length} projeto(s). Transfira ou exclua os projetos antes de remover o usuário.`,
+            hasProjects: true,
+            projectCount: userProjects.length
+        }, 400)
+    }
+
+    // 6. Delete related records first (sessions and accounts don't have cascade)
+    await db.delete(sessions).where(eq(sessions.userId, userIdToDelete))
+    await db.delete(accounts).where(eq(accounts.userId, userIdToDelete))
+
+    // 7. Delete user (memberships will cascade, audit_logs will set null)
+    await db.delete(users).where(eq(users.id, userIdToDelete))
+
+    // 8. Audit log
+    await createAuditLog({
+        userId: session.user.id,
+        organizationId: null,
+        action: 'DELETE',
+        resource: 'user',
+        resourceId: userIdToDelete,
+        metadata: {
+            deletedUserEmail: userToDelete.email,
+            deletedUserName: userToDelete.name
+        }
+    })
+
+    return c.json({ success: true })
+})
 
 // GET /api/admin/audit-logs
 // Fetch audit logs with user information, filtering, pagination, and search
