@@ -26,6 +26,13 @@ import { toast } from "sonner"
 // Add to existing imports
 import { UserDialog } from "./user-dialog"
 
+// Role label translations
+const roleLabels: Record<string, string> = {
+    viewer: 'Visualizador',
+    gestor: 'Editor',
+    secretario: 'Admin'
+}
+
 export function UsersManager() {
     const [search, setSearch] = useState("")
     const [page, setPage] = useState(1)
@@ -159,7 +166,7 @@ export function UsersManager() {
                                             {user.organizations.length > 0 ? user.organizations.map((org: any) => (
                                                 <Badge key={org.id} variant="secondary" className="text-xs font-normal">
                                                     <Building2 className="mr-1 h-3 w-3 opacity-50" />
-                                                    {org.name} ({org.role})
+                                                    {org.name} ({roleLabels[org.role] || org.role})
                                                 </Badge>
                                             )) : (
                                                 <span className="text-muted-foreground text-xs italic">Sem organização</span>

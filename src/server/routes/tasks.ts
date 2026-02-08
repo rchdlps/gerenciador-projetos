@@ -116,6 +116,11 @@ app.post('/',
             return c.json({ error: 'Forbidden' }, 403)
         }
 
+        // Viewers cannot create tasks
+        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+            return c.json({ error: 'Visualizadores não podem criar tarefas' }, 403)
+        }
+
         const id = nanoid()
         const [newTask] = await db.insert(tasks).values({
             id,
@@ -179,6 +184,11 @@ app.patch('/reorder',
                     if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
                         return c.json({ error: 'Forbidden' }, 403)
                     }
+
+                    // Viewers cannot reorder tasks
+                    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+                        return c.json({ error: 'Visualizadores não podem reordenar tarefas' }, 403)
+                    }
                 }
             }
         }
@@ -240,6 +250,11 @@ app.patch('/:id',
         if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
+
+        // Viewers cannot update tasks
+        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+            return c.json({ error: 'Visualizadores não podem editar tarefas' }, 403)
+        }
         const updateData: any = { ...data }
         if (data.startDate) updateData.startDate = new Date(data.startDate)
         if (data.endDate) updateData.endDate = new Date(data.endDate)
@@ -293,6 +308,11 @@ app.delete('/:id', async (c) => {
 
     if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
+    }
+
+    // Viewers cannot delete tasks
+    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+        return c.json({ error: 'Visualizadores não podem excluir tarefas' }, 403)
     }
 
     await db.delete(tasks).where(eq(tasks.id, id))

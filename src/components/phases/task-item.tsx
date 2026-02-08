@@ -22,7 +22,10 @@ interface TaskItemProps {
     projectId: string
 }
 
+import { useUserRole } from "@/hooks/use-user-role"
+
 export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
+    const { isViewer } = useUserRole()
     const [open, setOpen] = useState(false)
     const queryClient = useQueryClient()
 
@@ -63,7 +66,10 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                 param: { id: task.id },
                 json: { status: newStatus }
             })
-            if (!res.ok) throw new Error("Failed to update status")
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao atualizar status' }))
+                throw new Error((data as any).error || 'Erro ao atualizar status')
+            }
             return res.json()
         },
         onSuccess: () => {
@@ -71,8 +77,8 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
             queryClient.invalidateQueries({ queryKey: ["board", projectId] })
             toast.success("Status atualizado!")
         },
-        onError: () => {
-            toast.error("Erro ao atualizar status")
+        onError: (error: Error) => {
+            toast.error(error.message || "Erro ao atualizar status")
         }
     })
 
@@ -93,12 +99,14 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                 <CardContent className="p-4">
                     <div className="flex justify-between items-start">
                         {/* Drag Handle */}
-                        <div
-                            {...listeners}
-                            className="mr-3 mt-1 cursor-grab text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <GripVertical className="h-4 w-4" />
-                        </div>
+                        {!isViewer && (
+                            <div
+                                {...listeners}
+                                className="mr-3 mt-1 cursor-grab text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <GripVertical className="h-4 w-4" />
+                            </div>
+                        )}
 
                         <div
                             className="space-y-1 flex-1 cursor-pointer"
@@ -136,30 +144,40 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
 
                         <div className="flex flex-col gap-2 items-end ml-2">
                             {/* Quick Status Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Badge
-                                        variant="outline"
-                                        className={`cursor-pointer transition-colors ${currentStatus.color}`}
-                                    >
-                                        <currentStatus.icon className="w-3 h-3 mr-1" />
-                                        {currentStatus.label}
-                                    </Badge>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                    {Object.entries(statusConfig).map(([key, config]) => (
-                                        <DropdownMenuItem
-                                            key={key}
-                                            onClick={() => handleStatusChange(key)}
-                                            className={`cursor-pointer ${task.status === key ? 'bg-slate-100' : ''}`}
+                            {isViewer ? (
+                                <Badge
+                                    variant="outline"
+                                    className={`cursor-default ${currentStatus.color}`}
+                                >
+                                    <currentStatus.icon className="w-3 h-3 mr-1" />
+                                    {currentStatus.label}
+                                </Badge>
+                            ) : (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Badge
+                                            variant="outline"
+                                            className={`cursor-pointer transition-colors ${currentStatus.color}`}
                                         >
-                                            <config.icon className={`w-4 h-4 mr-2 ${task.status === key ? 'text-emerald-600' : ''}`} />
-                                            {config.label}
-                                            {task.status === key && <Check className="w-4 h-4 ml-auto text-emerald-600" />}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                            <currentStatus.icon className="w-3 h-3 mr-1" />
+                                            {currentStatus.label}
+                                        </Badge>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                        {Object.entries(statusConfig).map(([key, config]) => (
+                                            <DropdownMenuItem
+                                                key={key}
+                                                onClick={() => handleStatusChange(key)}
+                                                className={`cursor-pointer ${task.status === key ? 'bg-slate-100' : ''}`}
+                                            >
+                                                <config.icon className={`w-4 h-4 mr-2 ${task.status === key ? 'text-emerald-600' : ''}`} />
+                                                {config.label}
+                                                {task.status === key && <Check className="w-4 h-4 ml-auto text-emerald-600" />}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
 
                             <div className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${priorityColors[task.priority as keyof typeof priorityColors] || 'bg-gray-100'}`}>
                                 {task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Média' : task.priority === 'low' ? 'Baixa' : task.priority === 'urgent' ? 'Urgente' : task.priority}

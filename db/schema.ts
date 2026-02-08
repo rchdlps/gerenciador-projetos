@@ -62,6 +62,7 @@ export const sessions = pgTable("sessions", {
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
+    activeOrganizationId: text("active_organization_id").references(() => organizations.id, { onDelete: 'set null' }),
 }, (t) => ({
     userIdIdx: index('session_user_idx').on(t.userId),
 }));
@@ -362,6 +363,17 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 export const organizationsRelations = relations(organizations, ({ many }) => ({
     projects: many(projects),
     members: many(memberships),
+}));
+
+export const membershipsRelations = relations(memberships, ({ one }) => ({
+    user: one(users, {
+        fields: [memberships.userId],
+        references: [users.id],
+    }),
+    organization: one(organizations, {
+        fields: [memberships.organizationId],
+        references: [organizations.id],
+    }),
 }));
 
 export const projectPhasesRelations = relations(projectPhases, ({ one, many }) => ({

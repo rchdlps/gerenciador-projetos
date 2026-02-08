@@ -15,9 +15,11 @@ import {
     TrendingUp
 } from "lucide-react"
 import { toast } from "sonner"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function TAPSection({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
     const [justification, setJustification] = useState("")
     const [smartObjectives, setSmartObjectives] = useState("")
     const [successCriteria, setSuccessCriteria] = useState("")
@@ -98,6 +100,7 @@ export function TAPSection({ projectId }: { projectId: string }) {
                         className="min-h-[100px] bg-white"
                         value={justification}
                         onChange={(e) => setJustification(e.target.value)}
+                        disabled={isViewer}
                     />
                 </div>
 
@@ -113,6 +116,7 @@ export function TAPSection({ projectId }: { projectId: string }) {
                         className="min-h-[100px] bg-white"
                         value={smartObjectives}
                         onChange={(e) => setSmartObjectives(e.target.value)}
+                        disabled={isViewer}
                     />
                 </div>
 
@@ -128,19 +132,22 @@ export function TAPSection({ projectId }: { projectId: string }) {
                         className="min-h-[100px] bg-white"
                         value={successCriteria}
                         onChange={(e) => setSuccessCriteria(e.target.value)}
+                        disabled={isViewer}
                     />
                 </div>
 
                 {/* Buttons */}
                 <div className="flex flex-wrap gap-3 pt-4">
-                    <Button
-                        onClick={handleSave}
-                        className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                        disabled={mutation.isPending}
-                    >
-                        {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                        Salvar TAP
-                    </Button>
+                    {!isViewer && (
+                        <Button
+                            onClick={handleSave}
+                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                            disabled={mutation.isPending}
+                        >
+                            {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                            Salvar TAP
+                        </Button>
+                    )}
                     <Button
                         variant="default"
                         className="bg-blue-600 hover:bg-blue-700 text-white"

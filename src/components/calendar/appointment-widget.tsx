@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { useUserRole } from "@/hooks/use-user-role"
 import {
     Dialog,
     DialogContent,
@@ -20,6 +21,7 @@ export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
     const [isCreating, setIsCreating] = useState(false)
     const [date, setDate] = useState("")
     const [description, setDescription] = useState("")
+    const { isViewer } = useUserRole()
     const queryClient = useQueryClient()
 
     // Fetch Appointments
@@ -88,59 +90,61 @@ export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
                     </h3>
                 </div>
 
-                <Dialog open={isCreating} onOpenChange={setIsCreating}>
-                    <DialogTrigger asChild>
-                        <button className="p-2 hover:bg-[#f0fdfa] rounded-lg transition-colors text-[#1d4e46]">
-                            <Plus className="w-5 h-5" />
-                        </button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Novo Compromisso</DialogTitle>
-                        </DialogHeader>
+                {!isViewer && (
+                    <Dialog open={isCreating} onOpenChange={setIsCreating}>
+                        <DialogTrigger asChild>
+                            <button className="p-2 hover:bg-[#f0fdfa] rounded-lg transition-colors text-[#1d4e46]">
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Novo Compromisso</DialogTitle>
+                            </DialogHeader>
 
-                        <form className="space-y-4 mt-4" onSubmit={handleSubmit}>
-                            <div className="relative">
-                                <label className="text-sm font-medium leading-none mb-2 block">Data e Hora</label>
+                            <form className="space-y-4 mt-4" onSubmit={handleSubmit}>
                                 <div className="relative">
+                                    <label className="text-sm font-medium leading-none mb-2 block">Data e Hora</label>
+                                    <div className="relative">
+                                        <input
+                                            type="datetime-local"
+                                            value={date}
+                                            onChange={(e) => setDate(e.target.value)}
+                                            className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4e46]/20 transition-all text-foreground"
+                                            required
+                                        />
+                                        <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium leading-none mb-2 block">Descrição</label>
                                     <input
-                                        type="datetime-local"
-                                        value={date}
-                                        onChange={(e) => setDate(e.target.value)}
-                                        className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4e46]/20 transition-all text-foreground"
+                                        type="text"
+                                        placeholder="Nome do compromisso"
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4e46]/20 transition-all text-foreground placeholder:text-muted-foreground"
                                         required
                                     />
-                                    <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className="text-sm font-medium leading-none mb-2 block">Descrição</label>
-                                <input
-                                    type="text"
-                                    placeholder="Nome do compromisso"
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#1d4e46]/20 transition-all text-foreground placeholder:text-muted-foreground"
-                                    required
-                                />
-                            </div>
-
-                            <button
-                                disabled={isPending}
-                                type="submit"
-                                className="w-full py-2.5 bg-[#1d4e46] text-white rounded-xl font-medium text-sm hover:bg-[#153a34] transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
-                            >
-                                {isPending ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Plus className="w-4 h-4" />
-                                )}
-                                {isPending ? "Adicionando..." : "Adicionar Compromisso"}
-                            </button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                                <button
+                                    disabled={isPending}
+                                    type="submit"
+                                    className="w-full py-2.5 bg-[#1d4e46] text-white rounded-xl font-medium text-sm hover:bg-[#153a34] transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+                                >
+                                    {isPending ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Plus className="w-4 h-4" />
+                                    )}
+                                    {isPending ? "Adicionando..." : "Adicionar Compromisso"}
+                                </button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
 
             <p className="text-sm text-muted-foreground mb-4 -mt-4 ml-7">
@@ -169,15 +173,17 @@ export function AppointmentWidget({ projectId }: AppointmentWidgetProps) {
                                     {format(new Date(apt.date), "dd/MM 'às' HH:mm", { locale: ptBR })}
                                 </p>
                             </div>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteAppointment(apt.id);
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            {!isViewer && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteAppointment(apt.id);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
                     ))
                 )}

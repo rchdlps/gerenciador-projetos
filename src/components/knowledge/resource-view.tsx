@@ -11,6 +11,7 @@ import { toast } from "sonner"
 import { NotesSection } from "./notes-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface ResourceViewProps {
     projectId: string
@@ -33,6 +34,7 @@ interface RACIItem {
 export default function ResourceView({ projectId }: ResourceViewProps) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     // Team State
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -147,15 +149,24 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error()
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
                 await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-                await api.storage.confirm.$post({
+
+                const confirmRes = await api.storage.confirm.$post({
                     json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
+
                 toast.success(`Upload de ${file.name} concluído!`)
-            } catch {
-                toast.error(`Erro ao enviar ${file.name}`)
+            } catch (error) {
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -166,11 +177,14 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
-        } catch {
-            toast.error("Erro ao excluir anexo")
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -202,39 +216,43 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                     </div>
 
                     {/* Add Team Member Form */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <User className="w-3 h-3" /> Nome
-                            </Label>
-                            <Input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="" />
+                    {!isViewer && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <User className="w-3 h-3" /> Nome
+                                </Label>
+                                <Input value={newMemberName} onChange={e => setNewMemberName(e.target.value)} placeholder="" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <Briefcase className="w-3 h-3" /> Função
+                                </Label>
+                                <Input value={newMemberRole} onChange={e => setNewMemberRole(e.target.value)} placeholder="" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <Clock className="w-3 h-3" /> Dedicação
+                                </Label>
+                                <Select value={newMemberDedication} onValueChange={setNewMemberDedication}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="100% (Integral)">100% (Integral)</SelectItem>
+                                        <SelectItem value="75%">75%</SelectItem>
+                                        <SelectItem value="50%">50%</SelectItem>
+                                        <SelectItem value="25%">25%</SelectItem>
+                                        <SelectItem value="Sob demanda">Sob demanda</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <Briefcase className="w-3 h-3" /> Função
-                            </Label>
-                            <Input value={newMemberRole} onChange={e => setNewMemberRole(e.target.value)} placeholder="" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <Clock className="w-3 h-3" /> Dedicação
-                            </Label>
-                            <Select value={newMemberDedication} onValueChange={setNewMemberDedication}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="100% (Integral)">100% (Integral)</SelectItem>
-                                    <SelectItem value="75%">75%</SelectItem>
-                                    <SelectItem value="50%">50%</SelectItem>
-                                    <SelectItem value="25%">25%</SelectItem>
-                                    <SelectItem value="Sob demanda">Sob demanda</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                    )}
 
-                    <Button onClick={addTeamMember} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Membro
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addTeamMember} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Adicionar Membro
+                        </Button>
+                    )}
 
                     {teamMembers.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum membro cadastrado</p>
@@ -256,15 +274,17 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                                             <span className="text-sm text-emerald-600 font-medium">{member.dedication}</span>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setTeamMembers(teamMembers.filter(m => m.id !== member.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setTeamMembers(teamMembers.filter(m => m.id !== member.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {teamMembers.length > 0 && (
+                    {teamMembers.length > 0 && !isViewer && (
                         <Button onClick={() => saveResourceMutation.mutate()} disabled={saveResourceMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Equipe
                         </Button>
@@ -292,38 +312,42 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                     </div>
 
                     {/* Add RACI Item Form */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <FileText className="w-3 h-3" /> Atividade
-                            </Label>
-                            <Input value={newRaciActivity} onChange={e => setNewRaciActivity(e.target.value)} placeholder="" />
+                    {!isViewer && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <FileText className="w-3 h-3" /> Atividade
+                                </Label>
+                                <Input value={newRaciActivity} onChange={e => setNewRaciActivity(e.target.value)} placeholder="" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <User className="w-3 h-3" /> Pessoa
+                                </Label>
+                                <Input value={newRaciPerson} onChange={e => setNewRaciPerson(e.target.value)} placeholder="" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    🏷️ Papel RACI
+                                </Label>
+                                <Select value={newRaciRole} onValueChange={setNewRaciRole}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="R - Responsável">R - Responsável</SelectItem>
+                                        <SelectItem value="A - Aprovador">A - Aprovador</SelectItem>
+                                        <SelectItem value="C - Consultado">C - Consultado</SelectItem>
+                                        <SelectItem value="I - Informado">I - Informado</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <User className="w-3 h-3" /> Pessoa
-                            </Label>
-                            <Input value={newRaciPerson} onChange={e => setNewRaciPerson(e.target.value)} placeholder="" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                🏷️ Papel RACI
-                            </Label>
-                            <Select value={newRaciRole} onValueChange={setNewRaciRole}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="R - Responsável">R - Responsável</SelectItem>
-                                    <SelectItem value="A - Aprovador">A - Aprovador</SelectItem>
-                                    <SelectItem value="C - Consultado">C - Consultado</SelectItem>
-                                    <SelectItem value="I - Informado">I - Informado</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                    )}
 
-                    <Button onClick={addRaciItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar à Matriz RACI
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addRaciItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Adicionar à Matriz RACI
+                        </Button>
+                    )}
 
                     {raciItems.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum item na matriz RACI</p>
@@ -345,15 +369,17 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                                             <span className={`text-xs px-2 py-0.5 rounded border ${getRaciColor(item.raciRole)}`}>{item.raciRole}</span>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setRaciItems(raciItems.filter(r => r.id !== item.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setRaciItems(raciItems.filter(r => r.id !== item.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {raciItems.length > 0 && (
+                    {raciItems.length > 0 && !isViewer && (
                         <Button onClick={() => saveResourceMutation.mutate()} disabled={saveResourceMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Matriz RACI
                         </Button>
@@ -379,8 +405,8 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                             <span className="font-bold">Anexe documentos relevantes:</span> Organogramas, currículos, matrizes de responsabilidade, ou qualquer documento de RH.
                         </p>
                     </div>
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} />
+                    {!isViewer && <FileUpload onUpload={handleUpload} />}
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} readonly={isViewer} />
                 </CardContent>
             </Card>
         </div>

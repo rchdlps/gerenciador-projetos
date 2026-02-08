@@ -16,6 +16,7 @@ import qualityRouter from './routes/quality'
 
 import communicationRouter from './routes/communication'
 import procurementRouter from './routes/procurement'
+import orgSessionRouter from './routes/org-session'
 
 const app = new Hono().basePath('/api')
 
@@ -38,6 +39,7 @@ const apiRoutes = app
     .route('/quality', qualityRouter)
     .route('/communication', communicationRouter)
     .route('/procurement', procurementRouter)
+    .route('/org-session', orgSessionRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })

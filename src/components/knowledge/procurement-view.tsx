@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShoppingCart, FileText, Plus, Trash2, StickyNote, Lightbulb, Phone, Package, Landmark } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export default function ProcurementView({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
 
     // 1. Query Data
     const { data, isLoading } = useQuery({
@@ -118,47 +120,49 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                     </div>
 
                     {/* Form */}
-                    <div className="space-y-4 pb-6 border-b">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    <Landmark className="w-3 h-3" /> Nome do Fornecedor
-                                </Label>
-                                <Input
-                                    value={supplierForm.name}
-                                    onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                                />
+                    {!isViewer && (
+                        <div className="space-y-4 pb-6 border-b">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        <Landmark className="w-3 h-3" /> Nome do Fornecedor
+                                    </Label>
+                                    <Input
+                                        value={supplierForm.name}
+                                        onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        <Package className="w-3 h-3" /> Item/Serviço
+                                    </Label>
+                                    <Input
+                                        value={supplierForm.itemService}
+                                        onChange={e => setSupplierForm({ ...supplierForm, itemService: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        <Phone className="w-3 h-3" /> Contato
+                                    </Label>
+                                    <Input
+                                        value={supplierForm.contact}
+                                        onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })}
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    <Package className="w-3 h-3" /> Item/Serviço
-                                </Label>
-                                <Input
-                                    value={supplierForm.itemService}
-                                    onChange={e => setSupplierForm({ ...supplierForm, itemService: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    <Phone className="w-3 h-3" /> Contato
-                                </Label>
-                                <Input
-                                    value={supplierForm.contact}
-                                    onChange={e => setSupplierForm({ ...supplierForm, contact: e.target.value })}
-                                />
-                            </div>
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={!supplierForm.name || !supplierForm.itemService || addSupplier.isPending}
+                                onClick={() => {
+                                    addSupplier.mutate(supplierForm)
+                                    setSupplierForm({ name: "", itemService: "", contact: "" })
+                                }}
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Adicionar Fornecedor
+                            </Button>
                         </div>
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={!supplierForm.name || !supplierForm.itemService || addSupplier.isPending}
-                            onClick={() => {
-                                addSupplier.mutate(supplierForm)
-                                setSupplierForm({ name: "", itemService: "", contact: "" })
-                            }}
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Adicionar Fornecedor
-                        </Button>
-                    </div>
+                    )}
 
                     {/* List */}
                     <div className="space-y-2">
@@ -184,14 +188,16 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                                                 <div className="text-sm text-slate-700">{item.contact}</div>
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={() => deleteSupplier.mutate(item.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {!isViewer && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => deleteSupplier.mutate(item.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -210,68 +216,70 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Form */}
-                    <div className="space-y-4 pb-6 border-b">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    📄 Descrição
-                                </Label>
-                                <Input
-                                    value={contractForm.description}
-                                    onChange={e => setContractForm({ ...contractForm, description: e.target.value })}
-                                />
+                    {!isViewer && (
+                        <div className="space-y-4 pb-6 border-b">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        📄 Descrição
+                                    </Label>
+                                    <Input
+                                        value={contractForm.description}
+                                        onChange={e => setContractForm({ ...contractForm, description: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        💵 Valor (R$)
+                                    </Label>
+                                    <Input
+                                        value={contractForm.value}
+                                        onChange={e => setContractForm({ ...contractForm, value: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        🗓️ Vigência
+                                    </Label>
+                                    <Input
+                                        type="date"
+                                        value={contractForm.validity}
+                                        onChange={e => setContractForm({ ...contractForm, validity: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        ✅ Status
+                                    </Label>
+                                    <Select
+                                        value={contractForm.status}
+                                        onValueChange={v => setContractForm({ ...contractForm, status: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Em negociação">Em negociação</SelectItem>
+                                            <SelectItem value="Assinado">Assinado</SelectItem>
+                                            <SelectItem value="Em execução">Em execução</SelectItem>
+                                            <SelectItem value="Finalizado">Finalizado</SelectItem>
+                                            <SelectItem value="Cancelado">Cancelado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    💵 Valor (R$)
-                                </Label>
-                                <Input
-                                    value={contractForm.value}
-                                    onChange={e => setContractForm({ ...contractForm, value: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    🗓️ Vigência
-                                </Label>
-                                <Input
-                                    type="date"
-                                    value={contractForm.validity}
-                                    onChange={e => setContractForm({ ...contractForm, validity: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    ✅ Status
-                                </Label>
-                                <Select
-                                    value={contractForm.status}
-                                    onValueChange={v => setContractForm({ ...contractForm, status: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Em negociação">Em negociação</SelectItem>
-                                        <SelectItem value="Assinado">Assinado</SelectItem>
-                                        <SelectItem value="Em execução">Em execução</SelectItem>
-                                        <SelectItem value="Finalizado">Finalizado</SelectItem>
-                                        <SelectItem value="Cancelado">Cancelado</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={!contractForm.description || !contractForm.value || addContract.isPending}
+                                onClick={() => {
+                                    addContract.mutate(contractForm)
+                                    setContractForm({ description: "", value: "", validity: "", status: "Em negociação" })
+                                }}
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Adicionar Contrato
+                            </Button>
                         </div>
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={!contractForm.description || !contractForm.value || addContract.isPending}
-                            onClick={() => {
-                                addContract.mutate(contractForm)
-                                setContractForm({ description: "", value: "", validity: "", status: "Em negociação" })
-                            }}
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Adicionar Contrato
-                        </Button>
-                    </div>
+                    )}
 
                     {/* List */}
                     <div className="space-y-2">
@@ -302,22 +310,24 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                                                 <div className="text-[10px] uppercase text-slate-500 font-bold">Status</div>
                                                 <div className="text-sm text-slate-700">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${item.status === 'Assinado' ? 'bg-green-100 text-green-700' :
-                                                            item.status === 'Em negociação' ? 'bg-yellow-100 text-yellow-700' :
-                                                                'bg-slate-100 text-slate-700'
+                                                        item.status === 'Em negociação' ? 'bg-yellow-100 text-yellow-700' :
+                                                            'bg-slate-100 text-slate-700'
                                                         }`}>
                                                         {item.status}
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={() => deleteContract.mutate(item.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {!isViewer && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => deleteContract.mutate(item.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -335,16 +345,18 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                         </div>
                         <CardTitle className="text-lg font-bold text-yellow-900">Notas Gerais</CardTitle>
                     </div>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSaveNotes}
-                        disabled={updateNotes.isPending}
-                        className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
-                    >
-                        <Plus className="w-3 h-3 mr-2 hidden" />
-                        Salvar Notas
-                    </Button>
+                    {!isViewer && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSaveNotes}
+                            disabled={updateNotes.isPending}
+                            className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
+                        >
+                            <Plus className="w-3 h-3 mr-2 hidden" />
+                            Salvar Notas
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-900 flex gap-2">
@@ -360,6 +372,7 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
                             onChange={e => setNotes(e.target.value)}
                             className="min-h-[150px] resize-y bg-white border-slate-200 focus:border-yellow-400 focus:ring-yellow-400"
                             placeholder="Adicione anotações gerais, observações importantes, decisões tomadas, lições aprendidas..."
+                            disabled={isViewer}
                         />
                         <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
                             {updateNotes.isPending && "Salvando..."}

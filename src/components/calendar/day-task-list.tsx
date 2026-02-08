@@ -4,6 +4,7 @@ import { ptBR } from "date-fns/locale"
 import { ListTodo, CheckCircle2, Circle, Plus, X, Loader2, Trash2 } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
+import { useUserRole } from "@/hooks/use-user-role"
 import {
     Dialog,
     DialogContent,
@@ -23,6 +24,7 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
     const [newTaskTitle, setNewTaskTitle] = useState("")
     const [selectedPhaseId, setSelectedPhaseId] = useState("")
     const [priority, setPriority] = useState("medium")
+    const { isViewer } = useUserRole()
 
     const queryClient = useQueryClient()
 
@@ -105,7 +107,7 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
                     </p>
                 </div>
 
-                {projectId && (
+                {projectId && !isViewer && (
                     <Dialog open={isCreating} onOpenChange={setIsCreating}>
                         <DialogTrigger asChild>
                             <button className="p-2 hover:bg-[#f0fdfa] rounded-lg transition-colors text-[#1d4e46]">
@@ -224,15 +226,17 @@ export function DayTaskList({ date, tasks, projectId }: DayTaskListProps) {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteTask(task.id);
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                {!isViewer && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteTask(task.id);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         ))}
                     </div>

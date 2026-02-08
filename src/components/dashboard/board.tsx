@@ -43,7 +43,14 @@ interface BoardColumn {
     cards: BoardCard[]
 }
 
-export function ScrumbanBoard({ projectId }: { projectId: string }) {
+import { useUserRole } from "@/hooks/use-user-role"
+
+interface BoardProps {
+    projectId: string
+}
+
+export function ScrumbanBoard({ projectId }: BoardProps) {
+    const { isViewer } = useUserRole()
     const queryClient = useQueryClient()
     const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
     const [activeCard, setActiveCard] = useState<BoardCard | null>(null)
@@ -52,12 +59,13 @@ export function ScrumbanBoard({ projectId }: { projectId: string }) {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 5, // Prevent accidental drags
+                distance: isViewer ? 999999 : 5,
             },
         }),
-        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
     )
-
     // Custom collision detection to handle empty columns better
     const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
         // First, check if pointer is strictly within a droppable (works best for empty containers)

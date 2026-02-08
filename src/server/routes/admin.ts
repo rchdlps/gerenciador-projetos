@@ -246,22 +246,28 @@ app.post('/users',
 // PATCH /api/admin/users/:id
 // Update user details
 // PATCH /api/admin/users/:id
-// Update user details
+// Update user details - supports multi-org memberships
 app.patch('/users/:id',
     zValidator('json', z.object({
         name: z.string().optional(),
         globalRole: z.enum(['super_admin', 'user']).optional(),
         isActive: z.boolean().optional(),
+        // Legacy single org support
         organizationId: z.string().optional(),
-        orgRole: z.enum(['secretario', 'gestor', 'viewer']).optional()
+        orgRole: z.enum(['secretario', 'gestor', 'viewer']).optional(),
+        // New: array of memberships for multi-org
+        memberships: z.array(z.object({
+            organizationId: z.string(),
+            role: z.enum(['secretario', 'gestor', 'viewer'])
+        })).optional()
     })),
     async (c) => {
         const session = await getSession(c)
         if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
         const userIdToUpdate = c.req.param('id')
-        const { name, globalRole, isActive, organizationId, orgRole } = c.req.valid('json')
-        console.log(`[Admin] PATCH /users/${userIdToUpdate}`, { name, globalRole, isActive, organizationId, orgRole })
+        const { name, globalRole, isActive, organizationId, orgRole, memberships: newMemberships } = c.req.valid('json')
+        console.log(`[Admin] PATCH /users/${userIdToUpdate}`, { name, globalRole, isActive, memberships: newMemberships })
 
         // 1. Permission Check
         const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
@@ -271,23 +277,22 @@ app.patch('/users/:id',
         if (!isSuperAdmin) {
             if (globalRole) return c.json({ error: 'Only Super Admins can change Global Roles' }, 403)
             if (isActive !== undefined) return c.json({ error: 'Only Super Admins can change active status' }, 403)
-            if (!organizationId) return c.json({ error: 'Context Organization ID required' }, 400)
+            if (name) return c.json({ error: 'Only Super Admins can change cached user names via this API' }, 403)
 
-            const [membership] = await db.select()
-                .from(memberships)
-                .where(and(
-                    eq(memberships.userId, session.user.id),
-                    eq(memberships.organizationId, organizationId),
-                    inArray(memberships.role, ['secretario', 'gestor'])
-                ))
-
-            if (!membership) return c.json({ error: 'Insufficient permissions' }, 403)
-
-            // Limit scope: Can only update if target user is ALSO in this org (or being added)
-            // But if we are editing 'name', that affects global user. 
-            // Design Decision: Org Admins can only update Role for their org. Name changes restricted to user profile or Super Admin.
-            if (name) {
-                return c.json({ error: 'Only Super Admins can change cached user names via this API' }, 403)
+            // For non-super-admins with memberships array, verify they have admin in all orgs
+            if (newMemberships && newMemberships.length > 0) {
+                for (const m of newMemberships) {
+                    const [membership] = await db.select()
+                        .from(memberships)
+                        .where(and(
+                            eq(memberships.userId, session.user.id),
+                            eq(memberships.organizationId, m.organizationId),
+                            inArray(memberships.role, ['secretario', 'gestor'])
+                        ))
+                    if (!membership) {
+                        return c.json({ error: `Insufficient permissions for organization ${m.organizationId}` }, 403)
+                    }
+                }
             }
         }
 
@@ -303,8 +308,50 @@ app.patch('/users/:id',
             }
         }
 
-        // 3. Update Membership
-        if (organizationId && orgRole) {
+        // 3. Update Memberships - support both legacy single org and new array
+        if (newMemberships && newMemberships.length >= 0) {
+            // Get current memberships
+            const currentMemberships = await db.select()
+                .from(memberships)
+                .where(eq(memberships.userId, userIdToUpdate))
+
+            const currentOrgIds = currentMemberships.map(m => m.organizationId)
+            const newOrgIds = newMemberships.map(m => m.organizationId)
+
+            // Remove memberships not in new list
+            const toRemove = currentOrgIds.filter(id => !newOrgIds.includes(id))
+            for (const orgId of toRemove) {
+                await db.delete(memberships)
+                    .where(and(
+                        eq(memberships.userId, userIdToUpdate),
+                        eq(memberships.organizationId, orgId)
+                    ))
+            }
+
+            // Add or update memberships
+            for (const m of newMemberships) {
+                const existing = currentMemberships.find(cm => cm.organizationId === m.organizationId)
+                if (existing) {
+                    // Update role if changed
+                    if (existing.role !== m.role) {
+                        await db.update(memberships)
+                            .set({ role: m.role })
+                            .where(and(
+                                eq(memberships.userId, userIdToUpdate),
+                                eq(memberships.organizationId, m.organizationId)
+                            ))
+                    }
+                } else {
+                    // Insert new membership
+                    await db.insert(memberships).values({
+                        userId: userIdToUpdate,
+                        organizationId: m.organizationId,
+                        role: m.role
+                    })
+                }
+            }
+        } else if (organizationId && orgRole) {
+            // Legacy single org update
             const [existingMember] = await db.select().from(memberships).where(and(
                 eq(memberships.userId, userIdToUpdate),
                 eq(memberships.organizationId, organizationId)
@@ -318,7 +365,6 @@ app.patch('/users/:id',
                         eq(memberships.organizationId, organizationId)
                     ))
             } else {
-                // Or insert if for some reason missing (though this is 'Edit')
                 await db.insert(memberships).values({
                     userId: userIdToUpdate,
                     organizationId,

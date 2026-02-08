@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { NotesSection } from "./notes-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface RiskViewProps {
     projectId: string
@@ -33,6 +34,7 @@ const IMPACT_LABELS = ['Muito Baixo', 'Baixo', 'Médio', 'Alto', 'Muito Alto']
 export default function RiskView({ projectId }: RiskViewProps) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     // Risk State
     const [risks, setRisks] = useState<Risk[]>([])
@@ -127,15 +129,24 @@ export default function RiskView({ projectId }: RiskViewProps) {
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error()
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
                 await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-                await api.storage.confirm.$post({
+
+                const confirmRes = await api.storage.confirm.$post({
                     json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
+
                 toast.success(`Upload de ${file.name} concluído!`)
-            } catch {
-                toast.error(`Erro ao enviar ${file.name}`)
+            } catch (error) {
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -146,11 +157,14 @@ export default function RiskView({ projectId }: RiskViewProps) {
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
-        } catch {
-            toast.error("Erro ao excluir anexo")
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -191,73 +205,77 @@ export default function RiskView({ projectId }: RiskViewProps) {
                     </div>
 
                     {/* Add Risk Form */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2 md:col-span-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Descrição do Risco</Label>
-                            <Textarea
-                                value={newRiskDescription}
-                                onChange={e => setNewRiskDescription(e.target.value)}
-                                placeholder="Descreva o risco identificado..."
-                                className="min-h-[80px]"
-                            />
+                    {!isViewer && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2 md:col-span-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Descrição do Risco</Label>
+                                <Textarea
+                                    value={newRiskDescription}
+                                    onChange={e => setNewRiskDescription(e.target.value)}
+                                    placeholder="Descreva o risco identificado..."
+                                    className="min-h-[80px]"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Categoria</Label>
+                                <Select value={newRiskCategory} onValueChange={setNewRiskCategory}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Técnico">Técnico</SelectItem>
+                                        <SelectItem value="Externo">Externo</SelectItem>
+                                        <SelectItem value="Organizacional">Organizacional</SelectItem>
+                                        <SelectItem value="Gerencial">Gerencial</SelectItem>
+                                        <SelectItem value="Comercial">Comercial</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Responsável</Label>
+                                <Input value={newRiskOwner} onChange={e => setNewRiskOwner(e.target.value)} placeholder="Nome do responsável" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Probabilidade (1-5)</Label>
+                                <Select value={String(newRiskProbability)} onValueChange={v => setNewRiskProbability(Number(v))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">1 - Muito Baixa</SelectItem>
+                                        <SelectItem value="2">2 - Baixa</SelectItem>
+                                        <SelectItem value="3">3 - Média</SelectItem>
+                                        <SelectItem value="4">4 - Alta</SelectItem>
+                                        <SelectItem value="5">5 - Muito Alta</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Impacto (1-5)</Label>
+                                <Select value={String(newRiskImpact)} onValueChange={v => setNewRiskImpact(Number(v))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="1">1 - Muito Baixo</SelectItem>
+                                        <SelectItem value="2">2 - Baixo</SelectItem>
+                                        <SelectItem value="3">3 - Médio</SelectItem>
+                                        <SelectItem value="4">4 - Alto</SelectItem>
+                                        <SelectItem value="5">5 - Muito Alto</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase">Resposta ao Risco</Label>
+                                <Textarea
+                                    value={newRiskResponse}
+                                    onChange={e => setNewRiskResponse(e.target.value)}
+                                    placeholder="Descreva a estratégia de resposta ao risco..."
+                                    className="min-h-[60px]"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Categoria</Label>
-                            <Select value={newRiskCategory} onValueChange={setNewRiskCategory}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Técnico">Técnico</SelectItem>
-                                    <SelectItem value="Externo">Externo</SelectItem>
-                                    <SelectItem value="Organizacional">Organizacional</SelectItem>
-                                    <SelectItem value="Gerencial">Gerencial</SelectItem>
-                                    <SelectItem value="Comercial">Comercial</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Responsável</Label>
-                            <Input value={newRiskOwner} onChange={e => setNewRiskOwner(e.target.value)} placeholder="Nome do responsável" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Probabilidade (1-5)</Label>
-                            <Select value={String(newRiskProbability)} onValueChange={v => setNewRiskProbability(Number(v))}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">1 - Muito Baixa</SelectItem>
-                                    <SelectItem value="2">2 - Baixa</SelectItem>
-                                    <SelectItem value="3">3 - Média</SelectItem>
-                                    <SelectItem value="4">4 - Alta</SelectItem>
-                                    <SelectItem value="5">5 - Muito Alta</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Impacto (1-5)</Label>
-                            <Select value={String(newRiskImpact)} onValueChange={v => setNewRiskImpact(Number(v))}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">1 - Muito Baixo</SelectItem>
-                                    <SelectItem value="2">2 - Baixo</SelectItem>
-                                    <SelectItem value="3">3 - Médio</SelectItem>
-                                    <SelectItem value="4">4 - Alto</SelectItem>
-                                    <SelectItem value="5">5 - Muito Alto</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase">Resposta ao Risco</Label>
-                            <Textarea
-                                value={newRiskResponse}
-                                onChange={e => setNewRiskResponse(e.target.value)}
-                                placeholder="Descreva a estratégia de resposta ao risco..."
-                                className="min-h-[60px]"
-                            />
-                        </div>
-                    </div>
+                    )}
 
-                    <Button onClick={addRisk} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Risco
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addRisk} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Adicionar Risco
+                        </Button>
+                    )}
 
                     {risks.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum risco identificado</p>
@@ -279,16 +297,18 @@ export default function RiskView({ projectId }: RiskViewProps) {
                                                 <p className="text-sm text-slate-600"><span className="font-medium">Resposta:</span> {risk.response}</p>
                                             )}
                                         </div>
-                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setRisks(risks.filter(r => r.id !== risk.id))}>
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {!isViewer && (
+                                            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setRisks(risks.filter(r => r.id !== risk.id))}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {risks.length > 0 && (
+                    {risks.length > 0 && !isViewer && (
                         <Button onClick={() => saveRiskMutation.mutate()} disabled={saveRiskMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Riscos
                         </Button>
@@ -394,8 +414,8 @@ export default function RiskView({ projectId }: RiskViewProps) {
                             <span className="font-bold">Anexe documentos relevantes:</span> Análises de risco, planos de contingência, ou qualquer documento relacionado à gestão de riscos.
                         </p>
                     </div>
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} />
+                    {!isViewer && <FileUpload onUpload={handleUpload} />}
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} readonly={isViewer} />
                 </CardContent>
             </Card>
         </div>

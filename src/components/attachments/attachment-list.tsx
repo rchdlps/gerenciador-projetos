@@ -18,11 +18,12 @@ export type Attachment = {
 
 interface AttachmentListProps {
     attachments: Attachment[]
-    onDelete: (id: string) => Promise<void>
-    isDeleting?: string | null // ID of file being deleted
+    onDelete: (id: string) => void
+    isDeleting: string | null // ID of file being deleted
+    readonly?: boolean
 }
 
-export function AttachmentList({ attachments, onDelete, isDeleting }: AttachmentListProps) {
+export function AttachmentList({ attachments, onDelete, isDeleting, readonly = false }: AttachmentListProps) {
     if (attachments.length === 0) {
         return (
             <div className="text-sm text-muted-foreground text-center py-8 bg-muted/20 rounded-lg border border-dashed">
@@ -80,19 +81,21 @@ export function AttachmentList({ attachments, onDelete, isDeleting }: Attachment
                                     </Button>
                                 )}
 
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => onDelete(file.id)}
-                                    disabled={isDeleting === file.id}
-                                >
-                                    {isDeleting === file.id ? (
-                                        <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                        <Trash2 className="h-4 w-4" />
-                                    )}
-                                </Button>
+                                {!readonly && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => onDelete(file.id)}
+                                        disabled={isDeleting === file.id}
+                                    >
+                                        {isDeleting === file.id ? (
+                                            <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

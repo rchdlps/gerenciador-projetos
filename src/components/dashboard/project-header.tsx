@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface ProjectHeaderProps {
     project: any
@@ -28,6 +29,7 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
     const [desc, setDesc] = useState(project.description || "")
     const [type, setType] = useState(project.type || "Projeto")
     const [status, setStatus] = useState(project.status || "em_andamento")
+    const { isViewer } = useUserRole()
 
     const updateProject = useMutation({
         mutationFn: async () => {
@@ -87,73 +89,75 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-stretch" aria-label="Cabeçalho do Projeto">
             <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden relative group/card flex flex-col h-full">
-                <div className="absolute top-4 right-4 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 ease-in-out z-10">
-                    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors">
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                                <DialogTitle>Editar Projeto</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nome do Projeto</Label>
-                                    <Input id="name" value={name} onChange={e => setName(e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="type">Tipo de Projeto</Label>
-                                    <Select value={type} onValueChange={setType}>
-                                        <SelectTrigger id="type">
-                                            <SelectValue placeholder="Selecione o Tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Obra">Obra</SelectItem>
-                                            <SelectItem value="Trabalho Social">Trabalho Social</SelectItem>
-                                            <SelectItem value="Programa">Programa</SelectItem>
-                                            <SelectItem value="Serviço">Serviço</SelectItem>
-                                            <SelectItem value="Aquisição">Aquisição</SelectItem>
-                                            <SelectItem value="Evento">Evento</SelectItem>
-                                            <SelectItem value="Estudo">Estudo</SelectItem>
-                                            <SelectItem value="Capacitação">Capacitação</SelectItem>
-                                            <SelectItem value="Inovação">Inovação</SelectItem>
-                                            <SelectItem value="TIC">TIC</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="status">Status</Label>
-                                    <Select value={status} onValueChange={setStatus}>
-                                        <SelectTrigger id="status">
-                                            <SelectValue placeholder="Selecione o Status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="em_andamento">Em Andamento</SelectItem>
-                                            <SelectItem value="concluido">Concluído</SelectItem>
-                                            <SelectItem value="suspenso">Suspenso</SelectItem>
-                                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                                            <SelectItem value="recorrente">Recorrente</SelectItem>
-                                            <SelectItem value="proposta">Proposta</SelectItem>
-                                            <SelectItem value="planejamento">Planejamento</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="desc">Descrição</Label>
-                                    <Textarea id="desc" value={desc} onChange={e => setDesc(e.target.value)} />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
-                                <Button onClick={() => updateProject.mutate()} disabled={updateProject.isPending}>
-                                    {updateProject.isPending ? 'Salvando...' : 'Salvar Alterações'}
+                {!isViewer && (
+                    <div className="absolute top-4 right-4 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 ease-in-out z-10">
+                        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors">
+                                    <Pencil className="h-4 w-4" />
                                 </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Editar Projeto</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Nome do Projeto</Label>
+                                        <Input id="name" value={name} onChange={e => setName(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type">Tipo de Projeto</Label>
+                                        <Select value={type} onValueChange={setType}>
+                                            <SelectTrigger id="type">
+                                                <SelectValue placeholder="Selecione o Tipo" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Obra">Obra</SelectItem>
+                                                <SelectItem value="Trabalho Social">Trabalho Social</SelectItem>
+                                                <SelectItem value="Programa">Programa</SelectItem>
+                                                <SelectItem value="Serviço">Serviço</SelectItem>
+                                                <SelectItem value="Aquisição">Aquisição</SelectItem>
+                                                <SelectItem value="Evento">Evento</SelectItem>
+                                                <SelectItem value="Estudo">Estudo</SelectItem>
+                                                <SelectItem value="Capacitação">Capacitação</SelectItem>
+                                                <SelectItem value="Inovação">Inovação</SelectItem>
+                                                <SelectItem value="TIC">TIC</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="status">Status</Label>
+                                        <Select value={status} onValueChange={setStatus}>
+                                            <SelectTrigger id="status">
+                                                <SelectValue placeholder="Selecione o Status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                                                <SelectItem value="concluido">Concluído</SelectItem>
+                                                <SelectItem value="suspenso">Suspenso</SelectItem>
+                                                <SelectItem value="cancelado">Cancelado</SelectItem>
+                                                <SelectItem value="recorrente">Recorrente</SelectItem>
+                                                <SelectItem value="proposta">Proposta</SelectItem>
+                                                <SelectItem value="planejamento">Planejamento</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="desc">Descrição</Label>
+                                        <Textarea id="desc" value={desc} onChange={e => setDesc(e.target.value)} />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+                                    <Button onClick={() => updateProject.mutate()} disabled={updateProject.isPending}>
+                                        {updateProject.isPending ? 'Salvando...' : 'Salvar Alterações'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                )}
 
                 <CardContent className="p-8 flex flex-col h-full justify-between gap-8">
                     <div className="space-y-6">
@@ -163,12 +167,12 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                                     {project.type || "Projeto"}
                                 </span>
                                 <span className={`inline-flex items-center rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${status === 'concluido' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                        status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                            status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                status === 'recorrente' ? 'bg-violet-50 text-violet-700 border-violet-200' :
-                                                    status === 'proposta' ? 'bg-slate-50 text-slate-700 border-slate-200' :
-                                                        status === 'planejamento' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' :
-                                                            'bg-sky-50 text-sky-700 border-sky-200'
+                                    status === 'suspenso' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                        status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                            status === 'recorrente' ? 'bg-violet-50 text-violet-700 border-violet-200' :
+                                                status === 'proposta' ? 'bg-slate-50 text-slate-700 border-slate-200' :
+                                                    status === 'planejamento' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' :
+                                                        'bg-sky-50 text-sky-700 border-sky-200'
                                     }`}>
                                     {status === 'em_andamento' ? 'Em Andamento' :
                                         status === 'concluido' ? 'Concluído' :

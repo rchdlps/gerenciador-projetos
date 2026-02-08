@@ -11,9 +11,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Lightbulb, Megaphone, Calendar, Plus, Trash2, StickyNote } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export default function CommunicationView({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
 
     // Query Data
     const { data, isLoading } = useQuery({
@@ -115,78 +117,80 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                     </div>
 
                     {/* Form */}
-                    <div className="space-y-4 pb-6 border-b">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    📋 Informação
-                                </Label>
-                                <Input
-                                    placeholder="O que será comunicado"
-                                    value={planForm.info}
-                                    onChange={e => setPlanForm({ ...planForm, info: e.target.value })}
-                                />
+                    {!isViewer && (
+                        <div className="space-y-4 pb-6 border-b">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        📋 Informação
+                                    </Label>
+                                    <Input
+                                        placeholder="O que será comunicado"
+                                        value={planForm.info}
+                                        onChange={e => setPlanForm({ ...planForm, info: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        👥 Para Quem
+                                    </Label>
+                                    <Input
+                                        placeholder="Destinatários"
+                                        value={planForm.stakeholders}
+                                        onChange={e => setPlanForm({ ...planForm, stakeholders: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        🗓️ Quando
+                                    </Label>
+                                    <Select
+                                        value={planForm.frequency}
+                                        onValueChange={v => setPlanForm({ ...planForm, frequency: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Diário">Diário</SelectItem>
+                                            <SelectItem value="Semanal">Semanal</SelectItem>
+                                            <SelectItem value="Mensal">Mensal</SelectItem>
+                                            <SelectItem value="Sob Demanda">Sob Demanda</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        📱 Meio
+                                    </Label>
+                                    <Select
+                                        value={planForm.medium}
+                                        onValueChange={v => setPlanForm({ ...planForm, medium: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="E-mail">E-mail</SelectItem>
+                                            <SelectItem value="Reunião">Reunião</SelectItem>
+                                            <SelectItem value="Relatório">Relatório</SelectItem>
+                                            <SelectItem value="Mensagem">Mensagem</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    👥 Para Quem
-                                </Label>
-                                <Input
-                                    placeholder="Destinatários"
-                                    value={planForm.stakeholders}
-                                    onChange={e => setPlanForm({ ...planForm, stakeholders: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    🗓️ Quando
-                                </Label>
-                                <Select
-                                    value={planForm.frequency}
-                                    onValueChange={v => setPlanForm({ ...planForm, frequency: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Diário">Diário</SelectItem>
-                                        <SelectItem value="Semanal">Semanal</SelectItem>
-                                        <SelectItem value="Mensal">Mensal</SelectItem>
-                                        <SelectItem value="Sob Demanda">Sob Demanda</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    📱 Meio
-                                </Label>
-                                <Select
-                                    value={planForm.medium}
-                                    onValueChange={v => setPlanForm({ ...planForm, medium: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="E-mail">E-mail</SelectItem>
-                                        <SelectItem value="Reunião">Reunião</SelectItem>
-                                        <SelectItem value="Relatório">Relatório</SelectItem>
-                                        <SelectItem value="Mensagem">Mensagem</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={!planForm.info || !planForm.stakeholders || addPlanItem.isPending}
+                                onClick={() => {
+                                    addPlanItem.mutate(planForm)
+                                    setPlanForm({ info: "", stakeholders: "", frequency: "Diário", medium: "E-mail" })
+                                }}
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Adicionar ao Plano
+                            </Button>
                         </div>
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={!planForm.info || !planForm.stakeholders || addPlanItem.isPending}
-                            onClick={() => {
-                                addPlanItem.mutate(planForm)
-                                setPlanForm({ info: "", stakeholders: "", frequency: "Diário", medium: "E-mail" })
-                            }}
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Adicionar ao Plano
-                        </Button>
-                    </div>
+                    )}
 
                     {/* List */}
                     <div className="space-y-2">
@@ -216,14 +220,16 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                                                 <div className="text-sm text-slate-700">{item.medium}</div>
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={() => deletePlanItem.mutate(item.id)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {!isViewer && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => deletePlanItem.mutate(item.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -242,51 +248,53 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Form */}
-                    <div className="space-y-4 pb-6 border-b">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    📋 Assunto
-                                </Label>
-                                <Input
-                                    value={meetingForm.subject}
-                                    onChange={e => setMeetingForm({ ...meetingForm, subject: e.target.value })}
-                                    placeholder="Tema da reunião"
-                                />
+                    {!isViewer && (
+                        <div className="space-y-4 pb-6 border-b">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        📋 Assunto
+                                    </Label>
+                                    <Input
+                                        value={meetingForm.subject}
+                                        onChange={e => setMeetingForm({ ...meetingForm, subject: e.target.value })}
+                                        placeholder="Tema da reunião"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                        🗓️ Data
+                                    </Label>
+                                    <Input
+                                        type="date"
+                                        value={meetingForm.date}
+                                        onChange={e => setMeetingForm({ ...meetingForm, date: e.target.value })}
+                                    />
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                    🗓️ Data
+                                    📝 Principais Decisões
                                 </Label>
-                                <Input
-                                    type="date"
-                                    value={meetingForm.date}
-                                    onChange={e => setMeetingForm({ ...meetingForm, date: e.target.value })}
+                                <Textarea
+                                    className="resize-none h-20"
+                                    value={meetingForm.decisions}
+                                    onChange={e => setMeetingForm({ ...meetingForm, decisions: e.target.value })}
+                                    placeholder="Registre aqui as decisões tomadas..."
                                 />
                             </div>
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={!meetingForm.subject || !meetingForm.date || addMeeting.isPending}
+                                onClick={() => {
+                                    addMeeting.mutate(meetingForm)
+                                    setMeetingForm({ subject: "", date: "", decisions: "" })
+                                }}
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Registrar Reunião
+                            </Button>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                                📝 Principais Decisões
-                            </Label>
-                            <Textarea
-                                className="resize-none h-20"
-                                value={meetingForm.decisions}
-                                onChange={e => setMeetingForm({ ...meetingForm, decisions: e.target.value })}
-                                placeholder="Registre aqui as decisões tomadas..."
-                            />
-                        </div>
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={!meetingForm.subject || !meetingForm.date || addMeeting.isPending}
-                            onClick={() => {
-                                addMeeting.mutate(meetingForm)
-                                setMeetingForm({ subject: "", date: "", decisions: "" })
-                            }}
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Registrar Reunião
-                        </Button>
-                    </div>
+                    )}
 
                     {/* List */}
                     <div className="space-y-2">
@@ -306,14 +314,16 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                                                     {format(new Date(meeting.date), "dd/MM/yyyy")}
                                                 </div>
                                             </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => deleteMeeting.mutate(meeting.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
+                                            {!isViewer && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={() => deleteMeeting.mutate(meeting.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                         {meeting.decisions && (
                                             <div className="mt-2 text-sm text-slate-600 bg-white p-3 rounded border border-slate-100">
@@ -338,16 +348,18 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                         </div>
                         <CardTitle className="text-lg font-bold text-yellow-900">Notas Gerais</CardTitle>
                     </div>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleSaveNotes}
-                        disabled={updateNotes.isPending}
-                        className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
-                    >
-                        <Plus className="w-3 h-3 mr-2 hidden" />
-                        Salvar Notas
-                    </Button>
+                    {!isViewer && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSaveNotes}
+                            disabled={updateNotes.isPending}
+                            className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
+                        >
+                            <Plus className="w-3 h-3 mr-2 hidden" />
+                            Salvar Notas
+                        </Button>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-900 flex gap-2">
@@ -363,6 +375,7 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
                             onChange={e => setNotes(e.target.value)}
                             className="min-h-[150px] resize-y bg-white border-slate-200 focus:border-yellow-400 focus:ring-yellow-400"
                             placeholder="Adicione anotações gerais, observações importantes, decisões tomadas, lições aprendidas..."
+                            disabled={isViewer}
                         />
                         <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
                             {updateNotes.isPending && "Salvando..."}

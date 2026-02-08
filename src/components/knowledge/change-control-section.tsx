@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function ChangeControlSection({
     projectId,
@@ -26,6 +27,7 @@ export function ChangeControlSection({
     const [type, setType] = useState("Escopo")
     const [status, setStatus] = useState("Solicitado")
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+    const { isViewer } = useUserRole()
 
 
     const addMutation = useMutation({
@@ -64,65 +66,67 @@ export function ChangeControlSection({
                     <p className="font-bold">Registro de Mudanças: <span className="font-normal">Documente todas as mudanças no escopo, cronograma ou orçamento.</span></p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold flex items-center gap-1">
-                            <FileText className="w-3 h-3" /> Descrição da Mudança
-                        </label>
-                        <Input
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            placeholder="Ex: Novo requisito X"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold flex items-center gap-1">
-                            <Plus className="w-3 h-3" /> Tipo
-                        </label>
-                        <Select value={type} onValueChange={setType}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Escopo">Escopo</SelectItem>
-                                <SelectItem value="Cronograma">Cronograma</SelectItem>
-                                <SelectItem value="Custos">Custos</SelectItem>
-                                <SelectItem value="Qualidade">Qualidade</SelectItem>
-                                <SelectItem value="Recursos">Recursos</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Status
-                        </label>
-                        <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Solicitado">Solicitado</SelectItem>
-                                <SelectItem value="Em Análise">Em Análise</SelectItem>
-                                <SelectItem value="Aprovado">Aprovado</SelectItem>
-                                <SelectItem value="Rejeitado">Rejeitado</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold flex items-center gap-1">
-                            <Calendar className="w-3 h-3" /> Data
-                        </label>
-                        <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-                    </div>
-                    <Button
-                        type="submit"
-                        className="bg-[#1d4e46] hover:bg-[#256056] col-span-1"
-                        disabled={addMutation.isPending}
-                    >
-                        {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                        Registrar Mudança
-                    </Button>
-                </form>
+                {!isViewer && (
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold flex items-center gap-1">
+                                <FileText className="w-3 h-3" /> Descrição da Mudança
+                            </label>
+                            <Input
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                placeholder="Ex: Novo requisito X"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold flex items-center gap-1">
+                                <Plus className="w-3 h-3" /> Tipo
+                            </label>
+                            <Select value={type} onValueChange={setType}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Escopo">Escopo</SelectItem>
+                                    <SelectItem value="Cronograma">Cronograma</SelectItem>
+                                    <SelectItem value="Custos">Custos</SelectItem>
+                                    <SelectItem value="Qualidade">Qualidade</SelectItem>
+                                    <SelectItem value="Recursos">Recursos</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Status
+                            </label>
+                            <Select value={status} onValueChange={setStatus}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Solicitado">Solicitado</SelectItem>
+                                    <SelectItem value="Em Análise">Em Análise</SelectItem>
+                                    <SelectItem value="Aprovado">Aprovado</SelectItem>
+                                    <SelectItem value="Rejeitado">Rejeitado</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-semibold flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> Data
+                            </label>
+                            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                        </div>
+                        <Button
+                            type="submit"
+                            className="bg-[#1d4e46] hover:bg-[#256056] col-span-1"
+                            disabled={addMutation.isPending}
+                        >
+                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                            Registrar Mudança
+                        </Button>
+                    </form>
+                )}
 
                 <div className="pt-4 border-t">
                     <div className="space-y-3">
@@ -145,22 +149,24 @@ export function ChangeControlSection({
                                                     <Calendar className="w-3 h-3" /> {new Date(change.date).toLocaleDateString()}
                                                 </span>
                                                 <span className={`flex items-center gap-1 font-semibold ${change.status === 'Aprovado' ? 'text-green-600' :
-                                                        change.status === 'Rejeitado' ? 'text-red-600' :
-                                                            'text-blue-600'
+                                                    change.status === 'Rejeitado' ? 'text-red-600' :
+                                                        'text-blue-600'
                                                     }`}>
                                                     {change.status}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => onDelete(change.id)}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => onDelete(change.id)}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))
                         ) : (

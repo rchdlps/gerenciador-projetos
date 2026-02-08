@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { attachments } from '../../../db/schema'
+import { attachments, tasks, projectPhases, projects, users, memberships, knowledgeAreas } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { auth } from '@/lib/auth'
@@ -14,6 +14,57 @@ const app = new Hono()
 // Middleware helper
 const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers });
+}
+
+// Helper to check viewer permission for an entity
+async function checkViewerPermission(entityId: string, entityType: string, userId: string): Promise<{ allowed: boolean, error?: string }> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId))
+
+    // Super admins always allowed
+    if (user?.globalRole === 'super_admin') {
+        return { allowed: true }
+    }
+
+    let organizationId: string | null = null
+
+    // Get organization from entity
+    if (entityType === 'task') {
+        const [task] = await db.select().from(tasks).where(eq(tasks.id, entityId))
+        if (task) {
+            const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId))
+            if (phase) {
+                const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
+                organizationId = project?.organizationId || null
+            }
+        }
+    } else if (entityType === 'project') {
+        const [project] = await db.select().from(projects).where(eq(projects.id, entityId))
+        organizationId = project?.organizationId || null
+    } else if (entityType === 'knowledge_area') {
+        const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, entityId))
+        if (ka) {
+            const [project] = await db.select().from(projects).where(eq(projects.id, ka.projectId))
+            organizationId = project?.organizationId || null
+        }
+    }
+
+    if (!organizationId) {
+        return { allowed: true } // Can't determine org, allow (fallback)
+    }
+
+    // Check membership role
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, userId),
+            eq(memberships.organizationId, organizationId)
+        ))
+
+    if (membership && membership.role === 'viewer') {
+        return { allowed: false, error: 'Visualizadores não podem enviar arquivos' }
+    }
+
+    return { allowed: true }
 }
 
 // 1. Get Upload URL
@@ -30,7 +81,13 @@ app.post('/presigned-url',
             const session = await getSession(c)
             if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
-            const { fileName, fileType, entityId } = c.req.valid('json')
+            const { fileName, fileType, entityId, entityType } = c.req.valid('json')
+
+            // Check viewer permission
+            const permCheck = await checkViewerPermission(entityId, entityType, session.user.id)
+            if (!permCheck.allowed) {
+                return c.json({ error: permCheck.error }, 403)
+            }
 
             // Create a unique key: entityType/entityId/random-fileName
             const key = `${entityId}/${nanoid()}-${fileName}`
@@ -62,6 +119,12 @@ app.post('/confirm',
         if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
         const data = c.req.valid('json')
+
+        // Check viewer permission
+        const permCheck = await checkViewerPermission(data.entityId, data.entityType, session.user.id)
+        if (!permCheck.allowed) {
+            return c.json({ error: permCheck.error }, 403)
+        }
 
         const [attachment] = await db.insert(attachments).values({
             id: nanoid(),

@@ -2,6 +2,7 @@ import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookO
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
+import { OrgSwitcher } from "./org-switcher"
 
 export function Sidebar({ user }: { user?: any }) {
     const [currentPath, setCurrentPath] = useState("")
@@ -43,6 +44,11 @@ export function Sidebar({ user }: { user?: any }) {
     return (
         <aside className="w-64 hidden lg:flex flex-col border-r bg-card/50 backdrop-blur-sm h-[calc(100vh-64px)] sticky top-16">
             <nav className="flex-1 p-4 space-y-6">
+
+                {/* Organization Switcher */}
+                <div className="-mx-1">
+                    <OrgSwitcher isSuperAdmin={isSuperAdmin} />
+                </div>
 
                 {/* Main Navigation */}
                 <div>

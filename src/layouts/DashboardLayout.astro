@@ -1,7 +1,7 @@
 ---
 import "@/styles/globals.css";
 import { Header } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
+import { SidebarWithProvider } from "@/components/layout/sidebar-with-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 import { auth } from "@/lib/auth";
@@ -43,7 +43,7 @@ const session = await auth.api.getSession({
 	<body class="bg-background min-h-screen font-sans antialiased">
 		<Header client:load user={session?.user} />
 		<div class="flex">
-			<Sidebar client:load user={session?.user} />
+			<SidebarWithProvider client:load user={session?.user} />
 			<main class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8">
 				<slot />
 			</main>

@@ -21,8 +21,11 @@ interface Stakeholder {
     createdAt: string
 }
 
+import { useUserRole } from "@/hooks/use-user-role"
+
 export function Stakeholders({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
     const [isOpen, setIsOpen] = useState(false) // Collapsible state
     const [isDialogOpen, setIsDialogOpen] = useState(false) // Dialog state
     const [newItem, setNewItem] = useState({ name: "", role: "", level: "interessado", email: "" })
@@ -132,49 +135,51 @@ export function Stakeholders({ projectId }: { projectId: string }) {
                         <CardTitle className="text-lg">Partes Interessadas</CardTitle>
                     </div>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="secondary" size="sm" className="font-semibold shadow-none" onClick={openCreateDialog}>
-                            <Plus className="h-4 w-4 mr-1" /> Adicionar
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{activeId ? "Editar Parte Interessada" : "Nova Parte Interessada"}</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name">Nome</Label>
-                                <Input id="name" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                {!isViewer && (
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="secondary" size="sm" className="font-semibold shadow-none" onClick={openCreateDialog}>
+                                <Plus className="h-4 w-4 mr-1" /> Adicionar
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{activeId ? "Editar Parte Interessada" : "Nova Parte Interessada"}</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="name">Nome</Label>
+                                    <Input id="name" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="role">Papel / Cargo</Label>
+                                    <Input id="role" value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="level">Nível de Envolvimento</Label>
+                                    <Select value={newItem.level} onValueChange={val => setNewItem({ ...newItem, level: val })}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="patrocinador">Patrocinador</SelectItem>
+                                            <SelectItem value="gerente">Gerente</SelectItem>
+                                            <SelectItem value="equipe">Equipe</SelectItem>
+                                            <SelectItem value="interessado">Interessado</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input id="email" value={newItem.email} onChange={e => setNewItem({ ...newItem, email: e.target.value })} />
+                                </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="role">Papel / Cargo</Label>
-                                <Input id="role" value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="level">Nível de Envolvimento</Label>
-                                <Select value={newItem.level} onValueChange={val => setNewItem({ ...newItem, level: val })}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="patrocinador">Patrocinador</SelectItem>
-                                        <SelectItem value="gerente">Gerente</SelectItem>
-                                        <SelectItem value="equipe">Equipe</SelectItem>
-                                        <SelectItem value="interessado">Interessado</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input id="email" value={newItem.email} onChange={e => setNewItem({ ...newItem, email: e.target.value })} />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleSave}>Salvar</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                            <DialogFooter>
+                                <Button onClick={handleSave}>Salvar</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </CardHeader>
             {isOpen && (
                 <CardContent className="p-6">
@@ -203,13 +208,17 @@ export function Stakeholders({ projectId }: { projectId: string }) {
                                             {s.level}
                                         </Badge>
                                         <div className="flex items-center border rounded-md">
-                                            <Button variant="ghost" size="icon" onClick={() => openEditDialog(s)} className="h-8 w-8 text-muted-foreground hover:text-primary">
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <div className="w-px h-4 bg-border"></div>
-                                            <Button variant="ghost" size="icon" onClick={() => deleteStakeholder.mutate(s.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                                                <Trash className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {!isViewer && (
+                                                <Button variant="ghost" size="icon" onClick={() => openEditDialog(s)} className="h-8 w-8 text-muted-foreground hover:text-primary">
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                            {!isViewer && <div className="w-px h-4 bg-border"></div>}
+                                            {!isViewer && (
+                                                <Button variant="ghost" size="icon" onClick={() => deleteStakeholder.mutate(s.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                                                    <Trash className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

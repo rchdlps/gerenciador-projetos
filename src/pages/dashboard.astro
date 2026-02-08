@@ -18,37 +18,150 @@ import {
     users,
     organizations,
     projectPhases,
+    sessions,
+    memberships,
 } from "../../db/schema";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, inArray, and } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 
-// 1. Fetch Metrics
-const [projectsCount] = await db.select({ count: count() }).from(projects);
-const [usersCount] = await db.select({ count: count() }).from(users);
+// Get session and active organization
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) {
+    return Astro.redirect("/login");
+}
 
-// Status Counts
-const allTasks = await db.select({ status: tasks.status }).from(tasks);
+// Fetch user's full info to check role
+const [currentUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id));
+const isSuperAdmin = currentUser?.globalRole === "super_admin";
+
+// Get active organization from session
+const [sessionData] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, session.session.id));
+
+const activeOrgId = sessionData?.activeOrganizationId || null;
+
+// Determine org IDs to filter by
+let orgIds: string[] | null = null;
+
+if (isSuperAdmin && !activeOrgId) {
+    // Super admin with no filter sees all
+    orgIds = null;
+} else if (activeOrgId) {
+    // Active org is set
+    orgIds = [activeOrgId];
+} else {
+    // Get all orgs user belongs to
+    const userMemberships = await db
+        .select({ orgId: memberships.organizationId })
+        .from(memberships)
+        .where(eq(memberships.userId, session.user.id));
+    orgIds = userMemberships.map((m) => m.orgId);
+}
+
+// Helper to check if we should show scoped or all data
+const shouldFilter = orgIds !== null && orgIds.length > 0;
+const showEmptyState = orgIds !== null && orgIds.length === 0;
+
+// 1. Fetch Metrics (Scoped)
+let projectsCount = { count: 0 };
+let usersCount = { count: 0 };
+
+if (showEmptyState) {
+    // No access
+    projectsCount = { count: 0 };
+} else if (shouldFilter) {
+    // Filter by org
+    const [result] = await db
+        .select({ count: count() })
+        .from(projects)
+        .where(inArray(projects.organizationId, orgIds!));
+    projectsCount = result;
+} else {
+    // Super admin - all data
+    const [result] = await db.select({ count: count() }).from(projects);
+    projectsCount = result;
+}
+
+// Users count (not filtered by org - total users)
+const [totalUsers] = await db.select({ count: count() }).from(users);
+usersCount = totalUsers;
+
+// Status Counts (Scoped)
+let allTasks: { status: string | null }[] = [];
+
+if (!showEmptyState) {
+    if (shouldFilter) {
+        // Get tasks from projects in user's orgs
+        const orgProjects = await db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(inArray(projects.organizationId, orgIds!));
+
+        const projectIds = orgProjects.map((p) => p.id);
+
+        if (projectIds.length > 0) {
+            const phases = await db
+                .select({ id: projectPhases.id })
+                .from(projectPhases)
+                .where(inArray(projectPhases.projectId, projectIds));
+
+            const phaseIds = phases.map((p) => p.id);
+
+            if (phaseIds.length > 0) {
+                allTasks = await db
+                    .select({ status: tasks.status })
+                    .from(tasks)
+                    .where(inArray(tasks.phaseId, phaseIds));
+            }
+        }
+    } else {
+        allTasks = await db.select({ status: tasks.status }).from(tasks);
+    }
+}
+
 const activeTasksCount = allTasks.filter((t) => t.status !== "done").length;
 const completedTasksCount = allTasks.filter((t) => t.status === "done").length;
 const totalTasksCount = allTasks.length;
 
-// 2. Charts Data
+// 2. Charts Data (Scoped)
+let allProjects: any[] = [];
 
-const allProjects = await db.query.projects.findMany({
-    with: {
-        phases: {
+if (!showEmptyState) {
+    if (shouldFilter) {
+        allProjects = await db.query.projects.findMany({
+            where: inArray(projects.organizationId, orgIds!),
             with: {
-                tasks: true,
+                phases: {
+                    with: {
+                        tasks: true,
+                    },
+                },
+                organization: true,
             },
-        },
-        organization: true,
-    },
-});
+        });
+    } else {
+        allProjects = await db.query.projects.findMany({
+            with: {
+                phases: {
+                    with: {
+                        tasks: true,
+                    },
+                },
+                organization: true,
+            },
+        });
+    }
+}
 
 // Projects by Type
 const projectsByTypeMap = new Map<string, number>();
 
 allProjects.forEach((p) => {
-    // Default to 'Projeto' if null or undefined
     const type = p.type || "Projeto";
     projectsByTypeMap.set(type, (projectsByTypeMap.get(type) || 0) + 1);
 });
@@ -65,7 +178,6 @@ if (projectsByType.length === 0) {
 }
 
 // Project Status (Real DB Status)
-
 const projectsByStatusMap = new Map<string, number>();
 const statusLabels: Record<string, string> = {
     em_andamento: "Em Andamento",
@@ -92,7 +204,6 @@ const projectsByStatus = Array.from(projectsByStatusMap.entries())
     }));
 
 // Data Secretariats (Progress per Organization)
-// Map Organizations -> Calculate % of tasks done
 const orgStats = new Map<string, { total: number; done: number }>();
 
 allProjects.forEach((p) => {
@@ -100,9 +211,9 @@ allProjects.forEach((p) => {
         const orgName = p.organization.code || p.organization.name;
         const current = orgStats.get(orgName) || { total: 0, done: 0 };
 
-        const pTasks = p.phases.flatMap((ph) => ph.tasks);
+        const pTasks = p.phases.flatMap((ph: any) => ph.tasks);
         const pTotal = pTasks.length;
-        const pDone = pTasks.filter((t) => t.status === "done").length;
+        const pDone = pTasks.filter((t: any) => t.status === "done").length;
 
         orgStats.set(orgName, {
             total: current.total + pTotal,
@@ -123,9 +234,18 @@ const completionRate = {
     total: allProjects.length,
 };
 
-// If no projects, provide defaults to avoid empty charts
 if (projectsByOrg.length === 0) {
     projectsByOrg.push({ name: "N/A", progress: 0 });
+}
+
+// Get active org name for display
+let activeOrgName = "Todas as Secretarias";
+if (activeOrgId) {
+    const [org] = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, activeOrgId));
+    activeOrgName = org?.name || "Secretaria";
 }
 ---
 
@@ -140,7 +260,22 @@ if (projectsByOrg.length === 0) {
                     Dashboard
                 </h1>
                 <p class="text-muted-foreground mt-1">
-                    Visão geral e desempenho do sistema.
+                    {
+                        activeOrgId ? (
+                            <span>
+                                Dados de{" "}
+                                <span class="font-medium text-primary">
+                                    {activeOrgName}
+                                </span>
+                            </span>
+                        ) : isSuperAdmin ? (
+                            <span class="text-amber-600">
+                                Visão administrativa - Todas as organizações
+                            </span>
+                        ) : (
+                            "Visão geral e desempenho do sistema."
+                        )
+                    }
                 </p>
             </div>
             <div class="flex items-center gap-3">
@@ -180,176 +315,152 @@ if (projectsByOrg.length === 0) {
             </div>
         </div>
 
-        {/* SECTION 1: METRICS */}
-        <section class="space-y-6">
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold tracking-tight text-slate-800">
-                    Métricas Principais
-                </h2>
-            </div>
-
-            <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                {/* Total de Projetos - Indigo Theme */}
-                <Card
-                    className="hover:shadow-md transition-shadow border-l-4 border-l-indigo-500 hover:-translate-y-1 duration-300"
-                >
-                    <CardHeader
-                        className="flex flex-row items-center justify-between space-y-0 pb-2"
-                    >
-                        <CardTitle
-                            className="text-sm font-medium text-muted-foreground"
-                            >Total de Projetos</CardTitle
-                        >
-                        <FileText className="h-4 w-4 text-indigo-500" />
-                    </CardHeader>
-                    <CardContent className="pb-10">
-                        <div class="flex items-baseline space-x-2">
-                            <div class="text-3xl font-bold text-slate-800">
-                                {projectsCount.count}
-                            </div>
-                            <span
-                                class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full"
-                                >Ativos</span
-                            >
-                        </div>
-                        <div
-                            class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
-                        >
-                            <div
-                                class="h-full bg-indigo-500 w-[60%] rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"
-                            >
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Tarefas Ativas - Violet Theme */}
-                <Card
-                    className="hover:shadow-md transition-shadow border-l-4 border-l-violet-500 hover:-translate-y-1 duration-300"
-                >
-                    <CardHeader
-                        className="flex flex-row items-center justify-between space-y-0 pb-2"
-                    >
-                        <CardTitle
-                            className="text-sm font-medium text-muted-foreground"
-                            >Tarefas Ativas</CardTitle
-                        >
-                        <Activity className="h-4 w-4 text-violet-500" />
-                    </CardHeader>
-                    <CardContent className="pb-10">
-                        <div class="flex items-baseline space-x-2">
-                            <div class="text-3xl font-bold text-slate-800">
-                                {activeTasksCount}
-                            </div>
-                            <span
-                                class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full"
-                                >Em andamento</span
-                            >
-                        </div>
-                        <div
-                            class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
-                        >
-                            <div
-                                class="h-full bg-violet-500 w-[45%] rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]"
-                            >
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Equipe - Amber Theme */}
-                <Card
-                    className="hover:shadow-md transition-shadow border-l-4 border-l-amber-500 hover:-translate-y-1 duration-300"
-                >
-                    <CardHeader
-                        className="flex flex-row items-center justify-between space-y-0 pb-2"
-                    >
-                        <CardTitle
-                            className="text-sm font-medium text-muted-foreground"
-                            >Equipe</CardTitle
-                        >
-                        <Users className="h-4 w-4 text-amber-500" />
-                    </CardHeader>
-                    <CardContent className="pb-10">
-                        <div class="flex items-baseline space-x-2">
-                            <div class="text-3xl font-bold text-slate-800">
-                                {usersCount.count}
-                            </div>
-                            <span
-                                class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full"
-                                >Usuários</span
-                            >
-                        </div>
-                        <div
-                            class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
-                        >
-                            <div
-                                class="h-full bg-amber-500 w-[80%] rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"
-                            >
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Concluídos - Emerald Theme */}
-                <Card
-                    className="hover:shadow-md transition-shadow border-l-4 border-l-emerald-500 hover:-translate-y-1 duration-300"
-                >
-                    <CardHeader
-                        className="flex flex-row items-center justify-between space-y-0 pb-2"
-                    >
-                        <CardTitle
-                            className="text-sm font-medium text-muted-foreground"
-                            >Tarefas Concluídas</CardTitle
-                        >
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent className="pb-10">
-                        <div class="flex items-baseline space-x-2">
-                            <div class="text-3xl font-bold text-slate-800">
-                                {completedTasksCount}
-                            </div>
-                            <span
-                                class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full"
-                                >Total</span
-                            >
-                        </div>
-                        <div
-                            class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden"
-                        >
-                            <div
-                                class="h-full bg-emerald-500 w-[95%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                            >
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </section>
-
-        {/* SECTION 2: CHARTS */}
-        <section class="space-y-6">
-            <div
-                class="flex items-center justify-between border-b border-slate-200 pb-4"
-            >
-                <div>
-                    <h2
-                        class="text-xl font-semibold tracking-tight text-slate-800"
-                    >
-                        Análise Detalhada
-                    </h2>
-                    <p class="text-sm text-muted-foreground">
-                        Distribuição de tarefas e desempenho mensal.
+        {/* Empty State */}
+        {
+            showEmptyState && (
+                <div class="text-center py-12">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
+                        <Briefcase className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-700 mb-2">
+                        Nenhum dado disponível
+                    </h3>
+                    <p class="text-muted-foreground max-w-md mx-auto">
+                        Você não está vinculado a nenhuma secretaria. Entre em
+                        contato com um administrador para ter acesso.
                     </p>
                 </div>
-            </div>
-            <OverviewCharts
-                client:load
-                projectsByType={projectsByType}
-                projectsByStatus={projectsByStatus}
-                projectsByOrg={projectsByOrg}
-                completionRate={completionRate}
-            />
-        </section>
+            )
+        }
+
+        {
+            !showEmptyState && (
+                <>
+                    {/* SECTION 1: METRICS */}
+                    <section class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-semibold tracking-tight text-slate-800">
+                                Métricas Principais
+                            </h2>
+                        </div>
+
+                        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            {/* Total de Projetos - Indigo Theme */}
+                            <Card className="hover:shadow-md transition-shadow border-l-4 border-l-indigo-500 hover:-translate-y-1 duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        Total de Projetos
+                                    </CardTitle>
+                                    <FileText className="h-4 w-4 text-indigo-500" />
+                                </CardHeader>
+                                <CardContent className="pb-10">
+                                    <div class="flex items-baseline space-x-2">
+                                        <div class="text-3xl font-bold text-slate-800">
+                                            {projectsCount.count}
+                                        </div>
+                                        <span class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                            Ativos
+                                        </span>
+                                    </div>
+                                    <div class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-500 w-[60%] rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Tarefas Ativas - Violet Theme */}
+                            <Card className="hover:shadow-md transition-shadow border-l-4 border-l-violet-500 hover:-translate-y-1 duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        Tarefas Ativas
+                                    </CardTitle>
+                                    <Activity className="h-4 w-4 text-violet-500" />
+                                </CardHeader>
+                                <CardContent className="pb-10">
+                                    <div class="flex items-baseline space-x-2">
+                                        <div class="text-3xl font-bold text-slate-800">
+                                            {activeTasksCount}
+                                        </div>
+                                        <span class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                            Em andamento
+                                        </span>
+                                    </div>
+                                    <div class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-violet-500 w-[45%] rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]"></div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Equipe - Amber Theme */}
+                            <Card className="hover:shadow-md transition-shadow border-l-4 border-l-amber-500 hover:-translate-y-1 duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        Equipe
+                                    </CardTitle>
+                                    <Users className="h-4 w-4 text-amber-500" />
+                                </CardHeader>
+                                <CardContent className="pb-10">
+                                    <div class="flex items-baseline space-x-2">
+                                        <div class="text-3xl font-bold text-slate-800">
+                                            {usersCount.count}
+                                        </div>
+                                        <span class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                            Usuários
+                                        </span>
+                                    </div>
+                                    <div class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-amber-500 w-[80%] rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Concluídos - Emerald Theme */}
+                            <Card className="hover:shadow-md transition-shadow border-l-4 border-l-emerald-500 hover:-translate-y-1 duration-300">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                                        Tarefas Concluídas
+                                    </CardTitle>
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                </CardHeader>
+                                <CardContent className="pb-10">
+                                    <div class="flex items-baseline space-x-2">
+                                        <div class="text-3xl font-bold text-slate-800">
+                                            {completedTasksCount}
+                                        </div>
+                                        <span class="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                            Total
+                                        </span>
+                                    </div>
+                                    <div class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-emerald-500 w-[95%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </section>
+
+                    {/* SECTION 2: CHARTS */}
+                    <section class="space-y-6">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                            <div>
+                                <h2 class="text-xl font-semibold tracking-tight text-slate-800">
+                                    Análise Detalhada
+                                </h2>
+                                <p class="text-sm text-muted-foreground">
+                                    Distribuição de tarefas e desempenho mensal.
+                                </p>
+                            </div>
+                        </div>
+                        <OverviewCharts
+                            client:load
+                            projectsByType={projectsByType}
+                            projectsByStatus={projectsByStatus}
+                            projectsByOrg={projectsByOrg}
+                            completionRate={completionRate}
+                        />
+                    </section>
+                </>
+            )
+        }
     </div>
 </Layout>

@@ -74,6 +74,11 @@ app.put('/:projectId/:area',
             return c.json({ error: 'Forbidden' }, 403)
         }
 
+        // Viewers cannot update knowledge areas
+        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+            return c.json({ error: 'Visualizadores não podem editar áreas de conhecimento' }, 403)
+        }
+
         // Check if exists
         const [existing] = await db.select().from(knowledgeAreas).where(
             and(
@@ -230,6 +235,11 @@ app.post('/:areaId/changes',
             return c.json({ error: 'Forbidden' }, 403)
         }
 
+        // Viewers cannot add changes
+        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+            return c.json({ error: 'Visualizadores não podem adicionar mudanças' }, 403)
+        }
+
         // Audit log
         await createAuditLog({
             userId: session.user.id,
@@ -250,6 +260,36 @@ app.delete('/changes/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Get change record to verify access
+    const [change] = await db.select().from(knowledgeAreaChanges).where(eq(knowledgeAreaChanges.id, id))
+    if (!change) return c.json({ error: 'Change not found' }, 404)
+
+    const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, change.knowledgeAreaId))
+    if (!ka) return c.json({ error: 'Knowledge area not found' }, 404)
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, ka.projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    // Check access
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
+    // Viewers cannot delete changes
+    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+        return c.json({ error: 'Visualizadores não podem excluir mudanças' }, 403)
+    }
+
     await db.delete(knowledgeAreaChanges).where(eq(knowledgeAreaChanges.id, id))
     return c.json({ success: true })
 })

@@ -41,8 +41,11 @@ const PHASE_COLORS = [
     { border: 'border-l-amber-500', bar: 'bg-amber-500' },
 ]
 
+import { useUserRole } from "@/hooks/use-user-role"
+
 export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
     const [createOpen, setCreateOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
@@ -126,33 +129,35 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                 <AccordionTrigger
                     className="hover:no-underline py-6"
                     extraActions={
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                    className="cursor-pointer"
-                                    onClick={() => {
-                                        setEditName(phase.name)
-                                        setEditDescription(phase.description || getPhaseSubtitle(phase.name))
-                                        setEditOpen(true)
-                                    }}
-                                >
-                                    <Pencil className="mr-2 h-4 w-4" />
-                                    Editar Detalhes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
-                                    onClick={() => setDeleteOpen(true)}
-                                >
-                                    <Trash className="mr-2 h-4 w-4" />
-                                    Excluir Fase
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        !isViewer && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        className="cursor-pointer"
+                                        onClick={() => {
+                                            setEditName(phase.name)
+                                            setEditDescription(phase.description || getPhaseSubtitle(phase.name))
+                                            setEditOpen(true)
+                                        }}
+                                    >
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Editar Detalhes
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer"
+                                        onClick={() => setDeleteOpen(true)}
+                                    >
+                                        <Trash className="mr-2 h-4 w-4" />
+                                        Excluir Fase
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )
                     }
                 >
                     <div className="flex items-center justify-between w-full pr-4">
@@ -181,7 +186,7 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                             </div>
                         </div>
                     </div>
-                </AccordionTrigger>
+                </AccordionTrigger >
                 <AccordionContent className="pt-2 pb-6 border-t border-gray-50">
                     <div ref={setNodeRef} className="space-y-3 min-h-[50px] pt-4">
                         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
@@ -197,17 +202,19 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                         )}
                     </div>
 
-                    <div className="mt-8 flex justify-center">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setCreateOpen(true)}
-                            className="rounded-full px-6 border-[#1d4e46] text-[#1d4e46] hover:bg-[#1d4e46] hover:text-white transition-all font-semibold"
-                        >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Adicionar Tarefa
-                        </Button>
-                    </div>
+                    {!isViewer && (
+                        <div className="mt-8 flex justify-center">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCreateOpen(true)}
+                                className="rounded-full px-6 border-[#1d4e46] text-[#1d4e46] hover:bg-[#1d4e46] hover:text-white transition-all font-semibold"
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Adicionar Tarefa
+                            </Button>
+                        </div>
+                    )}
 
                     <TaskDialog
                         open={createOpen}
@@ -216,7 +223,7 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                         projectId={projectId}
                     />
                 </AccordionContent>
-            </AccordionItem>
+            </AccordionItem >
 
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
                 <DialogContent>

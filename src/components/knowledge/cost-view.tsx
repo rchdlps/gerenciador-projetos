@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { NotesSection } from "./notes-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface CostViewProps {
     projectId: string
@@ -32,6 +33,7 @@ interface ExpenseRecord {
 export default function CostView({ projectId }: CostViewProps) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     // Budget State
     const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([])
@@ -154,15 +156,24 @@ export default function CostView({ projectId }: CostViewProps) {
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error()
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
                 await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-                await api.storage.confirm.$post({
+
+                const confirmRes = await api.storage.confirm.$post({
                     json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
+
                 toast.success(`Upload de ${file.name} concluído!`)
-            } catch {
-                toast.error(`Erro ao enviar ${file.name}`)
+            } catch (error) {
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -173,11 +184,14 @@ export default function CostView({ projectId }: CostViewProps) {
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
-        } catch {
-            toast.error("Erro ao excluir anexo")
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -221,24 +235,28 @@ export default function CostView({ projectId }: CostViewProps) {
                     </div>
 
                     {/* Add Budget Item Form */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <FileText className="w-3 h-3" /> Categoria
-                            </Label>
-                            <Input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="Ex: Equipamentos, RH, Consultoria" />
+                    {!isViewer && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <FileText className="w-3 h-3" /> Categoria
+                                </Label>
+                                <Input value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="Ex: Equipamentos, RH, Consultoria" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <DollarSign className="w-3 h-3" /> Valor Orçado (R$)
+                                </Label>
+                                <Input type="number" step="0.01" value={newBudgetedValue} onChange={e => setNewBudgetedValue(e.target.value)} placeholder="0.00" />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <DollarSign className="w-3 h-3" /> Valor Orçado (R$)
-                            </Label>
-                            <Input type="number" step="0.01" value={newBudgetedValue} onChange={e => setNewBudgetedValue(e.target.value)} placeholder="0.00" />
-                        </div>
-                    </div>
+                    )}
 
-                    <Button onClick={addBudgetItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Item ao Orçamento
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addBudgetItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Adicionar Item ao Orçamento
+                        </Button>
+                    )}
 
                     {budgetItems.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum item no orçamento</p>
@@ -250,15 +268,17 @@ export default function CostView({ projectId }: CostViewProps) {
                                         <span className="font-medium">{item.category}</span>
                                         <div className="text-sm text-muted-foreground">{formatCurrency(item.budgetedValue)}</div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setBudgetItems(budgetItems.filter(b => b.id !== item.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setBudgetItems(budgetItems.filter(b => b.id !== item.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {budgetItems.length > 0 && (
+                    {budgetItems.length > 0 && !isViewer && (
                         <Button onClick={() => saveCostMutation.mutate()} disabled={saveCostMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Orçamento
                         </Button>
@@ -275,30 +295,34 @@ export default function CostView({ projectId }: CostViewProps) {
                     <CardTitle className="text-lg font-bold text-[#1d4e46]">Registro de Despesas</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6 pb-10">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <FileText className="w-3 h-3" /> Descrição
-                            </Label>
-                            <Input value={newExpenseDesc} onChange={e => setNewExpenseDesc(e.target.value)} placeholder="Ex: Compra de servidores" />
+                    {!isViewer && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <FileText className="w-3 h-3" /> Descrição
+                                </Label>
+                                <Input value={newExpenseDesc} onChange={e => setNewExpenseDesc(e.target.value)} placeholder="Ex: Compra de servidores" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <DollarSign className="w-3 h-3" /> Valor (R$)
+                                </Label>
+                                <Input type="number" step="0.01" value={newExpenseValue} onChange={e => setNewExpenseValue(e.target.value)} placeholder="0.00" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <CalendarDays className="w-3 h-3" /> Data
+                                </Label>
+                                <Input type="date" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <DollarSign className="w-3 h-3" /> Valor (R$)
-                            </Label>
-                            <Input type="number" step="0.01" value={newExpenseValue} onChange={e => setNewExpenseValue(e.target.value)} placeholder="0.00" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
-                                <CalendarDays className="w-3 h-3" /> Data
-                            </Label>
-                            <Input type="date" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} />
-                        </div>
-                    </div>
+                    )}
 
-                    <Button onClick={addExpense} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Registrar Despesa
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addExpense} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Registrar Despesa
+                        </Button>
+                    )}
 
                     {expenses.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhuma despesa registrada</p>
@@ -320,15 +344,17 @@ export default function CostView({ projectId }: CostViewProps) {
                                             <span className="text-sm">{exp.date ? new Date(exp.date).toLocaleDateString('pt-BR') : '-'}</span>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setExpenses(expenses.filter(e => e.id !== exp.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setExpenses(expenses.filter(e => e.id !== exp.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {expenses.length > 0 && (
+                    {expenses.length > 0 && !isViewer && (
                         <Button onClick={() => saveCostMutation.mutate()} disabled={saveCostMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Despesas
                         </Button>
@@ -354,8 +380,8 @@ export default function CostView({ projectId }: CostViewProps) {
                             <span className="font-bold">Anexe documentos relevantes:</span> Notas fiscais, recibos, orçamentos, contratos de fornecedores, ou qualquer documento financeiro.
                         </p>
                     </div>
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} />
+                    {!isViewer && <FileUpload onUpload={handleUpload} />}
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} readonly={isViewer} />
                 </CardContent>
             </Card>
         </div>

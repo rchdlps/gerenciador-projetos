@@ -30,8 +30,11 @@ interface PhaseListProps {
     projectId: string
 }
 
+import { useUserRole } from "@/hooks/use-user-role"
+
 export function PhaseList({ projectId }: PhaseListProps) {
     const queryClient = useQueryClient()
+    const { isViewer } = useUserRole()
     const [newPhaseOpen, setNewPhaseOpen] = useState(false)
     const [newPhaseName, setNewPhaseName] = useState("")
     const [newPhaseDescription, setNewPhaseDescription] = useState("")
@@ -60,7 +63,11 @@ export function PhaseList({ projectId }: PhaseListProps) {
     }
 
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: isViewer ? 999999 : 5,
+            }
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
@@ -217,7 +224,10 @@ export function PhaseList({ projectId }: PhaseListProps) {
                 json: { name: newPhaseName, description: newPhaseDescription || undefined }
             })
 
-            if (!res.ok) throw new Error("Failed to create phase")
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao criar fase' }))
+                throw new Error((data as any).error || 'Erro ao criar fase')
+            }
 
             toast.success("Fase criada com sucesso!")
             setNewPhaseName("")
@@ -225,7 +235,7 @@ export function PhaseList({ projectId }: PhaseListProps) {
             setNewPhaseOpen(false)
             queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
         } catch (error) {
-            toast.error("Erro ao criar fase")
+            toast.error((error as Error).message || "Erro ao criar fase")
             console.error(error)
         } finally {
             setCreating(false)
@@ -259,46 +269,48 @@ export function PhaseList({ projectId }: PhaseListProps) {
                                 {expandedPhases.length > 0 ? "Recolher Tudo" : "Expandir Tudo"}
                             </Button>
                         )}
-                        <Dialog open={newPhaseOpen} onOpenChange={setNewPhaseOpen}>
-                            <DialogTrigger asChild>
-                                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Nova Fase
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Adicionar Nova Fase</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Nome da Fase</Label>
-                                        <Input
-                                            id="name"
-                                            value={newPhaseName}
-                                            onChange={(e) => setNewPhaseName(e.target.value)}
-                                            placeholder="Ex: Pós-Implementação"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description">Descrição</Label>
-                                        <Textarea
-                                            id="description"
-                                            value={newPhaseDescription}
-                                            onChange={(e) => setNewPhaseDescription(e.target.value)}
-                                            placeholder="Descreva os objetivos e atividades desta fase..."
-                                            rows={3}
-                                        />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setNewPhaseOpen(false)}>Cancelar</Button>
-                                    <Button onClick={createPhase} disabled={creating || !newPhaseName}>
-                                        {creating ? "Criando..." : "Criar Fase"}
+                        {!isViewer && (
+                            <Dialog open={newPhaseOpen} onOpenChange={setNewPhaseOpen}>
+                                <DialogTrigger asChild>
+                                    <Button className="bg-emerald-600 hover:bg-emerald-700">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Nova Fase
                                     </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Adicionar Nova Fase</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">Nome da Fase</Label>
+                                            <Input
+                                                id="name"
+                                                value={newPhaseName}
+                                                onChange={(e) => setNewPhaseName(e.target.value)}
+                                                placeholder="Ex: Pós-Implementação"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="description">Descrição</Label>
+                                            <Textarea
+                                                id="description"
+                                                value={newPhaseDescription}
+                                                onChange={(e) => setNewPhaseDescription(e.target.value)}
+                                                placeholder="Descreva os objetivos e atividades desta fase..."
+                                                rows={3}
+                                            />
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setNewPhaseOpen(false)}>Cancelar</Button>
+                                        <Button onClick={createPhase} disabled={creating || !newPhaseName}>
+                                            {creating ? "Criando..." : "Criar Fase"}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
                     </div>
                 </div>
 
@@ -354,6 +366,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
 function SortablePhaseWrapper({ children, phase }: { children: React.ReactNode, phase: any, projectId: string, index: number }) {
+    const { isViewer } = useUserRole()
     const {
         attributes,
         listeners,
@@ -366,7 +379,8 @@ function SortablePhaseWrapper({ children, phase }: { children: React.ReactNode, 
         data: {
             type: "phase",
             phase
-        }
+        },
+        disabled: isViewer
     })
 
     const style = {
@@ -380,10 +394,12 @@ function SortablePhaseWrapper({ children, phase }: { children: React.ReactNode, 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
             <div className="flex items-center gap-2">
-                <div {...listeners} className="cursor-grab hover:text-emerald-600 px-2 py-4">
-                    <span className="sr-only">Move</span>
-                    <svg width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-400"><path d="M5.5 2.5C5.5 2.22386 5.27614 2 5 2C4.72386 2 4.5 2.22386 4.5 2.5V12.5C4.5 12.7761 4.72386 13 5 13C5.27614 13 5.5 12.7761 5.5 12.5V2.5ZM10.5 2.5C10.5 2.22386 10.2761 2 10 2C9.72386 2 9.5 2.22386 9.5 2.5V12.5C9.5 12.7761 9.72386 13 10 13C10.2761 13 10.5 12.7761 10.5 12.5V2.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                </div>
+                {!isViewer && (
+                    <div {...listeners} className="cursor-grab hover:text-emerald-600 px-2 py-4">
+                        <span className="sr-only">Move</span>
+                        <svg width="12" height="12" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-400"><path d="M5.5 2.5C5.5 2.22386 5.27614 2 5 2C4.72386 2 4.5 2.22386 4.5 2.5V12.5C4.5 12.7761 4.72386 13 5 13C5.27614 13 5.5 12.7761 5.5 12.5V2.5ZM10.5 2.5C10.5 2.22386 10.2761 2 10 2C9.72386 2 9.5 2.22386 9.5 2.5V12.5C9.5 12.7761 9.72386 13 10 13C10.2761 13 10.5 12.7761 10.5 12.5V2.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
+                    </div>
+                )}
                 <div className="flex-1">
                     {children}
                 </div>

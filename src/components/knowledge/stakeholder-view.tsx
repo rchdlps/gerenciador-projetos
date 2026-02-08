@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { NotesSection } from "./notes-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface StakeholderViewProps {
     projectId: string
@@ -37,6 +38,7 @@ const STAKEHOLDER_TYPES = [
 export default function StakeholderView({ projectId }: StakeholderViewProps) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     // Stakeholder State
     const [stakeholders, setStakeholders] = useState<Stakeholder[]>([])
@@ -149,15 +151,24 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error()
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
                 await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-                await api.storage.confirm.$post({
+
+                const confirmRes = await api.storage.confirm.$post({
                     json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
+
                 toast.success(`Upload de ${file.name} concluído!`)
-            } catch {
-                toast.error(`Erro ao enviar ${file.name}`)
+            } catch (error) {
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -168,11 +179,14 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
-        } catch {
-            toast.error("Erro ao excluir anexo")
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -195,9 +209,11 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                         <p><span className="font-bold">Stakeholders</span> são indivíduos ou organizações que podem afetar ou serem afetados pelo projeto.</p>
                     </div>
 
-                    <Button onClick={addStakeholder} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Stakeholder
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={addStakeholder} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Adicionar Stakeholder
+                        </Button>
+                    )}
 
                     {stakeholders.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum stakeholder cadastrado</p>
@@ -219,6 +235,7 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                                                 onBlur={() => saveStakeholderMutation.mutate()}
                                                 placeholder="Nome do stakeholder"
                                                 className="bg-white"
+                                                disabled={isViewer}
                                             />
                                             <Input
                                                 value={stakeholder.role}
@@ -226,6 +243,7 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                                                 onBlur={() => saveStakeholderMutation.mutate()}
                                                 placeholder="Cargo / Função"
                                                 className="bg-white"
+                                                disabled={isViewer}
                                             />
                                         </div>
 
@@ -236,6 +254,7 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                                                 updateStakeholder(stakeholder.id, 'type', v)
                                                 setTimeout(() => saveStakeholderMutation.mutate(), 100)
                                             }}
+                                            disabled={isViewer}
                                         >
                                             <SelectTrigger className="w-[160px] bg-white">
                                                 <SelectValue />
@@ -250,14 +269,16 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
 
                                     {/* Delete Button */}
                                     <div className="mt-3">
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => deleteStakeholder(stakeholder.id)}
-                                            className="h-8"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        {!isViewer && (
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={() => deleteStakeholder(stakeholder.id)}
+                                                className="h-8"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -284,8 +305,8 @@ export default function StakeholderView({ projectId }: StakeholderViewProps) {
                             <span className="font-bold">Anexe documentos relevantes:</span> Registros de stakeholders, análises de poder/interesse, planos de engajamento.
                         </p>
                     </div>
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} />
+                    {!isViewer && <FileUpload onUpload={handleUpload} />}
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} readonly={isViewer} />
                 </CardContent>
             </Card>
         </div>

@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function ScheduleSection({ projectId }: { projectId: string }) {
     return (
@@ -37,6 +38,7 @@ function MilestoneManager({ projectId }: { projectId: string }) {
     const [name, setName] = useState("")
     const [date, setDate] = useState("")
     const [phase, setPhase] = useState("Iniciação")
+    const { isViewer } = useUserRole()
 
     const { data: milestones = [], isLoading } = useQuery({
         queryKey: ['milestones', projectId],
@@ -97,57 +99,59 @@ function MilestoneManager({ projectId }: { projectId: string }) {
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Target className="w-3 h-3 text-red-500" />
-                            Nome do Marco
-                        </label>
-                        <Input
-                            placeholder="Ex: Aprovação do Design"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Calendar className="w-3 h-3 text-red-500" />
-                            Data Prevista
-                        </label>
-                        <Input
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Folder className="w-3 h-3 text-yellow-600" />
-                            Fase Relacionada
-                        </label>
-                        <Select value={phase} onValueChange={setPhase}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Iniciação">Iniciação</SelectItem>
-                                <SelectItem value="Planejamento">Planejamento</SelectItem>
-                                <SelectItem value="Execução">Execução</SelectItem>
-                                <SelectItem value="Monitoramento">Monitoramento</SelectItem>
-                                <SelectItem value="Encerramento">Encerramento</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="md:col-span-3">
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={addMutation.isPending}
-                        >
-                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Adicionar Marco
-                        </Button>
-                    </div>
-                </form>
+                {!isViewer && (
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Target className="w-3 h-3 text-red-500" />
+                                Nome do Marco
+                            </label>
+                            <Input
+                                placeholder="Ex: Aprovação do Design"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Calendar className="w-3 h-3 text-red-500" />
+                                Data Prevista
+                            </label>
+                            <Input
+                                type="date"
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Folder className="w-3 h-3 text-yellow-600" />
+                                Fase Relacionada
+                            </label>
+                            <Select value={phase} onValueChange={setPhase}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Iniciação">Iniciação</SelectItem>
+                                    <SelectItem value="Planejamento">Planejamento</SelectItem>
+                                    <SelectItem value="Execução">Execução</SelectItem>
+                                    <SelectItem value="Monitoramento">Monitoramento</SelectItem>
+                                    <SelectItem value="Encerramento">Encerramento</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="md:col-span-3">
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={addMutation.isPending}
+                            >
+                                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                                Adicionar Marco
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 <div className="space-y-2">
                     {isLoading ? (
@@ -172,14 +176,16 @@ function MilestoneManager({ projectId }: { projectId: string }) {
                                         </div>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => deleteMutation.mutate(m.id)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                {!isViewer && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => deleteMutation.mutate(m.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
                         ))
                     ) : (
@@ -198,6 +204,7 @@ function DependencyManager({ projectId }: { projectId: string }) {
     const [predecessor, setPredecessor] = useState("")
     const [successor, setSuccessor] = useState("")
     const [type, setType] = useState("TI")
+    const { isViewer } = useUserRole()
 
     const { data: dependencies = [], isLoading } = useQuery({
         queryKey: ['dependencies', projectId],
@@ -268,56 +275,58 @@ function DependencyManager({ projectId }: { projectId: string }) {
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Folder className="w-3 h-3 text-yellow-600" />
-                            Tarefa Predecessora
-                        </label>
-                        <Input
-                            placeholder="Tarefa que vem antes"
-                            value={predecessor}
-                            onChange={e => setPredecessor(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Folder className="w-3 h-3 text-yellow-600" />
-                            Tarefa Sucessora
-                        </label>
-                        <Input
-                            placeholder="Tarefa que vem depois"
-                            value={successor}
-                            onChange={e => setSuccessor(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <LinkIcon className="w-3 h-3 text-[#1d4e46]" />
-                            Tipo de Dependência
-                        </label>
-                        <Select value={type} onValueChange={setType}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="TI">{typeLabels["TI"]}</SelectItem>
-                                <SelectItem value="II">{typeLabels["II"]}</SelectItem>
-                                <SelectItem value="TT">{typeLabels["TT"]}</SelectItem>
-                                <SelectItem value="IT">{typeLabels["IT"]}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="md:col-span-3">
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={addMutation.isPending}
-                        >
-                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Adicionar Dependência
-                        </Button>
-                    </div>
-                </form>
+                {!isViewer && (
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Folder className="w-3 h-3 text-yellow-600" />
+                                Tarefa Predecessora
+                            </label>
+                            <Input
+                                placeholder="Tarefa que vem antes"
+                                value={predecessor}
+                                onChange={e => setPredecessor(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Folder className="w-3 h-3 text-yellow-600" />
+                                Tarefa Sucessora
+                            </label>
+                            <Input
+                                placeholder="Tarefa que vem depois"
+                                value={successor}
+                                onChange={e => setSuccessor(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <LinkIcon className="w-3 h-3 text-[#1d4e46]" />
+                                Tipo de Dependência
+                            </label>
+                            <Select value={type} onValueChange={setType}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="TI">{typeLabels["TI"]}</SelectItem>
+                                    <SelectItem value="II">{typeLabels["II"]}</SelectItem>
+                                    <SelectItem value="TT">{typeLabels["TT"]}</SelectItem>
+                                    <SelectItem value="IT">{typeLabels["IT"]}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="md:col-span-3">
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={addMutation.isPending}
+                            >
+                                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                                Adicionar Dependência
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 <div className="space-y-2">
                     {isLoading ? (
@@ -333,14 +342,16 @@ function DependencyManager({ projectId }: { projectId: string }) {
                                         {typeLabels[d.type]}
                                     </span>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => deleteMutation.mutate(d.id)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                {!isViewer && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => deleteMutation.mutate(d.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
                         ))
                     ) : (

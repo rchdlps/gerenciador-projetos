@@ -3,10 +3,11 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projects, memberships, users, projectPhases } from '../../../db/schema'
+import { projects, memberships, users, projectPhases, sessions } from '../../../db/schema'
 import { eq, desc, inArray, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { createAuditLog } from '@/lib/audit-logger'
+import { getScopedOrgIds, scopedProjects } from '@/lib/queries/scoped'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -14,33 +15,22 @@ app.use('*', requireAuth)
 
 app.get('/', async (c) => {
     const sessionUser = c.get('user')
+    const session = c.get('session')
 
     // Fetch full user to check role
     const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+    const isSuperAdmin = user?.globalRole === 'super_admin'
 
-    // Admin Bypass: View All Projects
-    if (user && user.globalRole === 'super_admin') {
-        const allProjects = await db.select()
-            .from(projects)
-            .orderBy(desc(projects.updatedAt))
-        return c.json(allProjects)
-    }
+    // Get active org from session
+    const [sessionData] = await db.select()
+        .from(sessions)
+        .where(eq(sessions.id, session.id))
 
-    // Get all organization IDs the user belongs to
-    const userMemberships = await db.select({ orgId: memberships.organizationId })
-        .from(memberships)
-        .where(eq(memberships.userId, sessionUser.id))
+    const activeOrgId = sessionData?.activeOrganizationId || null
 
-    const orgIds = userMemberships.map(m => m.orgId)
-
-    if (orgIds.length === 0) {
-        return c.json([])
-    }
-
-    const userProjects = await db.select()
-        .from(projects)
-        .where(inArray(projects.organizationId, orgIds))
-        .orderBy(desc(projects.updatedAt))
+    // Use centralized scoped query logic with active org from session
+    const orgIds = await getScopedOrgIds(sessionUser.id, activeOrgId, isSuperAdmin)
+    const userProjects = await scopedProjects(orgIds)
 
     return c.json(userProjects)
 })

@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Edit3, Lightbulb, Save, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function NotesSection({ projectId, area, initialContent }: { projectId: string, area: string, initialContent: string }) {
     const queryClient = useQueryClient()
     const [content, setContent] = useState(initialContent)
+    const { isViewer } = useUserRole()
 
     const mutation = useMutation({
         mutationFn: async (newContent: string) => {
@@ -39,16 +41,18 @@ export function NotesSection({ projectId, area, initialContent }: { projectId: s
                     </div>
                     <CardTitle className="text-lg font-bold text-yellow-900">Notas Gerais</CardTitle>
                 </div>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSave}
-                    disabled={mutation.isPending}
-                    className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
-                >
-                    {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-3 h-3 mr-2" />}
-                    Salvar Notas
-                </Button>
+                {!isViewer && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSave}
+                        disabled={mutation.isPending}
+                        className="border-yellow-400 text-yellow-900 h-8 hover:bg-yellow-50"
+                    >
+                        {mutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Save className="w-3 h-3 mr-2" />}
+                        Salvar Notas
+                    </Button>
+                )}
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="bg-amber-50 border-l-4 border-amber-400 p-3 text-sm text-amber-900 flex gap-2">
@@ -65,6 +69,7 @@ export function NotesSection({ projectId, area, initialContent }: { projectId: s
                     onChange={e => setContent(e.target.value)}
                     placeholder="Adicione anotações gerais, observações importantes, decisões tomadas, lições aprendidas..."
                     className="min-h-[200px] bg-white border-slate-200 focus:border-yellow-400 focus:ring-yellow-400"
+                    disabled={isViewer}
                 />
             </CardContent>
         </Card>

@@ -17,6 +17,7 @@ import {
     ClipboardCheck
 } from "lucide-react"
 import { toast } from "sonner"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function QualitySection({ projectId }: { projectId: string }) {
     return (
@@ -32,6 +33,7 @@ function QualityMetricsManager({ projectId }: { projectId: string }) {
     const [name, setName] = useState("")
     const [target, setTarget] = useState("")
     const [currentValue, setCurrentValue] = useState("")
+    const { isViewer } = useUserRole()
 
     const { data: metrics = [], isLoading } = useQuery({
         queryKey: ['quality-metrics', projectId],
@@ -93,50 +95,52 @@ function QualityMetricsManager({ projectId }: { projectId: string }) {
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <BarChart3 className="w-3 h-3 text-red-500" />
-                            Nome da Métrica
-                        </label>
-                        <Input
-                            placeholder="Ex: Taxa de Defeitos"
-                            value={name}
-                            onChange={e => setName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Target className="w-3 h-3 text-red-500" />
-                            Meta
-                        </label>
-                        <Input
-                            placeholder="Ex: < 2%"
-                            value={target}
-                            onChange={e => setTarget(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                            <Activity className="w-3 h-3 text-red-500" />
-                            Valor Atual
-                        </label>
-                        <Input
-                            placeholder="Ex: 1.5%"
-                            value={currentValue}
-                            onChange={e => setCurrentValue(e.target.value)}
-                        />
-                    </div>
-                    <div className="md:col-span-3">
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white"
-                            disabled={addMutation.isPending}
-                        >
-                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Adicionar Métrica
-                        </Button>
-                    </div>
-                </form>
+                {!isViewer && (
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-6 border-b">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <BarChart3 className="w-3 h-3 text-red-500" />
+                                Nome da Métrica
+                            </label>
+                            <Input
+                                placeholder="Ex: Taxa de Defeitos"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Target className="w-3 h-3 text-red-500" />
+                                Meta
+                            </label>
+                            <Input
+                                placeholder="Ex: < 2%"
+                                value={target}
+                                onChange={e => setTarget(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                                <Activity className="w-3 h-3 text-red-500" />
+                                Valor Atual
+                            </label>
+                            <Input
+                                placeholder="Ex: 1.5%"
+                                value={currentValue}
+                                onChange={e => setCurrentValue(e.target.value)}
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white"
+                                disabled={addMutation.isPending}
+                            >
+                                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                                Adicionar Métrica
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 <div className="space-y-2">
                     {isLoading ? (
@@ -156,14 +160,16 @@ function QualityMetricsManager({ projectId }: { projectId: string }) {
                                             <p className="text-xl font-black text-slate-900">{m.currentValue}</p>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute top-2 right-2 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => deleteMutation.mutate(m.id)}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute top-2 right-2 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => deleteMutation.mutate(m.id)}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -181,6 +187,7 @@ function QualityMetricsManager({ projectId }: { projectId: string }) {
 function QualityChecklistManager({ projectId }: { projectId: string }) {
     const queryClient = useQueryClient()
     const [item, setItem] = useState("")
+    const { isViewer } = useUserRole()
 
     const { data: checklist = [], isLoading } = useQuery({
         queryKey: ['quality-checklist', projectId],
@@ -248,27 +255,29 @@ function QualityChecklistManager({ projectId }: { projectId: string }) {
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-                <form onSubmit={handleSubmit} className="space-y-2 pb-6 border-b">
-                    <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
-                        <ClipboardCheck className="w-3 h-3 text-blue-500" />
-                        Item do Checklist
-                    </label>
-                    <div className="flex gap-3">
-                        <Input
-                            placeholder="Ex: Documentação completa e revisada"
-                            value={item}
-                            onChange={e => setItem(e.target.value)}
-                            className="flex-1"
-                        />
-                        <Button
-                            className="bg-[#1d4e46] hover:bg-[#256056] text-white shrink-0"
-                            disabled={addMutation.isPending}
-                        >
-                            {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                            Adicionar Item
-                        </Button>
-                    </div>
-                </form>
+                {!isViewer && (
+                    <form onSubmit={handleSubmit} className="space-y-2 pb-6 border-b">
+                        <label className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase">
+                            <ClipboardCheck className="w-3 h-3 text-blue-500" />
+                            Item do Checklist
+                        </label>
+                        <div className="flex gap-3">
+                            <Input
+                                placeholder="Ex: Documentação completa e revisada"
+                                value={item}
+                                onChange={e => setItem(e.target.value)}
+                                className="flex-1"
+                            />
+                            <Button
+                                className="bg-[#1d4e46] hover:bg-[#256056] text-white shrink-0"
+                                disabled={addMutation.isPending}
+                            >
+                                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                                Adicionar Item
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 <div className="space-y-2">
                     {isLoading ? (
@@ -280,19 +289,22 @@ function QualityChecklistManager({ projectId }: { projectId: string }) {
                                     <Checkbox
                                         checked={c.completed}
                                         onCheckedChange={(checked: boolean) => toggleMutation.mutate({ id: c.id, completed: checked })}
+                                        disabled={isViewer}
                                     />
                                     <span className={`text-sm font-medium ${c.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>
                                         {c.item}
                                     </span>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => deleteMutation.mutate(c.id)}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                {!isViewer && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => deleteMutation.mutate(c.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                )}
                             </div>
                         ))
                     ) : (

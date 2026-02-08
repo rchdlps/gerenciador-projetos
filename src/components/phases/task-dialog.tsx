@@ -20,7 +20,10 @@ interface TaskDialogProps {
     projectId: string
 }
 
+import { useUserRole } from "@/hooks/use-user-role"
+
 export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: TaskDialogProps) {
+    const { isViewer } = useUserRole()
     const [loading, setLoading] = useState(false)
     const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState("details")
@@ -100,7 +103,10 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         entityType: 'task'
                     }
                 })
-                if (!initRes.ok) throw new Error("Failed to get upload URL")
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
 
                 // 2. Upload to S3 (Directly)
@@ -111,7 +117,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                 })
 
                 // 3. Confirm Upload
-                await api.storage.confirm.$post({
+                const confirmRes = await api.storage.confirm.$post({
                     json: {
                         fileName: file.name,
                         fileType: file.type,
@@ -121,11 +127,15 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         entityType: 'task'
                     }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
 
                 toast.success(`Upload de ${file.name} concluído!`)
             } catch (error) {
                 console.error(error)
-                toast.error(`Erro ao enviar ${file.name}`)
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
     }
@@ -151,7 +161,10 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         priority
                     }
                 })
-                if (!res.ok) throw new Error("Failed to update task")
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({ error: 'Erro ao atualizar tarefa' }))
+                    throw new Error((data as any).error || 'Erro ao atualizar tarefa')
+                }
                 toast.success("Tarefa atualizada!")
             } else {
                 // Create
@@ -167,7 +180,10 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         priority
                     }
                 })
-                if (!res.ok) throw new Error("Failed to create task")
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({ error: 'Erro ao criar tarefa' }))
+                    throw new Error((data as any).error || 'Erro ao criar tarefa')
+                }
                 const newTask = await res.json()
                 finalTaskId = newTask.id
                 toast.success("Tarefa criada!")
@@ -184,7 +200,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
             queryClient.invalidateQueries({ queryKey: ["board", projectId] })
             onOpenChange(false)
         } catch (error) {
-            toast.error("Erro ao salvar tarefa")
+            toast.error((error as Error).message || "Erro ao salvar tarefa")
             console.error(error)
         } finally {
             setLoading(false)
@@ -192,6 +208,10 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
     }
 
     const handleUpload = async (files: File[]) => {
+        if (isViewer) {
+            toast.error("Visualizadores não podem enviar arquivos.")
+            return
+        }
         if (task?.id) {
             // Edit mode: Upload immediately
             await processUploads(files, task.id)
@@ -204,6 +224,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
     }
 
     const handleDeleteAttachment = async (id: string) => {
+        if (isViewer) return
         if (id.startsWith("pending-")) {
             // Remove from pending
             const idx = parseInt(id.split("-")[1])
@@ -240,17 +261,17 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="title">Título</Label>
-                                <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required />
+                                <Input id="title" value={title} onChange={e => setTitle(e.target.value)} required disabled={isViewer} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="description">Descrição</Label>
-                                <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} />
+                                <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} disabled={isViewer} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label>Responsável (Stakeholder)</Label>
-                                <Select value={stakeholderId} onValueChange={setStakeholderId}>
+                                <Select value={stakeholderId} onValueChange={setStakeholderId} disabled={isViewer}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Sem responsável" />
                                     </SelectTrigger>
@@ -268,18 +289,18 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="startDate">Início</Label>
-                                    <Input type="date" id="startDate" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                                    <Input type="date" id="startDate" value={startDate} onChange={e => setStartDate(e.target.value)} disabled={isViewer} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="endDate">Término</Label>
-                                    <Input type="date" id="endDate" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                                    <Input type="date" id="endDate" value={endDate} onChange={e => setEndDate(e.target.value)} disabled={isViewer} />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label>Prioridade</Label>
-                                    <Select value={priority} onValueChange={setPriority}>
+                                    <Select value={priority} onValueChange={setPriority} disabled={isViewer}>
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -293,7 +314,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Status</Label>
-                                    <Select value={status} onValueChange={setStatus}>
+                                    <Select value={status} onValueChange={setStatus} disabled={isViewer}>
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
@@ -307,17 +328,24 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
                                 </div>
                             </div>
 
-                            <DialogFooter>
-                                <Button type="submit" disabled={loading}>
-                                    {loading ? "Salvando..." : "Salvar"}
-                                </Button>
-                            </DialogFooter>
+                            {!isViewer && (
+                                <DialogFooter>
+                                    <Button type="submit" disabled={loading}>
+                                        {loading ? "Salvando..." : "Salvar"}
+                                    </Button>
+                                </DialogFooter>
+                            )}
                         </form>
                     </TabsContent>
 
                     <TabsContent value="attachments" className="mt-4 space-y-4">
-                        <FileUpload onUpload={handleUpload} />
-                        <AttachmentList attachments={allAttachments} onDelete={handleDeleteAttachment} />
+                        {!isViewer && <FileUpload onUpload={handleUpload} />}
+                        <AttachmentList
+                            attachments={allAttachments}
+                            onDelete={handleDeleteAttachment}
+                            isDeleting={null} // Todo: track deleting state per attachment if needed
+                            readonly={isViewer}
+                        />
                     </TabsContent>
                 </Tabs>
             </DialogContent>

@@ -19,6 +19,7 @@ import CostView from "./cost-view"
 import ResourceView from "./resource-view"
 import RiskView from "./risk-view"
 import StakeholderView from "./stakeholder-view"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function KnowledgeAreaDetail({ projectId, area }: { projectId: string, area: string }) {
     return (
@@ -31,6 +32,7 @@ export function KnowledgeAreaDetail({ projectId, area }: { projectId: string, ar
 function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: string }) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     const { data: ka, isLoading } = useQuery({
         queryKey: ['ka-detail', projectId, area],
@@ -74,7 +76,10 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error("Failed to get upload URL")
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
 
                 await fetch(url, {
@@ -83,7 +88,7 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                     headers: { 'Content-Type': file.type }
                 })
 
-                await api.storage.confirm.$post({
+                const confirmRes = await api.storage.confirm.$post({
                     json: {
                         fileName: file.name,
                         fileType: file.type,
@@ -93,11 +98,15 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                         entityType: 'knowledge_area'
                     }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
 
                 toast.success(`Upload de ${file.name} concluído!`)
             } catch (error) {
                 console.error(error)
-                toast.error(`Erro ao enviar ${file.name}`)
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -108,11 +117,14 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error("Failed to delete")
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
         } catch (error) {
-            toast.error("Erro ao excluir anexo")
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -226,11 +238,12 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                             </p>
                         </div>
 
-                        <FileUpload onUpload={handleUpload} />
+                        {!isViewer && <FileUpload onUpload={handleUpload} />}
                         <AttachmentList
                             attachments={attachments}
                             onDelete={handleDeleteAttachment}
                             isDeleting={isDeletingAttachment}
+                            readonly={isViewer}
                         />
                     </CardContent>
                 </Card>

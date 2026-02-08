@@ -12,6 +12,8 @@ import { toast } from "sonner"
 import { NotesSection } from "./notes-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
+import { useUserRole } from "@/hooks/use-user-role"
+
 
 interface ScopeViewProps {
     projectId: string
@@ -43,6 +45,7 @@ interface ScopeData {
 export default function ScopeView({ projectId }: ScopeViewProps) {
     const queryClient = useQueryClient()
     const [isDeletingAttachment, setIsDeletingAttachment] = useState<string | null>(null)
+    const { isViewer } = useUserRole()
 
     // Scope Declaration State
     const [objective, setObjective] = useState("")
@@ -167,15 +170,24 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                         entityType: 'knowledge_area'
                     }
                 })
-                if (!initRes.ok) throw new Error()
+                if (!initRes.ok) {
+                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
+                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                }
                 const { url, key } = await initRes.json()
                 await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
-                await api.storage.confirm.$post({
+
+                const confirmRes = await api.storage.confirm.$post({
                     json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
                 })
+                if (!confirmRes.ok) {
+                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
+                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                }
+
                 toast.success(`Upload de ${file.name} concluído!`)
-            } catch {
-                toast.error(`Erro ao enviar ${file.name}`)
+            } catch (error) {
+                toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
             }
         }
         refetchAttachments()
@@ -186,11 +198,14 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
         setIsDeletingAttachment(id)
         try {
             const res = await api.storage[':id'].$delete({ param: { id } })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: 'Erro ao excluir anexo' }))
+                throw new Error((data as any).error || 'Erro ao excluir anexo')
+            }
             toast.success("Anexo excluído")
             refetchAttachments()
-        } catch {
-            toast.error("Erro ao excluir anexo")
+        } catch (error) {
+            toast.error((error as Error).message || "Erro ao excluir anexo")
         } finally {
             setIsDeletingAttachment(null)
         }
@@ -221,6 +236,7 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                                 onChange={e => setObjective(e.target.value)}
                                 placeholder="Descreva o objetivo principal do projeto..."
                                 rows={4}
+                                disabled={isViewer}
                             />
                         </div>
 
@@ -231,6 +247,7 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                                 onChange={e => setDeliverables(e.target.value)}
                                 placeholder="Liste as principais entregas do projeto..."
                                 rows={4}
+                                disabled={isViewer}
                             />
                         </div>
 
@@ -241,14 +258,17 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                                 onChange={e => setExclusions(e.target.value)}
                                 placeholder="O que NÃO está incluído no projeto..."
                                 rows={4}
+                                disabled={isViewer}
                             />
                         </div>
                     </div>
 
-                    <Button onClick={() => saveScopeMutation.mutate()} disabled={saveScopeMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Save className="w-4 h-4 mr-2" />
-                        {saveScopeMutation.isPending ? "Salvando..." : "Salvar Declaração de Escopo"}
-                    </Button>
+                    {!isViewer && (
+                        <Button onClick={() => saveScopeMutation.mutate()} disabled={saveScopeMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                            <Save className="w-4 h-4 mr-2" />
+                            {saveScopeMutation.isPending ? "Salvando..." : "Salvar Declaração de Escopo"}
+                        </Button>
+                    )}
                 </CardContent>
             </Card>
 
@@ -270,31 +290,34 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                         </ul>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><FileText className="w-4 h-4 text-amber-600" /> Nome do Item</Label>
-                            <Input value={newWbsName} onChange={e => setNewWbsName(e.target.value)} placeholder="Ex: Infraestrutura de TI" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><TreePine className="w-4 h-4 text-emerald-600" /> Nível Hierárquico</Label>
-                            <Select value={newWbsLevel} onValueChange={setNewWbsLevel}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">Nível 1 - Pacote Principal</SelectItem>
-                                    <SelectItem value="2">Nível 2 - Subpacote</SelectItem>
-                                    <SelectItem value="3">Nível 3 - Atividade</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2">👤 Responsável</Label>
-                            <Input value={newWbsResponsible} onChange={e => setNewWbsResponsible(e.target.value)} placeholder="Nome do responsável" />
-                        </div>
-                    </div>
-
-                    <Button onClick={addWbsItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Item à EAP
-                    </Button>
+                    {!isViewer && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2"><FileText className="w-4 h-4 text-amber-600" /> Nome do Item</Label>
+                                    <Input value={newWbsName} onChange={e => setNewWbsName(e.target.value)} placeholder="Ex: Infraestrutura de TI" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2"><TreePine className="w-4 h-4 text-emerald-600" /> Nível Hierárquico</Label>
+                                    <Select value={newWbsLevel} onValueChange={setNewWbsLevel}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="1">Nível 1 - Pacote Principal</SelectItem>
+                                            <SelectItem value="2">Nível 2 - Subpacote</SelectItem>
+                                            <SelectItem value="3">Nível 3 - Atividade</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">👤 Responsável</Label>
+                                    <Input value={newWbsResponsible} onChange={e => setNewWbsResponsible(e.target.value)} placeholder="Nome do responsável" />
+                                </div>
+                            </div>
+                            <Button onClick={addWbsItem} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                                <Plus className="w-4 h-4 mr-2" /> Adicionar Item à EAP
+                            </Button>
+                        </>
+                    )}
 
                     {wbsItems.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum item na EAP ainda</p>
@@ -309,15 +332,17 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                                         <span className="font-medium">{item.name}</span>
                                         {item.responsible && <span className="ml-2 text-sm text-muted-foreground">({item.responsible})</span>}
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600" onClick={() => setWbsItems(wbsItems.filter(w => w.id !== item.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600" onClick={() => setWbsItems(wbsItems.filter(w => w.id !== item.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {wbsItems.length > 0 && (
+                    {wbsItems.length > 0 && !isViewer && (
                         <Button onClick={() => saveScopeMutation.mutate()} disabled={saveScopeMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar EAP
                         </Button>
@@ -338,39 +363,43 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                         <p><span className="font-bold">Requisitos:</span> Condições ou capacidades que o projeto deve atender.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><FileText className="w-4 h-4 text-amber-600" /> Requisito</Label>
-                            <Input value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} placeholder="Descreva o requisito" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><Package className="w-4 h-4 text-amber-600" /> Tipo</Label>
-                            <Select value={newReqType} onValueChange={setNewReqType}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Funcional">Funcional</SelectItem>
-                                    <SelectItem value="Não-Funcional">Não-Funcional</SelectItem>
-                                    <SelectItem value="Técnico">Técnico</SelectItem>
-                                    <SelectItem value="Negócio">Negócio</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2">⚡ Prioridade</Label>
-                            <Select value={newReqPriority} onValueChange={setNewReqPriority}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Alta">Alta</SelectItem>
-                                    <SelectItem value="Média">Média</SelectItem>
-                                    <SelectItem value="Baixa">Baixa</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                    {!isViewer && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2"><FileText className="w-4 h-4 text-amber-600" /> Requisito</Label>
+                                    <Input value={newReqDesc} onChange={e => setNewReqDesc(e.target.value)} placeholder="Descreva o requisito" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2"><Package className="w-4 h-4 text-amber-600" /> Tipo</Label>
+                                    <Select value={newReqType} onValueChange={setNewReqType}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Funcional">Funcional</SelectItem>
+                                            <SelectItem value="Não-Funcional">Não-Funcional</SelectItem>
+                                            <SelectItem value="Técnico">Técnico</SelectItem>
+                                            <SelectItem value="Negócio">Negócio</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="flex items-center gap-2">⚡ Prioridade</Label>
+                                    <Select value={newReqPriority} onValueChange={setNewReqPriority}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Alta">Alta</SelectItem>
+                                            <SelectItem value="Média">Média</SelectItem>
+                                            <SelectItem value="Baixa">Baixa</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
 
-                    <Button onClick={addRequirement} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Requisito
-                    </Button>
+                            <Button onClick={addRequirement} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
+                                <Plus className="w-4 h-4 mr-2" /> Adicionar Requisito
+                            </Button>
+                        </>
+                    )}
 
                     {requirements.length === 0 ? (
                         <p className="text-center text-muted-foreground py-8">Nenhum requisito cadastrado</p>
@@ -385,15 +414,17 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${req.priority === 'Alta' ? 'bg-rose-100 text-rose-700' : req.priority === 'Média' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{req.priority}</span>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600" onClick={() => setRequirements(requirements.filter(r => r.id !== req.id))}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {!isViewer && (
+                                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-600" onClick={() => setRequirements(requirements.filter(r => r.id !== req.id))}>
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     )}
 
-                    {requirements.length > 0 && (
+                    {requirements.length > 0 && !isViewer && (
                         <Button onClick={() => saveScopeMutation.mutate()} disabled={saveScopeMutation.isPending} className="bg-[#1d4e46] hover:bg-[#256056] text-white">
                             <Save className="w-4 h-4 mr-2" /> Salvar Requisitos
                         </Button>
@@ -419,8 +450,8 @@ export default function ScopeView({ projectId }: ScopeViewProps) {
                             <span className="font-bold">Anexe documentos relevantes:</span> Contratos, planilhas, apresentações, imagens, PDFs, ou qualquer arquivo que complemente as informações desta área.
                         </p>
                     </div>
-                    <FileUpload onUpload={handleUpload} />
-                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} />
+                    {!isViewer && <FileUpload onUpload={handleUpload} />}
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteAttachment} isDeleting={isDeletingAttachment} readonly={isViewer} />
                 </CardContent>
             </Card>
         </div>
