@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useActiveOrg } from "@/contexts/org-context"
 import { api } from "@/lib/api-client"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,9 +35,23 @@ export function ProjectList() {
     const [desc, setDesc] = useState("")
     const [type, setType] = useState("Projeto")
     const [status, setStatus] = useState("em_andamento")
-    const [selectedOrg, setSelectedOrg] = useState<string>("")
-    const [searchTerm, setSearchTerm] = useState("")
+    const { activeOrgId, isSuperAdmin } = useActiveOrg() // Get global context
+    const [selectedOrg, setSelectedOrg] = useState<string>("") // Local state for creation
+
+    // Initialize filter based on active context
     const [filterOrg, setFilterOrg] = useState("all")
+
+    // Sync filter with activeOrgId
+    useEffect(() => {
+        if (activeOrgId) {
+            setFilterOrg(activeOrgId)
+            setSelectedOrg(activeOrgId) // Auto-select for creation too
+        } else {
+            setFilterOrg("all")
+        }
+    }, [activeOrgId])
+
+    const [searchTerm, setSearchTerm] = useState("")
     const [filterStatus, setFilterStatus] = useState("all")
 
     // Fetch User Organizations
@@ -226,7 +241,11 @@ export function ProjectList() {
                     />
                 </div>
                 <div className="w-full sm:w-[300px]">
-                    <Select value={filterOrg} onValueChange={setFilterOrg}>
+                    <Select
+                        value={filterOrg}
+                        onValueChange={setFilterOrg}
+                        disabled={!!activeOrgId} // Disable if strictly scoped
+                    >
                         <SelectTrigger className="bg-background">
                             <div className="flex items-center gap-2 w-full overflow-hidden">
                                 <Filter className="h-4 w-4 text-muted-foreground shrink-0" />

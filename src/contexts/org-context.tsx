@@ -45,10 +45,12 @@ export function OrgProvider({ children, initialData }: OrgProviderProps) {
             setOrganizations(data.organizations)
             setIsSuperAdmin(data.isSuperAdmin ?? false)
 
-            // Auto-select first org ONLY for non-super-admins with no active org
-            // Super admins can intentionally have null = "view all"
-            if (!data.activeOrganizationId && data.organizations.length > 0 && !data.isSuperAdmin) {
-                await switchOrg(data.organizations[0].id)
+            // Auto-select first org ONLY for non-super-admins with SINGLE org
+            // Super admins and multi-org users can have null = "view all"
+            if (!data.activeOrganizationId && !data.isSuperAdmin) {
+                if (data.organizations.length === 1) {
+                    await switchOrg(data.organizations[0].id)
+                }
             }
         } catch (err) {
             console.error('[OrgContext] Error fetching org session:', err)
@@ -83,9 +85,11 @@ export function OrgProvider({ children, initialData }: OrgProviderProps) {
     useEffect(() => {
         if (!initialData) {
             fetchOrgSession()
-        } else if (!initialData.activeOrganizationId && initialData.organizations.length > 0 && !initialData.isSuperAdmin) {
-            // Auto-select first org ONLY for non-super-admins
-            switchOrg(initialData.organizations[0].id)
+        } else if (!initialData.activeOrganizationId && !initialData.isSuperAdmin) {
+            // Auto-select first org ONLY for non-super-admins with SINGLE org
+            if (initialData.organizations.length === 1) {
+                switchOrg(initialData.organizations[0].id)
+            }
         }
     }, [])
 

@@ -1,10 +1,17 @@
 import { Providers } from "@/components/providers";
 import { ProjectList } from "./project-list";
+import { OrgProvider } from "@/contexts/org-context";
 
-export function DashboardWrapper() {
+interface DashboardWrapperProps {
+    initialData?: any
+}
+
+export function DashboardWrapper({ initialData }: DashboardWrapperProps) {
     return (
         <Providers>
-            <ProjectList />
+            <OrgProvider initialData={initialData}>
+                <ProjectList />
+            </OrgProvider>
         </Providers>
     )
 }

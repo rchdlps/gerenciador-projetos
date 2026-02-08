@@ -3,13 +3,29 @@ import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { DashboardWrapper } from "@/components/dashboard/wrapper";
 import { auth } from "@/lib/auth";
 
+import app from "@/server/app";
+
 const session = await auth.api.getSession({ headers: Astro.request.headers });
 
 if (!session) {
     return Astro.redirect("/login");
 }
+
+let orgSessionData = null;
+try {
+    const res = await app.request("http://localhost/api/org-session", {
+        headers: Astro.request.headers,
+        method: "GET",
+    });
+
+    if (res.ok) {
+        orgSessionData = await res.json();
+    }
+} catch (error) {
+    console.error("Failed to fetch server-side org session:", error);
+}
 ---
 
 <DashboardLayout title="Dashboard - Gerenciador de Projetos">
-    <DashboardWrapper client:load />
+    <DashboardWrapper client:load initialData={orgSessionData} />
 </DashboardLayout>

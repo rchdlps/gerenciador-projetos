@@ -106,11 +106,21 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
     }
 
     // Determine display text
-    const isViewingAll = activeOrgId === null && isSuperAdmin
-    const displayName = isViewingAll
-        ? "Todas as Secretarias"
-        : (activeOrg?.name || 'Selecione uma secretaria')
-    const displayCode = isViewingAll ? "Modo Administrador" : activeOrg?.code
+    const isViewingAll = activeOrgId === null
+    const showViewAllOption = isSuperAdmin || organizations.length > 1
+
+    let displayName = activeOrg?.name || 'Selecione uma secretaria'
+    let displayCode = activeOrg?.code
+
+    if (isViewingAll) {
+        if (isSuperAdmin) {
+            displayName = "Todas as Secretarias"
+            displayCode = "Modo Administrador"
+        } else {
+            displayName = "Minhas Secretarias"
+            displayCode = "Visão Agregada"
+        }
+    }
 
     // Show search only when there are many orgs
     const showSearch = organizations.length > 5
@@ -182,11 +192,11 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                     )}
 
                     <div className="py-1 max-h-64 overflow-y-auto">
-                        {/* Super Admin: View All Option */}
-                        {isSuperAdmin && !searchQuery && (
+                        {/* View All Option (Super Admin OR Multi-Org User) */}
+                        {showViewAllOption && !searchQuery && (
                             <>
                                 <p className="px-3 py-1.5 text-xs font-semibold text-amber-600 uppercase">
-                                    Administrador
+                                    {isSuperAdmin ? "Administrador" : "Geral"}
                                 </p>
                                 <button
                                     onClick={() => handleSwitch(null)}
@@ -200,9 +210,14 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                                         <Globe className="w-3 h-3 text-amber-600" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">Todas as Secretarias</p>
+                                        <p className="text-sm font-medium truncate">
+                                            {isSuperAdmin ? "Todas as Secretarias" : "Minhas Secretarias"}
+                                        </p>
                                         <p className="text-xs text-amber-600">
-                                            Ver dados de todas as organizações
+                                            {isSuperAdmin
+                                                ? "Ver dados de todas as organizações"
+                                                : "Ver dados de todas as minhas organizações"
+                                            }
                                         </p>
                                     </div>
                                     {isViewingAll && (
@@ -217,7 +232,7 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                         <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
                             {searchQuery
                                 ? `Resultados (${filteredOrgs.length})`
-                                : isSuperAdmin
+                                : showViewAllOption
                                     ? "Ou selecione uma secretaria"
                                     : "Suas Secretarias"
                             }
