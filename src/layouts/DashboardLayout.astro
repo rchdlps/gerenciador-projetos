@@ -3,11 +3,16 @@ import "@/styles/globals.css";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 
+import { auth } from "@/lib/auth";
+
 interface Props {
 	title: string;
 }
 
 const { title } = Astro.props;
+const session = await auth.api.getSession({
+	headers: Astro.request.headers,
+});
 ---
 
 <!doctype html>
@@ -35,9 +40,9 @@ const { title } = Astro.props;
 		<title>{title}</title>
 	</head>
 	<body class="bg-background min-h-screen font-sans antialiased">
-		<Header client:load />
+		<Header client:load user={session?.user} />
 		<div class="flex">
-			<Sidebar client:load />
+			<Sidebar client:load user={session?.user} />
 			<main class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8">
 				<slot />
 			</main>

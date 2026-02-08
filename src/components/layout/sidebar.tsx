@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
 
-export function Sidebar() {
+export function Sidebar({ user }: { user?: any }) {
     const [currentPath, setCurrentPath] = useState("")
     const { data: session } = authClient.useSession()
 
@@ -14,8 +14,8 @@ export function Sidebar() {
     }, [])
 
     // Check if user is super admin (globalRole is a custom field)
-    const user = session?.user as { globalRole?: string } | undefined
-    const isSuperAdmin = user?.globalRole === 'super_admin'
+    const currentUser = user || session?.user
+    const isSuperAdmin = (currentUser as any)?.globalRole === 'super_admin'
 
     const isActive = (path: string) => currentPath === path
 
@@ -124,8 +124,8 @@ export function Sidebar() {
                                         title: "Relatar um erro",
                                         subtitle: "Descreva o que aconteceu para nos ajudar a melhorar.",
                                         user: {
-                                            email: session?.user?.email || "anonimo@exemplo.com",
-                                            name: session?.user?.name || "Anônimo",
+                                            email: currentUser?.email || "anonimo@exemplo.com",
+                                            name: currentUser?.name || "Anônimo",
                                         },
                                     });
                                 } else {

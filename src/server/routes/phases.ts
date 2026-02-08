@@ -1,9 +1,10 @@
+
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectPhases, tasks, projects, users, stakeholders } from '../../../db/schema'
+import { projectPhases, tasks, projects, users, stakeholders, memberships } from '../../../db/schema'
 import { eq, asc, desc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -20,6 +21,25 @@ app.get('/:projectId', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+
+    // Verify Access
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     const phases = await db.select().from(projectPhases)
         .where(eq(projectPhases.projectId, projectId))
@@ -91,10 +111,18 @@ app.post('/:projectId',
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
         if (!user) return c.json({ error: 'User not found' }, 401)
 
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
         const isOwner = project.userId === session.user.id
         const isSuperAdmin = user.globalRole === 'super_admin'
 
-        if (!isOwner && !isSuperAdmin) return c.json({ error: 'Forbidden' }, 403)
+        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
 
         // Get max order
         const [max] = await db.select({ value: projectPhases.order })
@@ -150,10 +178,18 @@ app.patch('/:projectId/reorder',
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
         if (!user) return c.json({ error: 'User not found' }, 401)
 
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
         const isOwner = project.userId === session.user.id
         const isSuperAdmin = user.globalRole === 'super_admin'
 
-        if (!isOwner && !isSuperAdmin) return c.json({ error: 'Forbidden' }, 403)
+        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
 
         // Use transaction to update all
         await db.transaction(async (tx) => {
@@ -195,10 +231,18 @@ app.patch('/:id',
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
         if (!user) return c.json({ error: 'User not found' }, 401)
 
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
         const isOwner = project.userId === session.user.id
         const isSuperAdmin = user.globalRole === 'super_admin'
 
-        if (!isOwner && !isSuperAdmin) return c.json({ error: 'Forbidden' }, 403)
+        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
 
         const [updatedPhase] = await db.update(projectPhases)
             .set({ ...(name && { name }), ...(description !== undefined && { description }) })
@@ -238,10 +282,18 @@ app.delete('/:id', async (c) => {
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
     if (!user) return c.json({ error: 'User not found' }, 401)
 
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
     const isOwner = project.userId === session.user.id
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    if (!isOwner && !isSuperAdmin) return c.json({ error: 'Forbidden' }, 403)
+    if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
 
     await db.delete(projectPhases).where(eq(projectPhases.id, id))
 

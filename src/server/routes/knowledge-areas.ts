@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { knowledgeAreas, projects, users, knowledgeAreaChanges } from '../../../db/schema'
+import { knowledgeAreas, projects, users, knowledgeAreaChanges, memberships } from '../../../db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -28,7 +28,15 @@ app.get('/:projectId', async (c) => {
     // Fetch full user to check role
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -54,7 +62,15 @@ app.put('/:projectId/:area',
         // Fetch full user to check role
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -118,6 +134,21 @@ app.get('/:projectId/:area', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     const [ka] = await db.select().from(knowledgeAreas).where(
         and(
             eq(knowledgeAreas.projectId, projectId),
@@ -133,6 +164,17 @@ app.get('/:projectId/:area', async (c) => {
             area,
             content: ""
         }).returning()
+
+        // Audit log for AUTO-CREATE
+        await createAuditLog({
+            userId: session.user.id,
+            organizationId: project.organizationId,
+            action: 'CREATE',
+            resource: 'knowledge_area',
+            resourceId: newKa.id,
+            metadata: { area, projectId, method: 'auto-create-on-get' }
+        })
+
         return c.json({ ...newKa, changes: [] })
     }
 
@@ -170,6 +212,23 @@ app.post('/:areaId/changes',
         // Get knowledge area for project context
         const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, areaId))
         const [project] = ka ? await db.select().from(projects).where(eq(projects.id, ka.projectId)) : [null]
+
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
 
         // Audit log
         await createAuditLog({

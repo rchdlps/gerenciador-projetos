@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectCharters, projects, users } from '../../../db/schema'
+import { projectCharters, projects, users, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -24,6 +24,21 @@ app.get('/:projectId', async (c) => {
     // Verify Access
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     const [charter] = await db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId))
 
@@ -59,7 +74,15 @@ app.put('/:projectId',
         // Fetch full user to check role
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 

@@ -3,7 +3,13 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectQualityMetrics, projectQualityChecklists, projects, users } from '../../../db/schema'
+import {
+    projectQualityMetrics,
+    projectQualityChecklists,
+    projects,
+    users,
+    memberships
+} from '../../../db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -21,6 +27,26 @@ app.get('/:projectId/metrics', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+
+    // Verify Access
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     const metrics = await db.select().from(projectQualityMetrics)
         .where(eq(projectQualityMetrics.projectId, projectId))
         .orderBy(desc(projectQualityMetrics.createdAt))
@@ -42,6 +68,25 @@ app.post('/:projectId/metrics',
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
 
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
         const [metric] = await db.insert(projectQualityMetrics).values({
             id: nanoid(),
             projectId,
@@ -60,6 +105,29 @@ app.delete('/metrics/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Verify Access
+    const [metric] = await db.select().from(projectQualityMetrics).where(eq(projectQualityMetrics.id, id))
+    if (!metric) return c.json({ error: 'Metric not found' }, 404)
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, metric.projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     await db.delete(projectQualityMetrics).where(eq(projectQualityMetrics.id, id))
     return c.json({ success: true })
 })
@@ -73,6 +141,26 @@ app.get('/:projectId/checklist', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+
+    // Verify Access
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     const items = await db.select().from(projectQualityChecklists)
         .where(eq(projectQualityChecklists.projectId, projectId))
         .orderBy(desc(projectQualityChecklists.createdAt))
@@ -91,6 +179,25 @@ app.post('/:projectId/checklist',
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
+
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
 
         const [newItem] = await db.insert(projectQualityChecklists).values({
             id: nanoid(),
@@ -115,6 +222,28 @@ app.patch('/checklist/:id',
         const id = c.req.param('id')
         const data = c.req.valid('json')
 
+        // Verify Access
+        const [checklist] = await db.select().from(projectQualityChecklists).where(eq(projectQualityChecklists.id, id))
+        if (!checklist) return c.json({ error: 'Checklist not found' }, 404)
+
+        const [project] = await db.select().from(projects).where(eq(projects.id, checklist.projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
         const [updated] = await db.update(projectQualityChecklists)
             .set({ completed: data.completed, updatedAt: new Date() })
             .where(eq(projectQualityChecklists.id, id))
@@ -130,6 +259,29 @@ app.delete('/checklist/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Verify Access
+    const [checklist] = await db.select().from(projectQualityChecklists).where(eq(projectQualityChecklists.id, id))
+    if (!checklist) return c.json({ error: 'Checklist not found' }, 404)
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, checklist.projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     await db.delete(projectQualityChecklists).where(eq(projectQualityChecklists.id, id))
     return c.json({ success: true })
 })

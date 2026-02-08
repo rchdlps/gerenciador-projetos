@@ -1,3 +1,4 @@
+
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
@@ -5,7 +6,10 @@ import { db } from '@/lib/db'
 import {
     procurementSuppliers,
     procurementContracts,
-    knowledgeAreas
+    knowledgeAreas,
+    users,
+    projects,
+    memberships
 } from '../../../db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
@@ -23,6 +27,25 @@ app.get('/:projectId', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+
+    // Verify Access
+    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
 
     // 1. Fetch Notes (from knowledge_areas)
     const [notesArea] = await db.select().from(knowledgeAreas).where(
@@ -62,6 +85,25 @@ app.put('/:projectId/notes',
         const projectId = c.req.param('projectId')
         const { content } = c.req.valid('json')
 
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
         const [existingArea] = await db.select().from(knowledgeAreas).where(
             and(
                 eq(knowledgeAreas.projectId, projectId),
@@ -100,6 +142,25 @@ app.post('/:projectId/suppliers',
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
 
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
         const [newItem] = await db.insert(procurementSuppliers).values({
             id: nanoid(),
             projectId,
@@ -116,6 +177,29 @@ app.delete('/suppliers/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Verify Access
+    const [supplier] = await db.select().from(procurementSuppliers).where(eq(procurementSuppliers.id, id))
+    if (!supplier) return c.json({ error: 'Supplier not found' }, 404)
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, supplier.projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     await db.delete(procurementSuppliers).where(eq(procurementSuppliers.id, id))
 
     return c.json({ success: true })
@@ -136,6 +220,25 @@ app.post('/:projectId/contracts',
         const projectId = c.req.param('projectId')
         const { validity, ...data } = c.req.valid('json')
 
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
         const [newItem] = await db.insert(procurementContracts).values({
             id: nanoid(),
             projectId,
@@ -153,9 +256,33 @@ app.delete('/contracts/:id', async (c) => {
     if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+
+    // Verify Access
+    const [contract] = await db.select().from(procurementContracts).where(eq(procurementContracts.id, id))
+    if (!contract) return c.json({ error: 'Contract not found' }, 404)
+
+    const [project] = await db.select().from(projects).where(eq(projects.id, contract.projectId))
+    if (!project) return c.json({ error: 'Project not found' }, 404)
+
+    // Fetch full user to check role
+    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        return c.json({ error: 'Forbidden' }, 403)
+    }
+
     await db.delete(procurementContracts).where(eq(procurementContracts.id, id))
 
     return c.json({ success: true })
 })
 
 export default app
+

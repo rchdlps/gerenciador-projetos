@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { LogOut } from "lucide-react"
 
-export function Header() {
+export function Header({ user }: { user?: any }) {
     const { data: session } = authClient.useSession()
+    const currentUser = user || session?.user
 
     return (
         <header className="bg-brand-gradient text-primary-foreground shadow-sm sticky top-0 z-50 relative pb-[5px]">
@@ -38,8 +39,8 @@ export function Header() {
 
                 <div className="flex items-center gap-4">
                     <div className="hidden md:block text-right">
-                        <p className="text-sm font-semibold leading-none text-white">{session?.user?.name || "Usuário"}</p>
-                        <p className="text-xs text-white/70">{session?.user?.email || ""}</p>
+                        <p className="text-sm font-semibold leading-none text-white">{currentUser?.name || "Usuário"}</p>
+                        <p className="text-xs text-white/70">{currentUser?.email || ""}</p>
                     </div>
                     <Button
                         variant="secondary"

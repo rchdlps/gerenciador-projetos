@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { stakeholders, projects, users } from '../../../db/schema'
+import { stakeholders, projects, users, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -28,7 +28,15 @@ app.get('/:projectId', async (c) => {
     // Fetch full user to check role
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -60,7 +68,15 @@ app.post('/:projectId',
         // Fetch full user to check role
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -112,7 +128,15 @@ app.put('/:id',
         // Fetch full user to check role
         const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -151,7 +175,15 @@ app.delete('/:id', async (c) => {
     // Fetch full user to check role
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 

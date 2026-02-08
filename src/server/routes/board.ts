@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects, users, stakeholders } from '../../../db/schema'
+import { tasks, projectPhases, projects, users, stakeholders, memberships } from '../../../db/schema'
 import { eq, asc, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 
@@ -27,7 +27,15 @@ app.get('/:projectId', async (c) => {
     // Fetch full user to check role
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id) {
+    // Check if user is a member of the organization
+    const [membership] = await db.select()
+        .from(memberships)
+        .where(and(
+            eq(memberships.userId, session.user.id),
+            eq(memberships.organizationId, project.organizationId!)
+        ))
+
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 

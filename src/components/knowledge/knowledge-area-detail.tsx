@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { Loader2, Trash2, Paperclip, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { Loader2, Paperclip } from "lucide-react"
 import { Providers } from "@/components/providers"
 import { ChangeControlSection } from "./change-control-section"
 import { NotesSection } from "./notes-section"
@@ -11,7 +11,6 @@ import { QualitySection } from "./quality-section"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import CommunicationView from "./communication-view"
 import ProcurementView from "./procurement-view"
@@ -39,7 +38,12 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             const res = await api['knowledge-areas'][':projectId'][':area'].$get({
                 param: { projectId, area }
             })
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                if (res.status === 401 || res.status === 403) {
+                    throw new Error("Acesso negado. Verifique suas permissões.")
+                }
+                throw new Error("Erro ao carregar dados.")
+            }
             return res.json()
         }
     })
