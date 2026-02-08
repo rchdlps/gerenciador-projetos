@@ -1,0 +1,20 @@
+---
+import Layout from "../layouts/DashboardLayout.astro";
+import { ProfileForm } from "@/components/profile/profile-form";
+---
+
+<Layout title="Meu Perfil">
+    <div class="space-y-6">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900">
+                Meu Perfil
+            </h1>
+            <p class="text-muted-foreground mt-1">
+                Gerencie suas informações pessoais e configurações de segurança.
+            </p>
+        </div>
+        <div class="border-t border-slate-200 pt-6">
+            <ProfileForm client:load />
+        </div>
+    </div>
+</Layout>

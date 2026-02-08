@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "./db";
 import * as schema from "../../db/schema";
-import { sendRecoveryEmail } from "./email/client";
+import { sendRecoveryEmail, sendVerificationEmail } from "./email/client";
 import { APIError } from "better-auth";
 
 const baseURL = process.env.BETTER_AUTH_URL || (import.meta.env as any).BETTER_AUTH_URL || "http://localhost:4321";
@@ -19,6 +19,15 @@ export const auth = betterAuth({
             verification: schema.verifications
         }
     }),
+    emailVerification: {
+        sendOnSignUp: false,
+        autoSignInAfterVerification: true,
+        async sendVerificationEmail(data, request) {
+            const { user, url } = data;
+            // Send email verification link
+            await sendVerificationEmail(user.email, url);
+        }
+    },
     emailAndPassword: {
         enabled: true,
         async sendResetPassword(data, request) {
@@ -38,6 +47,9 @@ export const auth = betterAuth({
     },
 
     user: {
+        changeEmail: {
+            enabled: true,
+        },
         additionalFields: {
             globalRole: {
                 type: "string",

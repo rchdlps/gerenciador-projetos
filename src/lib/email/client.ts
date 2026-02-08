@@ -82,3 +82,24 @@ export async function sendRecoveryEmail(to: string, resetLink: string) {
         html,
     });
 }
+
+export async function sendVerificationEmail(to: string, verificationLink: string) {
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Verifique seu Email</h2>
+            <p>Obrigado por se registrar! Por favor, verifique seu endereço de email para continuar.</p>
+            <p>Clique no botão abaixo para verificar seu email:</p>
+            <a href="${verificationLink}" style="display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
+                Verificar Email
+            </a>
+            <p>Se o botão não funcionar, copie e cole este link no seu navegador:</p>
+            <p>${verificationLink}</p>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: 'Verifique seu Email',
+        html,
+    });
+}

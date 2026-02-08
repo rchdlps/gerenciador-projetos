@@ -50,6 +50,13 @@ export const storage = {
         return await getSignedUrl(s3, command, { expiresIn: 3600 })
     },
 
+    // Get Public URL (assuming bucket is public)
+    getPublicUrl: (key: string) => {
+        // Remove 'https://' from endpoint to standardise
+        const endpoint = process.env.S3_ENDPOINT?.replace('https://', '').replace('http://', '')
+        return `https://${endpoint}/${BUCKET_NAME}/${key}`
+    },
+
     // Delete file
     deleteFile: async (key: string) => {
         const command = new DeleteObjectCommand({

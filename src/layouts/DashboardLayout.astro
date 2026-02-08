@@ -2,6 +2,7 @@
 import "@/styles/globals.css";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 import { auth } from "@/lib/auth";
 
@@ -47,5 +48,6 @@ const session = await auth.api.getSession({
 				<slot />
 			</main>
 		</div>
+		<Toaster client:load />
 	</body>
 </html>

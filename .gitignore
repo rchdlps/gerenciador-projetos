@@ -39,3 +39,5 @@ ux_full_report.txt
 playwright-report/
 test-results/
 playwright/.cache/
+
+.vscode/
