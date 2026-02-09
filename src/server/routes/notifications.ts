@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { requireAuth, AuthVariables } from "../middleware/auth";
+import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
     getNotifications,
     getUnreadCount,
@@ -77,16 +77,12 @@ notificationsRouter.post("/read-all", async (c) => {
 const systemAnnouncementSchema = z.object({
     title: z.string().min(1).max(200),
     message: z.string().min(1).max(1000),
-    data: z.record(z.unknown()).optional(),
+    data: z.record(z.string(), z.unknown()).optional(),
 });
 
 notificationsRouter.post(
     "/system",
-    zValidator("json", systemAnnouncementSchema, (result, c) => {
-        if (!result.success) {
-            return c.json({ error: "Invalid request body", issues: result.error.issues }, 400);
-        }
-    }),
+    zValidator("json", systemAnnouncementSchema),
     async (c) => {
         const user = c.get("user");
 
@@ -102,5 +98,49 @@ notificationsRouter.post(
         return c.json({ success: true, message: "System announcement queued" });
     }
 );
+
+/**
+ * POST /notifications/test (DEV ONLY)
+ * Create a test notification directly without Inngest queue
+ * This bypasses the event system for quick testing
+ */
+if (process.env.NODE_ENV !== "production") {
+    notificationsRouter.post("/test", async (c) => {
+        const user = c.get("user");
+
+        // Import here to avoid circular deps
+        const { storeNotification } = await import("@/lib/notification");
+        const { pushNotification } = await import("@/lib/pusher");
+
+        // Create notification directly
+        const notificationId = await storeNotification({
+            userId: user.id,
+            type: "activity",
+            title: "🧪 Test Notification",
+            message: "This is a test notification created directly (dev mode)",
+            data: { test: true, timestamp: new Date().toISOString() },
+        });
+
+        // Try to push real-time (will fail gracefully if Pusher not configured)
+        try {
+            await pushNotification(user.id, {
+                id: notificationId,
+                type: "activity",
+                title: "🧪 Test Notification",
+                message: "This is a test notification created directly (dev mode)",
+                data: { test: true, timestamp: new Date().toISOString() },
+                createdAt: new Date().toISOString(),
+            });
+        } catch (error) {
+            console.log("[Dev Test] Real-time push skipped:", error);
+        }
+
+        return c.json({
+            success: true,
+            notificationId,
+            message: "Test notification created (refresh to see it)"
+        });
+    });
+}
 
 export default notificationsRouter;
