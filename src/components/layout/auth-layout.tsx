@@ -39,7 +39,7 @@ export function AuthLayout({ children, title }: { children: ReactNode, title?: s
                     </div>
 
                     <div className="text-center text-xs text-muted-foreground">
-                        &copy; 2026 Secretaria Municipal de Planejamento (SMPO)
+                        &copy; 2026 Secretaria Municipal de Planejamento - SAETI
                     </div>
                 </div>
             </main>

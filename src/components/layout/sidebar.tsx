@@ -157,7 +157,7 @@ export function Sidebar({ user, initialPath }: { user?: any, initialPath?: strin
 
             <div className="p-4 border-t bg-muted/10">
                 <div className="text-xs text-muted-foreground text-center">
-                    &copy; 2026 Prefeitura de Cuiabá
+                    &copy; 2026 Prefeitura de Cuiabá - SAETI
                 </div>
             </div>
         </aside>
