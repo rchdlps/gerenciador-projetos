@@ -428,3 +428,6 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
         references: [stakeholders.id],
     }),
 }));
+
+// Re-export notifications schema
+export * from './notifications';
