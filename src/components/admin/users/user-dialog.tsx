@@ -124,29 +124,19 @@ export function UserDialog({ open, onOpenChange, defaultOrgId, user, onSuccess }
                 }
                 toast.success("Usuário atualizado com sucesso!")
             } else {
-                // CREATE MODE - use first membership
-                const firstMembership = memberships[0]
+                // CREATE MODE - Send everything at once
                 const res = await api.admin.users.$post({
                     json: {
                         name,
                         email,
-                        organizationId: firstMembership?.organizationId,
-                        orgRole: firstMembership?.role
+                        globalRole,
+                        memberships
                     }
                 })
 
                 if (!res.ok) {
                     const err = await res.json() as any
                     throw new Error(err.error || "Failed to create user")
-                }
-
-                // If more memberships, add them via patch
-                if (memberships.length > 1 && (res as any).userId) {
-                    const userId = (await res.json() as any).userId
-                    await api.admin.users[":id"].$patch({
-                        param: { id: userId },
-                        json: { memberships }
-                    })
                 }
 
                 toast.success("Usuário convidado com sucesso!")

@@ -143,100 +143,120 @@ app.get('/organizations', async (c) => {
 
 // POST /api/admin/users
 // Create or Invite User
-// POST /api/admin/users
-// Create or Invite User
 app.post('/users',
     zValidator('json', z.object({
         name: z.string(),
         email: z.string().email(),
-        password: z.string().optional(),
-        organizationId: z.string().optional(),
-        orgRole: z.enum(['secretario', 'gestor', 'viewer']).optional()
+        image: z.string().optional(),
+        globalRole: z.enum(['super_admin', 'user']).optional(),
+        organizationId: z.string().optional(), // Legacy support
+        orgRole: z.enum(['secretario', 'gestor', 'viewer']).optional(), // Legacy support
+        memberships: z.array(z.object({
+            organizationId: z.string(),
+            role: z.enum(['secretario', 'gestor', 'viewer'])
+        })).optional()
     })),
     async (c) => {
         const session = await getSession(c)
         if (!session) return c.json({ error: 'Unauthorized' }, 401)
 
-        const { name, email, password, organizationId, orgRole } = c.req.valid('json')
+        const { name, email, image, globalRole, organizationId, orgRole, memberships: providedMemberships } = c.req.valid('json')
 
         // 1. Permission Check
         const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
         const isSuperAdmin = currentUser?.globalRole === 'super_admin'
 
-        // Non-super admins MUST provide an organizationId they control
+        // Consolidate memberships (legacy + new array)
+        const membershipsToCreate = [...(providedMemberships || [])]
+        if (organizationId && orgRole) {
+            // Avoid duplicates
+            if (!membershipsToCreate.find(m => m.organizationId === organizationId)) {
+                membershipsToCreate.push({ organizationId, role: orgRole })
+            }
+        }
+
+        // Non-super admins MUST provide an organizationId they control for EVERY membership
         if (!isSuperAdmin) {
-            if (!organizationId) return c.json({ error: 'Organization ID required' }, 400)
+            if (globalRole === 'super_admin') return c.json({ error: 'Insuficient permissions to create Super Admin' }, 403)
 
-            // Verify caller has permissions in that org
-            const [membership] = await db.select()
-                .from(memberships)
-                .where(and(
-                    eq(memberships.userId, session.user.id),
-                    eq(memberships.organizationId, organizationId),
-                    inArray(memberships.role, ['secretario', 'gestor'])
-                ))
+            if (membershipsToCreate.length === 0) return c.json({ error: 'Organization required' }, 400)
 
-            if (!membership) return c.json({ error: 'Insufficient permissions for this organization' }, 403)
+            for (const m of membershipsToCreate) {
+                // Verify caller has permissions in that org
+                const [membership] = await db.select()
+                    .from(memberships)
+                    .where(and(
+                        eq(memberships.userId, session.user.id),
+                        eq(memberships.organizationId, m.organizationId),
+                        inArray(memberships.role, ['secretario', 'gestor'])
+                    ))
+
+                if (!membership) return c.json({ error: `Insufficient permissions for organization ${m.organizationId}` }, 403)
+            }
         }
 
         // 2. Check if user exists
         const [existingUser] = await db.select().from(users).where(eq(users.email, email))
-        let userId = existingUser?.id
 
-        if (!userId) {
-            // Create New User (Using Auth API would be best, here simplified insert)
-            // Real implementation: auth.api.signUpEmail...
-            // For now, we simulate user creation in DB if not exists
-            const newUser = await auth.api.signUpEmail({
-                body: {
-                    name,
-                    email,
-                    password: password || "Mudar123!", // Temp default password if not provided
-                }
-            })
-
-            if (!newUser) {
-                // Fallback if auth api returns unexpectedly
-                // This part depends on how you handle 'invites' without passwords
-                return c.json({ error: "Failed to create user via auth provider" }, 500)
-            }
-            userId = newUser.user.id
+        if (existingUser) {
+            return c.json({ error: 'User already exists with this email' }, 409)
         }
 
-        // 3. Add to Organization
-        if (organizationId && orgRole) {
-            // Check if already member
-            const [existingMember] = await db.select().from(memberships).where(and(
-                eq(memberships.userId, userId),
-                eq(memberships.organizationId, organizationId)
-            ))
+        // 3. Create New User with Random Password
+        // We use a random password because we will send a reset link correctly
+        const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8) + "!1Aa";
 
-            if (existingMember) {
-                // Update role
-                await db.update(memberships)
-                    .set({ role: orgRole })
-                    .where(and(
-                        eq(memberships.userId, userId),
-                        eq(memberships.organizationId, organizationId)
-                    ))
-            } else {
-                // Insert
+        const newUserCtx = await auth.api.signUpEmail({
+            body: {
+                name,
+                email,
+                password: randomPassword,
+                image
+            }
+        })
+
+        if (!newUserCtx) {
+            return c.json({ error: "Failed to create user via auth provider" }, 500)
+        }
+
+        const userId = newUserCtx.user.id
+
+        // 4. Update Global Role (Super Admin Only)
+        // We do this via DB update because signUpEmail might not respect our custom fields depending on adapter config
+        if (isSuperAdmin && globalRole) {
+            await db.update(users)
+                .set({ globalRole })
+                .where(eq(users.id, userId))
+        }
+
+        // 5. Add Memberships
+        if (membershipsToCreate.length > 0) {
+            for (const m of membershipsToCreate) {
                 await db.insert(memberships).values({
                     userId,
-                    organizationId,
-                    role: orgRole
+                    organizationId: m.organizationId,
+                    role: m.role
                 })
             }
         }
 
-        // Audit log for user creation or membership change
+        // 6. Send Invite Email (via Forgot Password flow)
+        // This generates a token and sends the email
+        await auth.api.requestPasswordReset({
+            body: {
+                email,
+                redirectTo: "/reset-password"
+            }
+        })
+
+        // Audit log
         await createAuditLog({
             userId: session.user.id,
-            organizationId: organizationId || null,
-            action: existingUser ? 'UPDATE' : 'CREATE',
-            resource: existingUser ? 'membership' : 'user',
+            organizationId: null, // Global action or we could pick the first org
+            action: 'CREATE',
+            resource: 'user',
             resourceId: userId,
-            metadata: { email, name, orgRole, organizationId }
+            metadata: { email, name, globalRole, membershipsCount: membershipsToCreate.length }
         })
 
         return c.json({ success: true, userId })
