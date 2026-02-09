@@ -23,9 +23,10 @@ interface CalendarRightPanelProps {
     appointments: any[]
     projectId?: string
     onClearDate: () => void
+    className?: string
 }
 
-export function CalendarRightPanel({ date, currentMonth, tasks, appointments, projectId, onClearDate }: CalendarRightPanelProps) {
+export function CalendarRightPanel({ date, currentMonth, tasks, appointments, projectId, onClearDate, className }: CalendarRightPanelProps) {
     const [isCreating, setIsCreating] = useState(false)
     const [activeTab, setActiveTab] = useState<"task" | "appointment">("task")
     const { isViewer } = useUserRole()
@@ -186,7 +187,7 @@ export function CalendarRightPanel({ date, currentMonth, tasks, appointments, pr
     // --- Render ---
 
     return (
-        <div className="bg-white dark:bg-card rounded-2xl p-8 shadow-sm border border-border flex flex-col h-full gap-6">
+        <div className={cn("bg-white dark:bg-card rounded-2xl p-8 shadow-sm border border-border flex flex-col h-full gap-6", className)}>
 
             {/* Header & Add Button */}
             <div className="flex items-center justify-between shrink-0">
@@ -427,7 +428,7 @@ export function CalendarRightPanel({ date, currentMonth, tasks, appointments, pr
                 </div>
 
                 {/* Appointments Section */}
-                <div className="flex flex-col min-h-0 shrink-0 max-h-[250px] overflow-y-auto">
+                <div className="flex flex-col min-h-0 overflow-y-auto flex-1">
                     <h4 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider shrink-0 sticky top-0 bg-white dark:bg-card z-10 py-2">
                         <Pin className="w-4 h-4 rotate-12" />
                         {date ? 'Próximos Compromissos' : 'Compromissos do Mês'}

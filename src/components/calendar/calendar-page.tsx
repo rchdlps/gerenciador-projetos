@@ -58,7 +58,7 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
     })
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             {/* Left Panel: Calendar */}
             <div className="md:col-span-2 bg-white dark:bg-card rounded-2xl shadow-sm border p-8 flex flex-col">
                 <CalendarView
@@ -73,8 +73,9 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
             </div>
 
             {/* Right Panel: Day Details & Appointments */}
-            <div className="md:col-span-1 h-full flex flex-col gap-6">
-                <div className="flex-1 min-h-0 h-full">
+            {/* Wrapper to ensure height matches Left Panel in grid */}
+            <div className="md:col-span-1 relative md:h-full min-h-[500px]">
+                <div className="md:absolute md:inset-0">
                     <CalendarRightPanel
                         date={date}
                         currentMonth={currentMonth}
@@ -82,6 +83,7 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
                         appointments={appointments}
                         projectId={projectId}
                         onClearDate={() => setDate(undefined)}
+                        className="h-full"
                     />
                 </div>
             </div>
