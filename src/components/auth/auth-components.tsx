@@ -40,7 +40,7 @@ export function AuthLayout({ children, title, subtitle }: { children: React.Reac
 
                 {/* Footer */}
                 <p className="text-center text-xs text-slate-400">
-                    &copy; 2026 Secretaria de Planejamento Estratégico
+                    &copy; 2026 Secretaria de Planejamento Estratégico e Orçamento - SAETI
                 </p>
             </div>
         </div>
