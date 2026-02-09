@@ -127,6 +127,87 @@ app.put('/:projectId/:area',
     }
 )
 
+// PATCH route (alias for PUT - used by risk-view and other components)
+app.patch('/:projectId/:area',
+    zValidator('json', z.object({ content: z.string() })),
+    async (c) => {
+        const session = await getSession(c)
+        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+
+        const projectId = c.req.param('projectId')
+        const area = c.req.param('area')
+        const { content } = c.req.valid('json')
+
+        // Verify Access
+        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        if (!project) return c.json({ error: 'Project not found' }, 404)
+
+        // Fetch full user to check role
+        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+
+        // Check if user is a member of the organization
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, session.user.id),
+                eq(memberships.organizationId, project.organizationId!)
+            ))
+
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+            return c.json({ error: 'Forbidden' }, 403)
+        }
+
+        // Viewers cannot update knowledge areas
+        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+            return c.json({ error: 'Visualizadores não podem editar áreas de conhecimento' }, 403)
+        }
+
+        // Check if exists
+        const [existing] = await db.select().from(knowledgeAreas).where(
+            and(
+                eq(knowledgeAreas.projectId, projectId),
+                eq(knowledgeAreas.area, area)
+            )
+        )
+
+        if (existing) {
+            const [updated] = await db.update(knowledgeAreas)
+                .set({ content, updatedAt: new Date() })
+                .where(eq(knowledgeAreas.id, existing.id))
+                .returning()
+
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'UPDATE',
+                resource: 'knowledge_area',
+                resourceId: existing.id,
+                metadata: { area, projectId }
+            })
+
+            return c.json(updated)
+        } else {
+            const [created] = await db.insert(knowledgeAreas).values({
+                id: nanoid(),
+                projectId,
+                area,
+                content
+            }).returning()
+
+            await createAuditLog({
+                userId: session.user.id,
+                organizationId: project.organizationId,
+                action: 'CREATE',
+                resource: 'knowledge_area',
+                resourceId: created.id,
+                metadata: { area, projectId }
+            })
+
+            return c.json(created)
+        }
+    }
+)
+
 // Get Single Knowledge Area with Changes
 app.get('/:projectId/:area', async (c) => {
     const session = await getSession(c)
