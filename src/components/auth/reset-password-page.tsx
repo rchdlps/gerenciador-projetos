@@ -1,12 +1,15 @@
 import { useState } from "react"
 import { authClient } from "@/lib/auth-client"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
-import { AuthLayout, AuthInput } from "./auth-components"
+import { Loader2, ArrowLeft, Lock, CheckCircle } from "lucide-react"
+import { AuthLayout } from "@/components/layout/auth-layout"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export function ResetPasswordPage({ initialToken }: { initialToken?: string }) {
     const [isLoading, setIsLoading] = useState(false)
+    const [isSuccess, setIsSuccess] = useState(false)
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
 
@@ -15,7 +18,6 @@ export function ResetPasswordPage({ initialToken }: { initialToken?: string }) {
 
         let token = initialToken
         if (!token) {
-            // Fallback for client-side navigation if token not passed as prop
             const urlParams = new URLSearchParams(window.location.search)
             token = urlParams.get('token') || undefined
         }
@@ -46,10 +48,11 @@ export function ResetPasswordPage({ initialToken }: { initialToken?: string }) {
             if (error) {
                 toast.error(error.message)
             } else {
-                toast.success("Senha redefinida com sucesso! Redirecionando...")
+                setIsSuccess(true)
+                toast.success("Senha redefinida com sucesso!")
                 setTimeout(() => {
                     window.location.href = "/login"
-                }, 2000)
+                }, 3000)
             }
         } catch (err) {
             toast.error("Erro ao redefinir senha.")
@@ -58,39 +61,85 @@ export function ResetPasswordPage({ initialToken }: { initialToken?: string }) {
         }
     }
 
+    if (isSuccess) {
+        return (
+            <AuthLayout title="Senha Redefinida!">
+                <div className="flex flex-col items-center space-y-6 animate-in fade-in zoom-in duration-300 py-4">
+                    <div className="bg-green-100 p-4 rounded-full ring-8 ring-green-50">
+                        <CheckCircle className="w-12 h-12 text-green-600" />
+                    </div>
+
+                    <div className="text-center space-y-2">
+                        <p className="text-muted-foreground">
+                            Sua senha foi alterada com segurança. Você já pode acessar sua conta.
+                        </p>
+                    </div>
+
+                    <Button
+                        className="w-full h-11 text-base shadow-lg shadow-primary/20 mt-2"
+                        onClick={() => window.location.href = '/login'}
+                    >
+                        Ir para o Login
+                    </Button>
+                </div>
+            </AuthLayout>
+        )
+    }
+
     return (
         <AuthLayout
             title="Redefinir Senha"
-            subtitle="Crie uma nova senha segura para sua conta."
         >
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <AuthInput
-                    id="password"
-                    name="password"
-                    type="password"
-                    label="Nova Senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo de 8 caracteres"
-                    required
-                    minLength={8}
-                />
+            <div className="text-center mb-6">
+                <p className="text-sm text-muted-foreground">
+                    Crie uma nova senha segura para sua conta.
+                </p>
+            </div>
 
-                <AuthInput
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    label="Confirmar Senha"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repita a nova senha"
-                    required
-                    minLength={8}
-                />
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="password">Nova Senha</Label>
+                    <div className="relative">
+                        <Input
+                            id="password"
+                            type="password"
+                            placeholder="Mínimo de 8 caracteres"
+                            className="pl-10 h-11"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            disabled={isLoading}
+                        />
+                        <div className="absolute left-3 top-3 text-muted-foreground">
+                            <Lock className="h-4 w-4" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                    <div className="relative">
+                        <Input
+                            id="confirmPassword"
+                            type="password"
+                            placeholder="Repita a nova senha"
+                            className="pl-10 h-11"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                            minLength={8}
+                            disabled={isLoading}
+                        />
+                        <div className="absolute left-3 top-3 text-muted-foreground">
+                            <Lock className="h-4 w-4" />
+                        </div>
+                    </div>
+                </div>
 
                 <Button
                     type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all duration-200 mt-2"
+                    className="w-full h-11 text-base shadow-lg shadow-primary/20 mt-2"
                     disabled={isLoading}
                 >
                     {isLoading ? (
@@ -102,6 +151,16 @@ export function ResetPasswordPage({ initialToken }: { initialToken?: string }) {
                         "Confirmar Nova Senha"
                     )}
                 </Button>
+
+                <div className="text-center pt-2">
+                    <a
+                        href="/login"
+                        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-1" />
+                        Voltar para o Login
+                    </a>
+                </div>
             </form>
         </AuthLayout>
     )
