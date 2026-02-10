@@ -1,12 +1,15 @@
-import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug, Users } from "lucide-react"
+import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug, Users, Bell, Megaphone } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"
 import { OrgSwitcher } from "./org-switcher"
+import { useActiveOrgOptional } from "@/contexts/org-context"
 
 export function Sidebar({ user, initialPath }: { user?: any, initialPath?: string }) {
     const [currentPath, setCurrentPath] = useState(initialPath || "")
     const { data: session } = authClient.useSession()
+    const orgContext = useActiveOrgOptional()
+    const activeOrg = orgContext?.activeOrg
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -68,6 +71,10 @@ export function Sidebar({ user, initialPath }: { user?: any, initialPath?: strin
                             <Users className={cn("w-4 h-4 group-hover:text-primary", isActive("/members") ? "text-primary" : "text-muted-foreground")} />
                             Membros
                         </a>
+                        <a href="/notifications" className={getLinkClass(isActive("/notifications"))}>
+                            <Bell className={cn("w-4 h-4 group-hover:text-primary", isActive("/notifications") ? "text-primary" : "text-muted-foreground")} />
+                            Notificações
+                        </a>
                     </div>
                 </div>
 
@@ -101,20 +108,28 @@ export function Sidebar({ user, initialPath }: { user?: any, initialPath?: strin
                 )}
 
 
-                {/* Admin Section - Only visible to super_admin */}
-                {isSuperAdmin && (
+                {/* Admin Section - Visible to super_admin or organization admins (secretario) */}
+                {(isSuperAdmin || activeOrg?.role === 'secretario') && (
                     <div>
                         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
                             Administração
                         </h3>
                         <div className="space-y-1">
-                            <a href="/admin" className={getLinkClass(currentPath === "/admin")}>
-                                <Building2 className={cn("w-4 h-4 group-hover:text-primary", currentPath === "/admin" ? "text-primary" : "text-muted-foreground")} />
-                                Gestão de Secretarias
-                            </a>
-                            <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
-                                <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
-                                Gerenciar Usuários
+                            {isSuperAdmin && (
+                                <>
+                                    <a href="/admin" className={getLinkClass(currentPath === "/admin")}>
+                                        <Building2 className={cn("w-4 h-4 group-hover:text-primary", currentPath === "/admin" ? "text-primary" : "text-muted-foreground")} />
+                                        Gestão de Secretarias
+                                    </a>
+                                    <a href="/admin/users" className={getLinkClass(currentPath.startsWith("/admin/users"))}>
+                                        <Settings className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/users") ? "text-primary" : "text-muted-foreground")} />
+                                        Gerenciar Usuários
+                                    </a>
+                                </>
+                            )}
+                            <a href="/admin/notifications" className={getLinkClass(currentPath.startsWith("/admin/notifications"))}>
+                                <Megaphone className={cn("w-4 h-4 group-hover:text-primary", currentPath.startsWith("/admin/notifications") ? "text-primary" : "text-muted-foreground")} />
+                                Notificações
                             </a>
                         </div>
                     </div>

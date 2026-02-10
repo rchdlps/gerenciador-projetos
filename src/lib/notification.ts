@@ -1,26 +1,16 @@
 import { nanoid } from "nanoid";
 import { db } from "./db";
 import { notifications, users } from "../../db/schema";
-import { eq, and, desc, sql, lt } from "drizzle-orm";
+import { eq, and, desc, sql, lt, or, ilike, type SQL } from "drizzle-orm";
 import { inngest } from "./inngest/client";
+import type {
+    NotificationType,
+    NotificationData,
+    CreateNotificationInput,
+    NotificationFilter
+} from "./notification-types";
 
-export type NotificationType = "activity" | "system";
-
-export type NotificationData = {
-    projectId?: string;
-    taskId?: string;
-    phaseId?: string;
-    link?: string;
-    [key: string]: unknown;
-};
-
-export type CreateNotificationInput = {
-    userId: string;
-    type: NotificationType;
-    title: string;
-    message: string;
-    data?: NotificationData;
-};
+export type { NotificationType, NotificationData, CreateNotificationInput, NotificationFilter };
 
 /**
  * Emit a notification event to Inngest queue
@@ -97,17 +87,65 @@ export async function getUnreadCount(userId: string): Promise<number> {
     return result[0]?.count ?? 0;
 }
 
+
 /**
- * Get all notifications for a user (paginated)
+ * Get all notifications for a user (paginated) with filters
  */
-export async function getNotifications(userId: string, limit = 50, offset = 0) {
-    return db
+export async function getNotifications(
+    userId: string,
+    limit = 50,
+    offset = 0,
+    filters?: NotificationFilter
+) {
+    const conditions: SQL<unknown>[] = [eq(notifications.userId, userId)];
+
+    if (filters) {
+        if (filters.status === "unread") {
+            conditions.push(eq(notifications.isRead, false));
+        } else if (filters.status === "read") {
+            conditions.push(eq(notifications.isRead, true));
+        }
+
+        if (filters.type && filters.type !== "all") {
+            conditions.push(eq(notifications.type, filters.type));
+        }
+
+        if (filters.search) {
+            conditions.push(
+                or(
+                    ilike(notifications.title, `%${filters.search}%`),
+                    ilike(notifications.message, `%${filters.search}%`)
+                ) as SQL<unknown>
+            );
+        }
+
+        if (filters.startDate) {
+            conditions.push(sql`${notifications.createdAt} >= ${filters.startDate}`);
+        }
+
+        if (filters.endDate) {
+            conditions.push(sql`${notifications.createdAt} <= ${filters.endDate}`);
+        }
+    }
+
+    const data = await db
         .select()
         .from(notifications)
-        .where(eq(notifications.userId, userId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(notifications.createdAt))
         .limit(limit)
         .offset(offset);
+
+    // Get total count for pagination
+    const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(notifications)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return {
+        items: data,
+        total: countResult[0]?.count ?? 0
+    };
 }
 
 /**

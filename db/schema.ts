@@ -429,5 +429,8 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     }),
 }));
 
+// Export admin notification schemas
+export * from "./admin-notifications";
+
 // Re-export notifications schema
 export * from './notifications';

@@ -24,15 +24,26 @@ notificationsRouter.get("/", async (c) => {
     const limit = parseInt(c.req.query("limit") || "50");
     const offset = parseInt(c.req.query("offset") || "0");
 
-    const items = await getNotifications(user.id, limit, offset);
+    const items = await getNotifications(user.id, limit, offset, {
+        status: (c.req.query("status") as any) || "all",
+        type: (c.req.query("type") as any) || "all",
+        search: c.req.query("search"),
+        startDate: c.req.query("from") ? new Date(c.req.query("from")!) : undefined,
+        endDate: c.req.query("to") ? new Date(c.req.query("to")!) : undefined,
+    });
 
     // Parse JSON data field for each notification
-    const parsed = items.map((n) => ({
+    const parsed = items.items.map((n) => ({
         ...n,
         data: n.data ? JSON.parse(n.data) : null,
     }));
 
-    return c.json({ notifications: parsed });
+    return c.json({
+        notifications: parsed,
+        total: items.total,
+        limit,
+        offset
+    });
 });
 
 /**
