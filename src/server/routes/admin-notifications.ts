@@ -64,8 +64,24 @@ adminNotificationsRouter.use("*", requireNotificationPermission);
  * Helper to get user context and validate permissions
  */
 async function getUserContext(userId: string, orgId?: string | null) {
+    // If no orgId, check if they are actually a super admin globally
     if (!orgId) {
-        return { role: "super_admin", orgId: null };
+        // We need to fetch the user to check global role if not passed, 
+        // but typically this helper is used where we might trust the caller's context?
+        // Actually, the route handler `c.get('user')` has the user with globalRole.
+        // But this helper only takes userId. 
+        // Let's safe guard: strictly return 'viewer' if not orgId, unless we verify super_admin.
+        // Since we can't easily verify super_admin here without extra DB call or passing user obj,
+        // and the middleware already checked global permissions for the *route* access,
+        // we should be careful. 
+        // However, for API safety, let's do a quick DB check or require passing the user object.
+        // Refactoring to take the user object is better.
+
+        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (user?.globalRole === "super_admin") {
+            return { role: "super_admin", orgId: null };
+        }
+        return { role: "viewer", orgId: null };
     }
 
     const membership = await db
@@ -285,6 +301,9 @@ adminNotificationsRouter.get("/targets", async (c) => {
     // Validate permission and get context
     const context = await getUserContext(user.id, orgId);
 
+    console.log(`[TargetSearch] User: ${user.id}, Org: ${orgId}, Role: ${context.role}, ContextOrg: ${context.orgId}`);
+    console.log(`[TargetSearch] Query: "${query}", Type: "${type}"`);
+
     if (context.role !== "super_admin" && !context.orgId) {
         return c.json({ error: "Organization context required" }, 403);
     }
@@ -331,6 +350,7 @@ adminNotificationsRouter.get("/targets", async (c) => {
                 )
                 .limit(limit);
 
+            console.log(`[TargetSearch] Found ${results.length} users in org ${context.orgId}`);
             return c.json({ users: results });
         }
 
@@ -341,6 +361,7 @@ adminNotificationsRouter.get("/targets", async (c) => {
             .where(and(...conditions))
             .limit(limit);
 
+        console.log(`[TargetSearch] Found ${results.length} users (Super Admin)`);
         return c.json({ users: results });
 
     } else if (type === "organization") {

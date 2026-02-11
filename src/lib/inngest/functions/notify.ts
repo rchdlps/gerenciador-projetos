@@ -19,16 +19,20 @@ export const handleActivityNotification = inngest.createFunction(
     { id: "notification-activity" },
     { event: "notification/activity" },
     async ({ event }) => {
-        const { userId, title, message, data } = event.data;
+        const { userId, title, message, data, notificationId: existingId } = event.data;
 
-        // Store in database
-        const notificationId = await storeNotification({
-            userId,
-            type: "activity",
-            title,
-            message,
-            data: data as Record<string, unknown> | undefined,
-        });
+        let notificationId = existingId;
+
+        // If no ID provided (legacy event or direct call), store in DB
+        if (!notificationId) {
+            notificationId = await storeNotification({
+                userId,
+                type: "activity",
+                title,
+                message,
+                data: data as Record<string, unknown> | undefined,
+            });
+        }
 
         // Push real-time notification via Pusher
         await pushNotification(userId, {

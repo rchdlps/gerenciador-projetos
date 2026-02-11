@@ -128,6 +128,12 @@ export function NotificationComposer({
                     : `Notificação enviada para ${data.sentCount} usuários!`,
             });
 
+            // Trigger updates in other components
+            window.dispatchEvent(new CustomEvent("notification:updated"));
+
+            // Scroll to top to show success message
+            window.scrollTo({ top: 0, behavior: "smooth" });
+
             form.reset();
             setPreviewOpen(false);
             if (onSuccess) onSuccess();

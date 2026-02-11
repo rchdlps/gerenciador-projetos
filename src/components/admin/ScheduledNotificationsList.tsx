@@ -60,6 +60,14 @@ export function ScheduledNotificationsList() {
 
     useEffect(() => {
         fetchScheduled();
+
+        // Listen for updates
+        const handleUpdate = () => fetchScheduled();
+        window.addEventListener("notification:updated", handleUpdate);
+
+        return () => {
+            window.removeEventListener("notification:updated", handleUpdate);
+        };
     }, []);
 
     const handleCancel = async () => {

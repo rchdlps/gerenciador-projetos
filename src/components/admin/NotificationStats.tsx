@@ -52,6 +52,14 @@ export function NotificationStats() {
         };
 
         fetchStats();
+
+        // Listen for updates
+        const handleUpdate = () => fetchStats();
+        window.addEventListener("notification:updated", handleUpdate);
+
+        return () => {
+            window.removeEventListener("notification:updated", handleUpdate);
+        };
     }, []);
 
     if (isLoading) {

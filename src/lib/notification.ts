@@ -9,6 +9,7 @@ import type {
     CreateNotificationInput,
     NotificationFilter
 } from "./notification-types";
+import { pushNotification } from "./pusher";
 
 export type { NotificationType, NotificationData, CreateNotificationInput, NotificationFilter };
 
@@ -17,6 +18,20 @@ export type { NotificationType, NotificationData, CreateNotificationInput, Notif
  * This is the primary way to create notifications - fire and forget
  */
 export async function emitNotification(input: CreateNotificationInput) {
+    // Store in DB immediately for reliability
+    const notificationId = await storeNotification(input);
+
+    // Send to Pusher immediately for real-time feedback (catch errors to not block)
+    pushNotification(input.userId, {
+        id: notificationId,
+        type: input.type,
+        title: input.title,
+        message: input.message,
+        data: input.data,
+        createdAt: new Date().toISOString(),
+    }).catch(err => console.error("Failed to push notification:", err));
+
+    // Send to Inngest for side-effects (Email, Analytics, etc.)
     await inngest.send({
         name: "notification/activity",
         data: {
@@ -24,6 +39,7 @@ export async function emitNotification(input: CreateNotificationInput) {
             title: input.title,
             message: input.message,
             data: input.data,
+            notificationId, // Pass the ID so handler knows it's already stored
         },
     });
 }

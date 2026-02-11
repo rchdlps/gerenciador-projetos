@@ -138,6 +138,7 @@ export async function sendImmediateNotification(input: SendNotificationInput): P
     const userIds = await getTargetUsers(input.targetType, input.targetIds, input.organizationId);
 
     if (userIds.length === 0) {
+        console.warn("[Notification] No users found for target");
         throw new Error("No users found for the specified target");
     }
 
@@ -154,7 +155,10 @@ export async function sendImmediateNotification(input: SendNotificationInput): P
                 type: input.type,
                 title: input.title,
                 message: input.message,
-                data: input.link ? { link: input.link, priority: input.priority } : undefined,
+                data: {
+                    link: input.link || undefined,
+                    priority: input.priority || "normal"
+                },
             });
             sentCount++;
         } catch (error) {

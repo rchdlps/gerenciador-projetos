@@ -64,7 +64,12 @@ export function TargetSelector({
 
         setIsSearching(true);
         try {
-            const res = await fetch(`/api/admin/notifications/targets?type=${type}&q=${encodeURIComponent(query)}`);
+            const queryParams = new URLSearchParams({
+                type,
+                q: query,
+                ...(organizationId && { orgId: organizationId }),
+            });
+            const res = await fetch(`/api/admin/notifications/targets?${queryParams}`);
             const data = await res.json();
             setSearchResults(type === "user" ? data.users : data.organizations);
         } catch (error) {
@@ -94,7 +99,16 @@ export function TargetSelector({
         <div className="space-y-4">
             <Label className="text-base font-semibold">Enviar para</Label>
 
-            <RadioGroup value={targetType} onValueChange={(value) => onTargetTypeChange(value as TargetType)}>
+            <RadioGroup
+                value={targetType}
+                onValueChange={(value) => {
+                    const newType = value as TargetType;
+                    onTargetTypeChange(newType);
+                    // Clear selections when type changes
+                    setSelectedItems([]);
+                    onTargetIdsChange([]);
+                }}
+            >
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="user" id="target-user" />
                     <Label htmlFor="target-user" className="cursor-pointer font-normal">
@@ -146,7 +160,7 @@ export function TargetSelector({
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[400px] p-0" align="start">
-                            <Command>
+                            <Command shouldFilter={false}>
                                 <CommandInput
                                     placeholder={targetType === "user" ? "Nome ou email..." : "Nome da organização..."}
                                     value={searchQuery}

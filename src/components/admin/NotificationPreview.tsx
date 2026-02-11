@@ -100,7 +100,13 @@ export function NotificationPreview({
                         <div className="space-y-1">
                             <span className="text-muted-foreground">Estimativa:</span>
                             <p className="font-medium">
-                                ~{data.targetCount} usuários
+                                {data.targetType === "all"
+                                    ? "Todos os usuários"
+                                    : data.targetType === "role"
+                                        ? "Todos os gestores"
+                                        : data.targetType === "organization"
+                                            ? `${data.targetCount} organização(ões)`
+                                            : `${data.targetCount} usuários`}
                             </p>
                         </div>
                     </div>
