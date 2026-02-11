@@ -7,6 +7,7 @@ import {
     getUnreadCount,
     markAsRead,
     markAllAsRead,
+    markSelectedAsRead,
     emitSystemAnnouncement,
 } from "../../lib/notification";
 
@@ -80,6 +81,27 @@ notificationsRouter.post("/read-all", async (c) => {
 
     return c.json({ success: true });
 });
+
+/**
+ * POST /notifications/bulk-read
+ * Mark selected notifications as read
+ */
+const bulkReadSchema = z.object({
+    ids: z.array(z.string()).min(1),
+});
+
+notificationsRouter.post(
+    "/bulk-read",
+    zValidator("json", bulkReadSchema),
+    async (c) => {
+        const user = c.get("user");
+        const { ids } = c.req.valid("json");
+
+        await markSelectedAsRead(ids, user.id);
+
+        return c.json({ success: true });
+    }
+);
 
 /**
  * POST /notifications/system

@@ -4,7 +4,7 @@ import { NotificationItem } from "./NotificationItem";
 import type { NotificationFilter, NotificationType } from "@/lib/notification-types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Trash2, CheckCircle } from "lucide-react";
+import { Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type Notification = {
@@ -128,24 +128,6 @@ export function NotificationList() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Tem certeza que deseja excluir esta notificação?")) return;
-        try {
-            const res = await fetch(`/api/notifications/${id}`, { method: "DELETE" }); // Assuming this route exists or needed
-            // Actually, I haven't implemented DELETE /api/notifications/:id yet in the user routes!
-            // I only implemented GET, GET count, POST read, POST read-all.
-            // I need to add DELETE route.
-            // For now, let's assume I'll add it momentarily.
-            if (!res.ok) throw new Error();
-
-            setNotifications((prev) => prev.filter((n) => n.id !== id));
-            setTotal((prev) => prev - 1);
-            toast.success("Notificação excluída");
-        } catch {
-            toast.error("Erro ao excluir notificação");
-        }
-    };
-
     const handleBulkRead = async () => {
         try {
             await fetch("/api/notifications/read-all", { method: "POST" });
@@ -153,6 +135,29 @@ export function NotificationList() {
             toast.success("Todas marcadas como lidas");
         } catch {
             toast.error("Erro ao atualizar");
+        }
+    };
+
+    const handleMarkSelectedAsRead = async () => {
+        if (selectedIds.size === 0) return;
+        try {
+            const res = await fetch("/api/notifications/bulk-read", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selectedIds) }),
+            });
+
+            if (!res.ok) throw new Error();
+
+            setNotifications((prev) =>
+                prev.map((n) =>
+                    selectedIds.has(n.id) ? { ...n, isRead: true } : n
+                )
+            );
+            setSelectedIds(new Set());
+            toast.success(`${selectedIds.size} notificações marcadas como lidas`);
+        } catch {
+            toast.error("Erro ao atualizar notificações selecionadas");
         }
     };
 
@@ -170,14 +175,6 @@ export function NotificationList() {
         } else {
             setSelectedIds(new Set(notifications.map(n => n.id)));
         }
-    };
-
-    // Bulk Delete (Not implemented in backend yet, but UI ready)
-    const handleBulkDelete = async () => {
-        if (!confirm(`Excluir ${selectedIds.size} notificações?`)) return;
-        // Implementation pending backend support for bulk delete by IDs
-        // For now, standard "Mark all read" is supported.
-        toast.info("Funcionalidade em breve");
     };
 
     return (
@@ -200,8 +197,9 @@ export function NotificationList() {
                         <span>{selectedIds.size} selecionadas</span>
                         <div className="flex gap-2">
                             <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Cancelar</Button>
-                            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                            <Button variant="outline" size="sm" onClick={handleMarkSelectedAsRead}>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Marcar como lidas
                             </Button>
                         </div>
                     </div>
@@ -219,7 +217,6 @@ export function NotificationList() {
                             key={notification.id}
                             notification={notification}
                             onMarkAsRead={handleMarkAsRead}
-                            onDelete={handleDelete}
                             selected={selectedIds.has(notification.id)}
                             onSelectedChange={() => toggleSelection(notification.id)}
                         />

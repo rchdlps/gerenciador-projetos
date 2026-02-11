@@ -5,7 +5,6 @@ import {
     Bell,
     Info,
     AlertTriangle,
-    Trash2,
     Check,
     MoreHorizontal
 } from "lucide-react";
@@ -32,7 +31,6 @@ export type NotificationItemProps = {
         data?: any;
     };
     onMarkAsRead: (id: string) => void;
-    onDelete: (id: string) => void;
     selected?: boolean;
     onSelectedChange?: (selected: boolean) => void;
 };
@@ -40,7 +38,6 @@ export type NotificationItemProps = {
 export function NotificationItem({
     notification,
     onMarkAsRead,
-    onDelete,
     selected = false,
     onSelectedChange,
 }: NotificationItemProps) {
@@ -146,13 +143,6 @@ export function NotificationItem({
                             Marcar como lida
                         </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem
-                        onClick={() => onDelete(notification.id)}
-                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                    >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

@@ -2,7 +2,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, Calendar, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,10 +18,9 @@ type NotificationDetailsProps = {
         createdAt: string | Date;
         data?: any;
     };
-    onDelete?: (id: string) => void;
 };
 
-export function NotificationDetails({ notification, onDelete }: NotificationDetailsProps) {
+export function NotificationDetails({ notification }: NotificationDetailsProps) {
     const handleBack = () => {
         window.history.back();
     };
@@ -44,23 +43,6 @@ export function NotificationDetails({ notification, onDelete }: NotificationDeta
         if (priority === "urgent") return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300";
         if (priority === "high") return "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300";
         return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300";
-    };
-
-    const handleDelete = async () => {
-        if (!confirm("Tem certeza que deseja excluir esta notificação?")) return;
-
-        if (onDelete) {
-            onDelete(notification.id);
-        } else {
-            try {
-                const res = await fetch(`/api/notifications/${notification.id}`, { method: "DELETE" });
-                if (res.ok) {
-                    window.location.href = "/notifications";
-                }
-            } catch (error) {
-                console.error("Failed to delete notification", error);
-            }
-        }
     };
 
     return (
@@ -139,12 +121,7 @@ export function NotificationDetails({ notification, onDelete }: NotificationDeta
                         </div>
                     )}
                 </CardContent>
-                <CardFooter className="justify-end border-t pt-6">
-                    <Button variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir Notificação
-                    </Button>
-                </CardFooter>
+                <CardFooter className="justify-end border-t pt-6" />
             </Card>
         </div>
     );

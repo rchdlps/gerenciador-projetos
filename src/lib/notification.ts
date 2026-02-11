@@ -191,6 +191,21 @@ export async function markAllAsRead(userId: string) {
 }
 
 /**
+ * Mark selected notifications as read for a user
+ */
+export async function markSelectedAsRead(notificationIds: string[], userId: string) {
+    if (notificationIds.length === 0) return;
+
+    await db
+        .update(notifications)
+        .set({ isRead: true })
+        .where(and(
+            eq(notifications.userId, userId),
+            sql`${notifications.id} IN (${sql.join(notificationIds.map(id => sql`${id}`), sql`, `)})`
+        ));
+}
+
+/**
  * Get notifications for daily digest that haven't been emailed yet
  */
 export async function getDigestItems(userId: string, since: Date) {
