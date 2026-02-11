@@ -240,3 +240,19 @@ export async function deleteOldNotifications(olderThanDays = 90) {
         .delete(notifications)
         .where(lt(notifications.createdAt, cutoff));
 }
+
+/**
+ * Get a single notification by ID
+ */
+export async function getNotificationById(notificationId: string, userId: string) {
+    const result = await db
+        .select()
+        .from(notifications)
+        .where(and(
+            eq(notifications.id, notificationId),
+            eq(notifications.userId, userId)
+        ))
+        .limit(1);
+
+    return result[0] || null;
+}

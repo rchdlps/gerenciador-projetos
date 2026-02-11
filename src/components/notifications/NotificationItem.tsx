@@ -1,3 +1,4 @@
+import * as React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,14 +33,31 @@ export type NotificationItemProps = {
     };
     onMarkAsRead: (id: string) => void;
     onDelete: (id: string) => void;
+    selected?: boolean;
+    onSelectedChange?: (selected: boolean) => void;
 };
 
 export function NotificationItem({
     notification,
     onMarkAsRead,
     onDelete,
+    selected = false,
+    onSelectedChange,
 }: NotificationItemProps) {
     const isUnread = !notification.isRead;
+
+    const parsedData = React.useMemo(() => {
+        if (!notification.data) return null;
+        if (typeof notification.data === 'string') {
+            try {
+                return JSON.parse(notification.data);
+            } catch (e) {
+                console.error("Failed to parse notification data", e);
+                return null;
+            }
+        }
+        return notification.data;
+    }, [notification.data]);
 
     const getIcon = () => {
         if (notification.type === "system") return <Info className="h-5 w-5 text-blue-500" />;
@@ -48,7 +67,7 @@ export function NotificationItem({
 
     const getPriorityColor = () => {
         // Assuming data.priority exists if it's a scheduled notification or similar
-        const priority = notification.data?.priority;
+        const priority = parsedData?.priority;
         if (priority === "urgent") return "bg-red-100 text-red-800 border-red-200";
         if (priority === "high") return "bg-orange-100 text-orange-800 border-orange-200";
         return "";
@@ -57,26 +76,38 @@ export function NotificationItem({
     return (
         <div
             className={cn(
-                "flex items-start gap-4 p-4 border-b transition-colors hover:bg-muted/50",
-                isUnread && "bg-blue-50/50 dark:bg-blue-950/10"
+                "flex items-start gap-4 p-4 border-b transition-colors hover:bg-muted/50 group relative",
+                isUnread && "bg-blue-50/50 dark:bg-blue-950/10",
+                selected && "bg-muted shadow-[inset_4px_0_0_0_theme(colors.primary.DEFAULT)]"
             )}
         >
+            {onSelectedChange && (
+                <div className={cn(
+                    "mt-1 flex-shrink-0 transition-opacity",
+                    selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}>
+                    <Checkbox
+                        checked={selected}
+                        onCheckedChange={(checked) => onSelectedChange(!!checked)}
+                    />
+                </div>
+            )}
             <div className="mt-1 flex-shrink-0">{getIcon()}</div>
 
             <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <h4 className={cn("text-sm font-semibold", isUnread && "text-foreground")}>
+                        <a href={`/notifications/${notification.id}`} className={cn("text-sm font-semibold hover:underline decoration-1 underline-offset-2", isUnread && "text-foreground")}>
                             {notification.title}
-                        </h4>
+                        </a>
                         {isUnread && (
                             <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
                                 Nova
                             </Badge>
                         )}
-                        {notification.data?.priority && (
+                        {parsedData?.priority && (
                             <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", getPriorityColor())}>
-                                {notification.data.priority === 'urgent' ? 'Urgente' : 'Alta'}
+                                {parsedData.priority === 'urgent' ? 'Urgente' : 'Alta'}
                             </Badge>
                         )}
                     </div>
@@ -88,14 +119,14 @@ export function NotificationItem({
                     </span>
                 </div>
 
-                <p className="text-sm text-muted-foreground line-clamp-2">
+                <a href={`/notifications/${notification.id}`} className="block text-sm text-muted-foreground line-clamp-2 hover:text-foreground transition-colors">
                     {notification.message}
-                </p>
+                </a>
 
-                {notification.data?.link && (
+                {parsedData?.link && (
                     <div className="pt-2">
                         <Button variant="link" className="h-auto p-0 text-xs" asChild>
-                            <a href={notification.data.link}>Ver detalhes →</a>
+                            <a href={parsedData.link}>Acessar link externo →</a>
                         </Button>
                     </div>
                 )}

@@ -215,21 +215,14 @@ export function NotificationList() {
                     </div>
                 ) : (
                     notifications.map((notification) => (
-                        <div key={notification.id} className="relative group">
-                            <div className="absolute left-2 top-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Checkbox
-                                    checked={selectedIds.has(notification.id)}
-                                    onCheckedChange={() => toggleSelection(notification.id)}
-                                />
-                            </div>
-                            <div className={selectedIds.has(notification.id) ? "bg-muted" : ""}>
-                                <NotificationItem
-                                    notification={notification}
-                                    onMarkAsRead={handleMarkAsRead}
-                                    onDelete={handleDelete}
-                                />
-                            </div>
-                        </div>
+                        <NotificationItem
+                            key={notification.id}
+                            notification={notification}
+                            onMarkAsRead={handleMarkAsRead}
+                            onDelete={handleDelete}
+                            selected={selectedIds.has(notification.id)}
+                            onSelectedChange={() => toggleSelection(notification.id)}
+                        />
                     ))
                 )}
             </div>
