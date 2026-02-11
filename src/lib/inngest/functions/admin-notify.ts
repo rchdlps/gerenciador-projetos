@@ -8,20 +8,22 @@ import { processPendingScheduledNotifications } from "@/lib/admin-notifications"
 export const processScheduledNotifications = inngest.createFunction(
     { id: "process-scheduled-notifications" },
     { cron: "*/5 * * * *" }, // Every 5 minutes
-    async () => {
-        console.log("[Inngest] Processing scheduled notifications...");
+    async ({ step }) => {
+        console.log("[Inngest] Starting scheduled notification sweep...");
 
-        const result = await processPendingScheduledNotifications();
+        const result = await step.run("process-batch", async () => {
+            return await processPendingScheduledNotifications(50);
+        });
 
         console.log(
-            `[Inngest] Processed ${result.processed} scheduled notifications, ${result.failed} failed`
+            `[Inngest] Cycle complete. Processed: ${result.processed}, Failed: ${result.failed}, Remaining: ${result.remaining}`
         );
 
-        return {
-            success: true,
-            processed: result.processed,
-            failed: result.failed,
-        };
+        if (result.remaining > 0) {
+            console.log(`[Inngest] More notifications are pending (${result.remaining}). They will be picked up in the next cycle.`);
+        }
+
+        return result;
     }
 );
 

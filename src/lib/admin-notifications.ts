@@ -274,30 +274,36 @@ export async function getDeliveryStats(sendLogId: string) {
 /**
  * Process pending scheduled notifications (called by cron)
  */
-export async function processPendingScheduledNotifications(): Promise<{
+export async function processPendingScheduledNotifications(limit = 50): Promise<{
     processed: number;
     failed: number;
+    remaining: number;
 }> {
     const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    // Get all pending notifications that should have been sent
+    // Get all pending notifications that should have been sent already
+    // We don't use a lookback window anymore to ensure we never skip a notification
+    // if the cron job fails or is delayed.
     const pending = await db
         .select()
         .from(scheduledNotifications)
         .where(
             and(
                 eq(scheduledNotifications.status, "pending"),
-                gte(scheduledNotifications.scheduledFor, fiveMinutesAgo),
-                lt(scheduledNotifications.scheduledFor, now)
+                sql`${scheduledNotifications.scheduledFor} <= ${now}`
             )
-        );
+        )
+        .limit(limit);
 
     let processed = 0;
     let failed = 0;
 
+    console.log(`[ScheduledNotifications] Found ${pending.length} notifications to process`);
+
     for (const scheduled of pending) {
         try {
+            console.log(`[ScheduledNotifications] Processing ${scheduled.id}: "${scheduled.title}"`);
+
             await sendImmediateNotification({
                 creatorId: scheduled.creatorId,
                 organizationId: scheduled.organizationId,
@@ -319,19 +325,35 @@ export async function processPendingScheduledNotifications(): Promise<{
             processed++;
         } catch (error) {
             // Mark as failed
+            const failureReason = error instanceof Error ? error.message : "Unknown error";
             await db
                 .update(scheduledNotifications)
                 .set({
                     status: "failed",
-                    failureReason: error instanceof Error ? error.message : "Unknown error",
+                    failureReason,
                     updatedAt: new Date(),
                 })
                 .where(eq(scheduledNotifications.id, scheduled.id));
 
             failed++;
-            console.error(`Failed to process scheduled notification ${scheduled.id}:`, error);
+            console.error(`[ScheduledNotifications] Failed to process ${scheduled.id}:`, failureReason);
         }
     }
 
-    return { processed, failed };
+    // Check if there are more
+    const remainingCount = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(scheduledNotifications)
+        .where(
+            and(
+                eq(scheduledNotifications.status, "pending"),
+                sql`${scheduledNotifications.scheduledFor} <= ${now}`
+            )
+        );
+
+    return {
+        processed,
+        failed,
+        remaining: Number(remainingCount[0]?.count || 0)
+    };
 }
