@@ -23,7 +23,7 @@ export const handleActivityNotification = inngest.createFunction(
 
         let notificationId = existingId;
 
-        // If no ID provided (legacy event or direct call), store in DB
+        // If no ID provided (legacy event or direct call), store in DB and push real-time
         if (!notificationId) {
             notificationId = await storeNotification({
                 userId,
@@ -32,17 +32,18 @@ export const handleActivityNotification = inngest.createFunction(
                 message,
                 data: data as Record<string, unknown> | undefined,
             });
-        }
 
-        // Push real-time notification via Pusher
-        await pushNotification(userId, {
-            id: notificationId,
-            type: "activity",
-            title,
-            message,
-            data,
-            createdAt: new Date().toISOString(),
-        });
+            // Only push via Pusher here when we're the ones storing — when emitNotification()
+            // is the caller it already pushed directly before sending this event.
+            await pushNotification(userId, {
+                id: notificationId,
+                type: "activity",
+                title,
+                message,
+                data,
+                createdAt: new Date().toISOString(),
+            });
+        }
 
         return { success: true, notificationId };
     }

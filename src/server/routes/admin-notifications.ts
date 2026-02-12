@@ -10,10 +10,10 @@ import {
     updateScheduledNotification,
     getSendHistory,
     getDeliveryStats,
-    getTargetUsers,
+    processPendingScheduledNotifications,
 } from "@/lib/admin-notifications";
 import { db } from "@/lib/db";
-import { users, organizations, memberships } from "../../../db/schema";
+import { users, organizations, memberships } from "../../../db/schema"; // organizations used in /targets org search
 import { eq, or, and, ilike } from "drizzle-orm";
 
 const adminNotificationsRouter = new Hono<{ Variables: AuthVariables }>();
@@ -230,7 +230,7 @@ adminNotificationsRouter.patch("/scheduled/:id", zValidator("json", updateSchema
     const body = c.req.valid("json");
 
     try {
-        await updateScheduledNotification(user.id, id, {
+        await updateScheduledNotification(id, user.id, {
             ...body,
             scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : undefined,
         });
@@ -272,6 +272,28 @@ adminNotificationsRouter.get("/history", async (c) => {
 });
 
 /**
+ * POST /admin/notifications/process-now
+ * Manually trigger processing of all pending scheduled notifications.
+ * Bypasses the Inngest cron — useful when the cron is unavailable (local dev,
+ * first deploy, or Inngest cloud not yet synced with the app URL).
+ * Restricted to super_admin only.
+ */
+adminNotificationsRouter.post("/process-now", async (c) => {
+    const user = c.get("user");
+
+    if (user.globalRole !== "super_admin") {
+        return c.json({ error: "Forbidden: super_admin only" }, 403);
+    }
+
+    try {
+        const result = await processPendingScheduledNotifications(100);
+        return c.json({ success: true, ...result });
+    } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : "Processing failed" }, 500);
+    }
+});
+
+/**
  * GET /admin/notifications/stats/:id
  * Get delivery stats for a send log
  */
@@ -301,47 +323,17 @@ adminNotificationsRouter.get("/targets", async (c) => {
     // Validate permission and get context
     const context = await getUserContext(user.id, orgId);
 
-    console.log(`[TargetSearch] User: ${user.id}, Org: ${orgId}, Role: ${context.role}, ContextOrg: ${context.orgId}`);
-    console.log(`[TargetSearch] Query: "${query}", Type: "${type}"`);
-
     if (context.role !== "super_admin" && !context.orgId) {
         return c.json({ error: "Organization context required" }, 403);
     }
 
     if (type === "user") {
-        let queryBuilder = db
-            .select({ id: users.id, name: users.name, email: users.email })
-            .from(users);
-
-        const conditions = [
-            or(ilike(users.name, `%${query}%`), ilike(users.email, `%${query}%`))
-        ];
-
-        // If not super admin, filter users by organization membership
+        // If not super admin, filter users by organization membership via join
         if (context.role !== "super_admin") {
-            // We need to join with memberships to filter by org
-            // Note: This is a bit complex with Drizzle's query builder in this structure
-            // Easier way: Get all userIDs in org first (if org is small) or use a subquery
-
-            // Let's use a subquery approach or join if generic enough
-            // For now, let's just use raw SQL or a simpler two-step for safety
-            const orgMembers = await db
-                .select({ userId: memberships.userId })
-                .from(memberships)
-                .where(eq(memberships.organizationId, context.orgId!));
-
-            const memberIds = orgMembers.map(m => m.userId);
-
-            if (memberIds.length === 0) return c.json({ users: [] });
-
-            // Add restriction
-            // conditions.push(inArray(users.id, memberIds)); -> import inArray
-            // To avoid large IN clauses, let's rewrite the query structure slightly
-
             const results = await db
                 .select({ id: users.id, name: users.name, email: users.email })
                 .from(users)
-                .innerJoin(memberships, eq(users.id, memberships.userId)) // Join to filter
+                .innerJoin(memberships, eq(users.id, memberships.userId))
                 .where(
                     and(
                         eq(memberships.organizationId, context.orgId!),
@@ -350,18 +342,16 @@ adminNotificationsRouter.get("/targets", async (c) => {
                 )
                 .limit(limit);
 
-            console.log(`[TargetSearch] Found ${results.length} users in org ${context.orgId}`);
             return c.json({ users: results });
         }
 
-        // Super admin search
+        // Super admin: search all users
         const results = await db
             .select({ id: users.id, name: users.name, email: users.email })
             .from(users)
-            .where(and(...conditions))
+            .where(or(ilike(users.name, `%${query}%`), ilike(users.email, `%${query}%`)))
             .limit(limit);
 
-        console.log(`[TargetSearch] Found ${results.length} users (Super Admin)`);
         return c.json({ users: results });
 
     } else if (type === "organization") {

@@ -24,14 +24,14 @@ export const scheduledNotifications = pgTable("scheduled_notifications", {
     link: text("link"), // optional action link
 
     // Scheduling
-    scheduledFor: timestamp("scheduled_for").notNull(),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
     status: text("status").notNull().default('pending'), // 'pending', 'sent', 'cancelled', 'failed'
-    sentAt: timestamp("sent_at"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
     failureReason: text("failure_reason"),
 
     // Metadata
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
     statusScheduledIdx: index('scheduled_notif_status_scheduled_idx').on(t.status, t.scheduledFor),
     creatorIdx: index('scheduled_notif_creator_idx').on(t.creatorId),

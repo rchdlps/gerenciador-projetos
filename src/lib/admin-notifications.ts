@@ -59,19 +59,19 @@ export async function getTargetUsers(
             return orgMembers.map((m) => m.userId);
 
         case "role":
-            // All users with "gestor" role
-            if (!organizationId) return [];
+            // All users with any of the roles specified in targetIds within the org
+            if (!organizationId || targetIds.length === 0) return [];
             const roleMembers = await db
                 .select({ userId: memberships.userId })
                 .from(memberships)
+                .innerJoin(users, eq(memberships.userId, users.id))
                 .where(
                     and(
                         eq(memberships.organizationId, organizationId),
-                        eq(memberships.role, "gestor"),
+                        inArray(memberships.role, targetIds as ("secretario" | "gestor" | "viewer")[]),
                         eq(users.isActive, true)
                     )
-                )
-                .innerJoin(users, eq(memberships.userId, users.id));
+                );
             return roleMembers.map((m) => m.userId);
 
         case "multi-org":
@@ -210,7 +210,13 @@ export async function cancelScheduledNotification(id: string, creatorId: string)
     await db
         .update(scheduledNotifications)
         .set({ status: "cancelled", updatedAt: new Date() })
-        .where(and(eq(scheduledNotifications.id, id), eq(scheduledNotifications.creatorId, creatorId)));
+        .where(
+            and(
+                eq(scheduledNotifications.id, id),
+                eq(scheduledNotifications.creatorId, creatorId),
+                eq(scheduledNotifications.status, "pending")
+            )
+        );
 }
 
 /**

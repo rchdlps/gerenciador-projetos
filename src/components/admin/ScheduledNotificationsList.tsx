@@ -17,7 +17,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Calendar, XCircle, Pencil } from "lucide-react";
+import { MoreHorizontal, Calendar, XCircle, Pencil, Play, Loader2 } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,9 +38,11 @@ type ScheduledNotification = {
     priority: "normal" | "high" | "urgent";
 };
 
-export function ScheduledNotificationsList() {
+export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
     const [notifications, setNotifications] = useState<ScheduledNotification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [processResult, setProcessResult] = useState<{ processed: number; failed: number } | null>(null);
     const [cancelId, setCancelId] = useState<string | null>(null);
 
     const fetchScheduled = async () => {
@@ -69,6 +71,24 @@ export function ScheduledNotificationsList() {
             window.removeEventListener("notification:updated", handleUpdate);
         };
     }, []);
+
+    const handleProcessNow = async () => {
+        setIsProcessing(true);
+        setProcessResult(null);
+        try {
+            const res = await fetch("/api/admin/notifications/process-now", { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+                setProcessResult({ processed: data.processed, failed: data.failed });
+                await fetchScheduled();
+                window.dispatchEvent(new CustomEvent("notification:updated"));
+            }
+        } catch (error) {
+            console.error("Failed to process notifications:", error);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     const handleCancel = async () => {
         if (!cancelId) return;
@@ -113,6 +133,30 @@ export function ScheduledNotificationsList() {
     }
 
     return (
+        <div className="space-y-3">
+            {isSuperAdmin && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                        {notifications.length} agendamento(s) pendente(s)
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleProcessNow}
+                        disabled={isProcessing || notifications.length === 0}
+                    >
+                        {isProcessing
+                            ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processando...</>
+                            : <><Play className="mr-2 h-4 w-4" />Processar Agora</>
+                        }
+                    </Button>
+                </div>
+            )}
+            {processResult && (
+                <p className="text-sm text-muted-foreground">
+                    Resultado: {processResult.processed} enviada(s){processResult.failed > 0 && `, ${processResult.failed} falhou`}
+                </p>
+            )}
         <div className="rounded-md border">
             <Table>
                 <TableHeader>
@@ -179,6 +223,7 @@ export function ScheduledNotificationsList() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+        </div>
         </div>
     );
 }

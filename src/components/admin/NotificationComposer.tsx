@@ -42,14 +42,24 @@ const notificationSchema = z.object({
     message: z.string().min(10, "Mensagem muito curta").max(500, "Mensagem muito longa"),
     type: z.enum(["activity", "system"]),
     priority: z.enum(["normal", "high", "urgent"]),
-    link: z.string().url("URL inválida").optional().or(z.literal("")),
+    link: z.string().optional().or(z.literal("")),
     targetType: z.enum(["user", "organization", "role", "multi-org", "all"]),
-    targetIds: z.array(z.string()).default([]),
+    targetIds: z.array(z.string()),
     isScheduled: z.boolean(),
     scheduledFor: z.date().optional(),
 });
 
-type NotificationFormValues = z.infer<typeof notificationSchema>;
+type NotificationFormValues = {
+    title: string;
+    message: string;
+    type: "activity" | "system";
+    priority: "normal" | "high" | "urgent";
+    link?: string;
+    targetType: "user" | "organization" | "role" | "multi-org" | "all";
+    targetIds: string[];
+    isScheduled: boolean;
+    scheduledFor?: Date;
+};
 
 type NotificationComposerProps = {
     organizationId?: string;
@@ -342,11 +352,12 @@ export function NotificationComposer({
                                             <div className="p-3 border-t">
                                                 <Input
                                                     type="time"
+                                                    value={field.value ? format(field.value, "HH:mm") : ""}
                                                     onChange={(e) => {
-                                                        const date = field.value || new Date();
                                                         const [hours, minutes] = e.target.value.split(":");
-                                                        date.setHours(parseInt(hours), parseInt(minutes));
-                                                        field.onChange(date);
+                                                        const base = field.value ? new Date(field.value) : new Date();
+                                                        base.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                                        field.onChange(new Date(base));
                                                     }}
                                                 />
                                             </div>

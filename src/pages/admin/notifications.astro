@@ -80,7 +80,7 @@ if (user.globalRole === "super_admin") {
 
         <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
           <h2 class="text-xl font-semibold mb-4">Notificações Agendadas</h2>
-          <ScheduledNotificationsList client:visible />
+          <ScheduledNotificationsList isSuperAdmin={user.globalRole === "super_admin"} client:visible />
         </div>
       </div>
     </div>
