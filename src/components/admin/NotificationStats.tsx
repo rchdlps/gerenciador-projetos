@@ -9,7 +9,7 @@ type Stats = {
     activeUsers: number;
 };
 
-export function NotificationStats() {
+export function NotificationStats({ organizationId }: { organizationId?: string }) {
     const [stats, setStats] = useState<Stats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -18,9 +18,10 @@ export function NotificationStats() {
         // For now, mocking or fetching individual endpoints
         const fetchStats = async () => {
             try {
+                const orgParam = organizationId ? `&orgId=${organizationId}` : '';
                 const [historyRes, scheduledRes] = await Promise.all([
-                    fetch("/api/admin/notifications/history?limit=100"),
-                    fetch("/api/admin/notifications/scheduled?status=pending"),
+                    fetch(`/api/admin/notifications/history?limit=100${orgParam}`),
+                    fetch(`/api/admin/notifications/scheduled?status=pending${orgParam}`),
                 ]);
 
                 if (historyRes.ok && scheduledRes.ok) {

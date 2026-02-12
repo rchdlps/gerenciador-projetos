@@ -45,7 +45,7 @@ const requireNotificationPermission = async (c: any, next: any) => {
                 and(
                     eq(memberships.userId, user.id),
                     eq(memberships.organizationId, orgId),
-                    or(eq(memberships.role, "secretario"), eq(memberships.role, "gestor"))
+                    eq(memberships.role, "secretario")
                 )
             )
             .limit(1);

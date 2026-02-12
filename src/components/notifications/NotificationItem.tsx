@@ -6,6 +6,7 @@ import {
     Info,
     AlertTriangle,
     Check,
+    Eye,
     MoreHorizontal
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -138,6 +139,12 @@ export function NotificationItem({
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => {
+                        window.location.href = `/notifications/${notification.id}`;
+                    }}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Ver detalhes
+                    </DropdownMenuItem>
                     {isUnread && (
                         <DropdownMenuItem onClick={() => onMarkAsRead(notification.id)}>
                             <Check className="mr-2 h-4 w-4" />

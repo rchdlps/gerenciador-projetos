@@ -7,8 +7,11 @@ import { stakeholders, projects, users, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
+import { requireAuth, type AuthVariables } from '../middleware/auth'
 
-const app = new Hono()
+const app = new Hono<{ Variables: AuthVariables }>()
+
+app.use('*', requireAuth)
 
 const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers });

@@ -38,7 +38,7 @@ type ScheduledNotification = {
     priority: "normal" | "high" | "urgent";
 };
 
-export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAdmin?: boolean }) {
+export function ScheduledNotificationsList({ isSuperAdmin = false, organizationId }: { isSuperAdmin?: boolean; organizationId?: string }) {
     const [notifications, setNotifications] = useState<ScheduledNotification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -48,7 +48,8 @@ export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAd
     const fetchScheduled = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/admin/notifications/scheduled?status=pending");
+            const orgParam = organizationId ? `&orgId=${organizationId}` : '';
+            const res = await fetch(`/api/admin/notifications/scheduled?status=pending${orgParam}`);
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(data.scheduled);
@@ -111,8 +112,8 @@ export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAd
     const getPriorityBadge = (priority: string) => {
         switch (priority) {
             case "urgent": return { label: "Urgente", className: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" };
-            case "high":   return { label: "Alta",    className: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800" };
-            default:       return { label: "Normal",  className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800" };
+            case "high": return { label: "Alta", className: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800" };
+            default: return { label: "Normal", className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800" };
         }
     };
 
@@ -157,78 +158,78 @@ export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAd
                     Resultado: {processResult.processed} enviada(s){processResult.failed > 0 && `, ${processResult.failed} falhou`}
                 </p>
             )}
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Título</TableHead>
-                        <TableHead>Destino</TableHead>
-                        <TableHead>Agendado para</TableHead>
-                        <TableHead>Prioridade</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {notifications.map((notification) => (
-                        <TableRow key={notification.id}>
-                            <TableCell className="font-medium">{notification.title}</TableCell>
-                            <TableCell className="capitalize">
-                                {notification.targetType.replace("-", " ")}
-                            </TableCell>
-                            <TableCell>
-                                {format(new Date(notification.scheduledFor), "PPp", { locale: ptBR })}
-                            </TableCell>
-                            <TableCell>
-                                {(() => {
-                                    const { label, className } = getPriorityBadge(notification.priority);
-                                    return (
-                                        <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${className}`}>
-                                            {label}
-                                        </Badge>
-                                    );
-                                })()}
-                            </TableCell>
-                            <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Abrir menu</span>
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            className="text-destructive focus:text-destructive"
-                                            onClick={() => setCancelId(notification.id)}
-                                        >
-                                            <XCircle className="mr-2 h-4 w-4" />
-                                            Cancelar Envio
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Título</TableHead>
+                            <TableHead>Destino</TableHead>
+                            <TableHead>Agendado para</TableHead>
+                            <TableHead>Prioridade</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {notifications.map((notification) => (
+                            <TableRow key={notification.id}>
+                                <TableCell className="font-medium">{notification.title}</TableCell>
+                                <TableCell className="capitalize">
+                                    {notification.targetType.replace("-", " ")}
+                                </TableCell>
+                                <TableCell>
+                                    {format(new Date(notification.scheduledFor), "PPp", { locale: ptBR })}
+                                </TableCell>
+                                <TableCell>
+                                    {(() => {
+                                        const { label, className } = getPriorityBadge(notification.priority);
+                                        return (
+                                            <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${className}`}>
+                                                {label}
+                                            </Badge>
+                                        );
+                                    })()}
+                                </TableCell>
+                                <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                <span className="sr-only">Abrir menu</span>
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                className="text-destructive focus:text-destructive"
+                                                onClick={() => setCancelId(notification.id)}
+                                            >
+                                                <XCircle className="mr-2 h-4 w-4" />
+                                                Cancelar Envio
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
 
-            <AlertDialog open={!!cancelId} onOpenChange={(open) => !open && setCancelId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Esta notificação não será enviada. Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Voltar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleCancel} className="bg-destructive hover:bg-destructive/90">
-                            Sim, cancelar
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+                <AlertDialog open={!!cancelId} onOpenChange={(open) => !open && setCancelId(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Esta notificação não será enviada. Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Voltar</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleCancel} className="bg-destructive hover:bg-destructive/90">
+                                Sim, cancelar
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
         </div>
     );
 }

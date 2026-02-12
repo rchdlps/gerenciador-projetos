@@ -32,7 +32,8 @@ export async function emitNotification(input: CreateNotificationInput) {
     }).catch(err => console.error("Failed to push notification:", err));
 
     // Send to Inngest for side-effects (Email, Analytics, etc.)
-    await inngest.send({
+    // Non-blocking: Inngest may be unavailable in local dev
+    inngest.send({
         name: "notification/activity",
         data: {
             userId: input.userId,
@@ -41,7 +42,7 @@ export async function emitNotification(input: CreateNotificationInput) {
             data: input.data,
             notificationId, // Pass the ID so handler knows it's already stored
         },
-    });
+    }).catch(err => console.error("Failed to queue Inngest event:", err.message));
 }
 
 /**
