@@ -6,6 +6,7 @@ import { ArrowLeft, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { NotificationType } from "@/lib/notification-types";
 
 type NotificationDetailsProps = {
@@ -40,9 +41,10 @@ export function NotificationDetails({ notification }: NotificationDetailsProps) 
 
     const getPriorityColor = () => {
         const priority = parsedData?.priority;
-        if (priority === "urgent") return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300";
-        if (priority === "high") return "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300";
-        return "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300";
+        if (priority === "urgent") return "bg-destructive text-destructive-foreground border-destructive/20 shadow-sm";
+        if (priority === "high") return "bg-secondary text-secondary-foreground border-secondary/20 shadow-sm";
+        if (priority === "normal") return "bg-slate-200 text-slate-900 border-slate-300 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 font-bold";
+        return "bg-primary text-primary-foreground border-primary/20 shadow-sm";
     };
 
     return (
@@ -59,13 +61,13 @@ export function NotificationDetails({ notification }: NotificationDetailsProps) 
                     <div className="flex items-start justify-between">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <Badge variant={notification.type === "system" ? "default" : "secondary"}>
-                                    {notification.type === "system" ? "Sistema" : "Atividade"}
+                                <Badge variant={notification.type === "system" ? "default" : "secondary"} className="font-bold border-0 shadow-sm text-slate-950 dark:text-secondary-foreground">
+                                    {notification.type === "system" ? "SISTEMA" : "ATIVIDADE"}
                                 </Badge>
                                 {parsedData?.priority && (
-                                    <Badge variant="outline" className={getPriorityColor()}>
-                                        {parsedData.priority === 'urgent' ? 'Urgente' :
-                                            parsedData.priority === 'high' ? 'Alta' : 'Normal'}
+                                    <Badge variant="default" className={cn("font-bold border-0", getPriorityColor())}>
+                                        {parsedData.priority === 'urgent' ? 'URGENTE' :
+                                            parsedData.priority === 'high' ? 'ALTA' : 'NORMAL'}
                                     </Badge>
                                 )}
                             </div>
@@ -85,9 +87,9 @@ export function NotificationDetails({ notification }: NotificationDetailsProps) 
                     </div>
 
                     {parsedData?.link && (
-                        <div className="flex items-center p-4 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center p-4 bg-muted border-2 border-muted-foreground/10 rounded-lg">
                             <div className="flex-1">
-                                <p className="font-medium text-sm mb-1">Link Relacionado</p>
+                                <p className="font-bold text-sm mb-1 text-foreground">Link Relacionado</p>
                                 <p className="text-sm text-muted-foreground truncate font-mono">
                                     {parsedData.link}
                                 </p>
@@ -108,8 +110,8 @@ export function NotificationDetails({ notification }: NotificationDetailsProps) 
                                 {Object.entries(parsedData)
                                     .filter(([key]) => key !== 'link' && key !== 'priority')
                                     .map(([key, value]) => (
-                                        <div key={key} className="bg-muted/30 p-3 rounded-md border text-sm">
-                                            <span className="font-semibold text-muted-foreground block mb-1 capitalize">
+                                        <div key={key} className="bg-muted p-4 rounded-md border-2 border-muted-foreground/10 text-sm shadow-sm">
+                                            <span className="font-bold text-muted-foreground block mb-1.5 capitalize tracking-tight">
                                                 {key.replace(/([A-Z])/g, ' $1').trim()}
                                             </span>
                                             <span className="font-mono text-foreground break-all">

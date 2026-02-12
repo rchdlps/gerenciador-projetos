@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 import { TargetSelector } from "./TargetSelector";
 import { NotificationPreview } from "./NotificationPreview";
@@ -75,6 +76,7 @@ export function NotificationComposer({
     const [previewOpen, setPreviewOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [selectedItems, setSelectedItems] = useState<{ id: string; name: string; email?: string }[]>([]);
 
     const form = useForm<NotificationFormValues>({
         resolver: zodResolver(notificationSchema),
@@ -169,11 +171,26 @@ export function NotificationComposer({
             </div>
 
             {status && (
-                <Alert variant={status.type === "error" ? "destructive" : "default"} className={status.type === "success" ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20" : ""}>
+                <Alert
+                    variant={status.type === "error" ? "destructive" : "default"}
+                    className={cn(
+                        "border-2",
+                        status.type === "success"
+                            ? "border-primary bg-primary/10 text-primary-foreground bg-primary text-black dark:text-primary-foreground font-semibold"
+                            : "border-destructive bg-destructive/5 text-destructive-foreground dark:bg-destructive/10"
+                    )}
+                >
                     {status.type === "error" && <AlertCircle className="h-4 w-4" />}
                     {status.type === "success" && <Send className="h-4 w-4" />}
-                    <AlertTitle>{status.type === "error" ? "Erro" : "Sucesso"}</AlertTitle>
-                    <AlertDescription>{status.message}</AlertDescription>
+                    <AlertTitle className="font-bold">
+                        {status.type === "error" ? "Erro" : "Sucesso"}
+                    </AlertTitle>
+                    <AlertDescription className={cn(
+                        "font-medium",
+                        status.type === "success" ? "text-green-950 dark:text-primary-foreground" : ""
+                    )}>
+                        {status.message}
+                    </AlertDescription>
                 </Alert>
             )}
 
@@ -281,6 +298,7 @@ export function NotificationComposer({
                             targetIds={targetIds}
                             onTargetTypeChange={(val) => form.setValue("targetType", val)}
                             onTargetIdsChange={(val) => form.setValue("targetIds", val)}
+                            onSelectedItemsChange={setSelectedItems}
                             organizationId={organizationId}
                             isSuperAdmin={isSuperAdmin}
                         />
@@ -394,7 +412,7 @@ export function NotificationComposer({
                 isSubmitting={isSubmitting}
                 data={{
                     ...form.getValues(),
-                    targetCount: form.getValues().targetIds.length, // Rough estimate, accurate for direct selection
+                    selectedItems,
                 }}
             />
         </div>

@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +36,7 @@ type TargetSelectorProps = {
     targetIds: string[];
     onTargetTypeChange: (type: TargetType) => void;
     onTargetIdsChange: (ids: string[]) => void;
+    onSelectedItemsChange?: (items: (User | Organization)[]) => void;
     organizationId?: string;
     isSuperAdmin: boolean;
 };
@@ -46,6 +46,7 @@ export function TargetSelector({
     targetIds,
     onTargetTypeChange,
     onTargetIdsChange,
+    onSelectedItemsChange,
     organizationId,
     isSuperAdmin,
 }: TargetSelectorProps) {
@@ -54,6 +55,16 @@ export function TargetSelector({
     const [searchResults, setSearchResults] = useState<User[] | Organization[]>([]);
     const [selectedItems, setSelectedItems] = useState<(User | Organization)[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Reset local state when the parent clears targetIds (e.g. after form.reset())
+    useEffect(() => {
+        if (targetIds.length === 0) {
+            setSelectedItems([]);
+            setSearchQuery("");
+            setSearchResults([]);
+            onSelectedItemsChange?.([]);
+        }
+    }, [targetIds]);
 
     // Search users or organizations
     const handleSearch = async (query: string, type: "user" | "organization") => {
@@ -84,6 +95,7 @@ export function TargetSelector({
         const newSelected = [...selectedItems, item];
         setSelectedItems(newSelected);
         onTargetIdsChange(newSelected.map((i) => i.id));
+        onSelectedItemsChange?.(newSelected);
         setSearchOpen(false);
         setSearchQuery("");
     };
@@ -93,6 +105,7 @@ export function TargetSelector({
         const newSelected = selectedItems.filter((i) => i.id !== id);
         setSelectedItems(newSelected);
         onTargetIdsChange(newSelected.map((i) => i.id));
+        onSelectedItemsChange?.(newSelected);
     };
 
     return (

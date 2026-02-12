@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -164,50 +164,66 @@ export function NotificationBell({ userId }: NotificationBellProps) {
                         </div>
                     ) : (
                         notifications.map((notification) => (
-                            <DropdownMenuItem
+                            <div
                                 key={notification.id}
-                                className={`flex items-start gap-3 p-3 cursor-pointer ${!notification.isRead ? "bg-blue-50/50 dark:bg-blue-950/20" : ""
-                                    }`}
+                                className={`p-3 transition-colors border-b last:border-0 ${!notification.isRead
+                                    ? "bg-primary/5 hover:bg-primary/10"
+                                    : "hover:bg-muted/50"
+                                    } cursor-pointer`}
                                 onClick={() => {
                                     if (!notification.isRead) {
                                         markAsRead(notification.id);
                                     }
-                                    // Navigate if link provided
                                     if (notification.data?.link) {
                                         window.location.href = notification.data.link as string;
                                     }
                                 }}
                             >
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-sm font-medium truncate">
-                                            {notification.title}
-                                        </p>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm font-semibold truncate text-foreground flex-1">
+                                        {notification.title}
+                                    </p>
+                                    {!notification.isRead && (
+                                        <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0 animate-pulse" title="Não lida" />
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                    {notification.message}
+                                </p>
+                                <div className="flex items-center justify-between mt-2">
+                                    <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-tight">
+                                        {formatTime(notification.createdAt)}
+                                    </span>
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded bg-[#367962] text-white hover:bg-[#2d6552] transition-colors shadow-sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                window.location.href = `/notifications/${notification.id}`;
+                                            }}
+                                            title="Ver detalhes"
+                                        >
+                                            <Eye className="h-3 w-3" />
+                                            Ver
+                                        </button>
                                         {!notification.isRead && (
-                                            <span className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded bg-[#F5C745] text-[#1a1a1a] hover:bg-[#e0b53d] transition-colors shadow-sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    markAsRead(notification.id);
+                                                }}
+                                                title="Marcar como lida"
+                                            >
+                                                <Check className="h-3 w-3" />
+                                                Lida
+                                            </button>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                        {notification.message}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground/70 mt-1">
-                                        {formatTime(notification.createdAt)}
-                                    </p>
                                 </div>
-                                {!notification.isRead && (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 flex-shrink-0"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            markAsRead(notification.id);
-                                        }}
-                                    >
-                                        <Check className="h-3.5 w-3.5" />
-                                    </Button>
-                                )}
-                            </DropdownMenuItem>
+                            </div>
                         ))
                     )}
                 </ScrollArea>

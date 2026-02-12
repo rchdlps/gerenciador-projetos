@@ -7,8 +7,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle, Bell, Info } from "lucide-react";
+import { AlertTriangle, Bell } from "lucide-react";
+
+type SelectedItem = { id: string; name: string; email?: string };
 
 type NotificationPreviewProps = {
     open: boolean;
@@ -21,7 +22,7 @@ type NotificationPreviewProps = {
         type: "activity" | "system";
         priority: "normal" | "high" | "urgent";
         targetType: string;
-        targetCount: number;
+        selectedItems: SelectedItem[];
         scheduledFor?: Date;
     };
 };
@@ -42,15 +43,17 @@ export function NotificationPreview({
 
                 <div className="space-y-6 py-4">
                     {/* Warning for large broadcasts */}
-                    {(data.targetType === "all" || data.targetCount > 50) && (
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md flex items-start gap-3 text-yellow-800 dark:text-yellow-200 text-sm">
-                            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-                            <p>
-                                Você está prestes a enviar esta notificação para{" "}
-                                <strong>
+                    {(data.targetType === "all" || data.targetType === "role" || data.selectedItems.length > 10) && (
+                        <div className="border-2 border-secondary bg-secondary/10 dark:bg-secondary/20 p-3 rounded-md flex items-start gap-3 text-sm shadow-sm">
+                            <AlertTriangle className="h-5 w-5 flex-shrink-0 text-secondary-foreground" />
+                            <p className="text-foreground font-medium">
+                                Você está prestes a enviar para{" "}
+                                <strong className="text-primary px-1 underline underline-offset-2">
                                     {data.targetType === "all"
-                                        ? "todos os usuários"
-                                        : `${data.targetCount} usuários`}
+                                        ? "todos os usuários do sistema"
+                                        : data.targetType === "role"
+                                            ? "todos os gestores da organização"
+                                            : `${data.selectedItems.length} destinatários`}
                                 </strong>
                                 . Esta ação não pode ser desfeita.
                             </p>
@@ -61,9 +64,9 @@ export function NotificationPreview({
                     <div className="border rounded-lg p-4 space-y-3 bg-card">
                         <div className="flex items-start justify-between gap-4">
                             <div className="space-y-1">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <h4 className="font-bold text-sm flex items-center gap-2">
                                     {data.type === "system" && (
-                                        <Badge variant="outline" className="text-[10px] h-5">
+                                        <Badge variant="default" className="text-[10px] h-5 border-0 shadow-sm">
                                             Sistema
                                         </Badge>
                                     )}
@@ -74,7 +77,7 @@ export function NotificationPreview({
                                 </p>
                             </div>
                             {data.priority === "urgent" && (
-                                <Badge variant="destructive" className="flex-shrink-0">
+                                <Badge variant="destructive" className="flex-shrink-0 bg-red-600 text-white font-bold shadow-sm">
                                     Urgente
                                 </Badge>
                             )}
@@ -89,26 +92,37 @@ export function NotificationPreview({
                         </div>
                     </div>
 
-                    {/* Summary Stats */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="space-y-1">
-                            <span className="text-muted-foreground">Destinatário:</span>
-                            <p className="font-medium capitalize">
-                                {data.targetType.replace("-", " ")}
+                    {/* Recipients */}
+                    <div className="space-y-2">
+                        <span className="text-sm text-muted-foreground">Destinatários:</span>
+                        {data.targetType === "all" && (
+                            <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                                Todos os usuários do sistema
                             </p>
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-muted-foreground">Estimativa:</span>
-                            <p className="font-medium">
-                                {data.targetType === "all"
-                                    ? "Todos os usuários"
-                                    : data.targetType === "role"
-                                        ? "Todos os gestores"
-                                        : data.targetType === "organization"
-                                            ? `${data.targetCount} organização(ões)`
-                                            : `${data.targetCount} usuários`}
+                        )}
+                        {data.targetType === "role" && (
+                            <p className="text-sm font-medium">
+                                Todos os gestores da organização
                             </p>
-                        </div>
+                        )}
+                        {(data.targetType === "user" || data.targetType === "organization" || data.targetType === "multi-org") && (
+                            data.selectedItems.length === 0 ? (
+                                <p className="text-sm text-destructive">Nenhum destinatário selecionado</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                                    {data.selectedItems.map((item) => (
+                                        <Badge key={item.id} variant="secondary" className="text-xs gap-1">
+                                            {item.name}
+                                            {item.email && (
+                                                <span className="text-muted-foreground font-normal">
+                                                    {item.email}
+                                                </span>
+                                            )}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )
+                        )}
                     </div>
                 </div>
 

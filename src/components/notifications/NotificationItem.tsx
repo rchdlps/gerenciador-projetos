@@ -57,16 +57,16 @@ export function NotificationItem({
     }, [notification.data]);
 
     const getIcon = () => {
-        if (notification.type === "system") return <Info className="h-5 w-5 text-blue-500" />;
+        if (notification.type === "system") return <Info className="h-5 w-5 text-primary" />;
         // Default activity icon
-        return <Bell className="h-5 w-5 text-gray-500" />;
+        return <Bell className="h-5 w-5 text-primary" />;
     };
 
     const getPriorityColor = () => {
-        // Assuming data.priority exists if it's a scheduled notification or similar
         const priority = parsedData?.priority;
-        if (priority === "urgent") return "bg-red-100 text-red-800 border-red-200";
-        if (priority === "high") return "bg-orange-100 text-orange-800 border-orange-200";
+        if (priority === "urgent") return "bg-destructive text-destructive-foreground border-destructive/20 shadow-sm";
+        if (priority === "high") return "bg-secondary text-secondary-foreground border-secondary/20 shadow-sm";
+        if (priority === "normal") return "bg-slate-200 text-slate-900 border-slate-300 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 font-bold";
         return "";
     };
 
@@ -74,7 +74,7 @@ export function NotificationItem({
         <div
             className={cn(
                 "flex items-start gap-4 p-4 border-b transition-colors hover:bg-muted/50 group relative",
-                isUnread && "bg-blue-50/50 dark:bg-blue-950/10",
+                isUnread && "bg-primary/5 dark:bg-primary/10 border-l-4 border-l-primary",
                 selected && "bg-muted shadow-[inset_4px_0_0_0_theme(colors.primary.DEFAULT)]"
             )}
         >
@@ -98,13 +98,14 @@ export function NotificationItem({
                             {notification.title}
                         </a>
                         {isUnread && (
-                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                                Nova
+                            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold border-0 shadow-sm text-slate-950">
+                                NOVA
                             </Badge>
                         )}
                         {parsedData?.priority && (
-                            <Badge variant="outline" className={cn("h-5 px-1.5 text-[10px]", getPriorityColor())}>
-                                {parsedData.priority === 'urgent' ? 'Urgente' : 'Alta'}
+                            <Badge variant="default" className={cn("h-5 px-1.5 text-[10px] font-bold border-0 shadow-sm", getPriorityColor())}>
+                                {parsedData.priority === 'urgent' ? 'URGENTE' :
+                                    parsedData.priority === 'high' ? 'ALTA' : 'NORMAL'}
                             </Badge>
                         )}
                     </div>

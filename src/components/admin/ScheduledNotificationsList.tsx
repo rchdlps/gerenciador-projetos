@@ -17,7 +17,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Calendar, XCircle, Pencil, Play, Loader2 } from "lucide-react";
+import { MoreHorizontal, Calendar, XCircle, Play, Loader2 } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -108,11 +108,11 @@ export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAd
         }
     };
 
-    const getPriorityColor = (priority: string) => {
+    const getPriorityBadge = (priority: string) => {
         switch (priority) {
-            case "urgent": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-            case "high": return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-            default: return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+            case "urgent": return { label: "Urgente", className: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800" };
+            case "high":   return { label: "Alta",    className: "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800" };
+            default:       return { label: "Normal",  className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800" };
         }
     };
 
@@ -179,9 +179,14 @@ export function ScheduledNotificationsList({ isSuperAdmin = false }: { isSuperAd
                                 {format(new Date(notification.scheduledFor), "PPp", { locale: ptBR })}
                             </TableCell>
                             <TableCell>
-                                <Badge variant="secondary" className={getPriorityColor(notification.priority)}>
-                                    {notification.priority}
-                                </Badge>
+                                {(() => {
+                                    const { label, className } = getPriorityBadge(notification.priority);
+                                    return (
+                                        <Badge variant="outline" className={`h-5 px-1.5 text-[10px] ${className}`}>
+                                            {label}
+                                        </Badge>
+                                    );
+                                })()}
                             </TableCell>
                             <TableCell>
                                 <DropdownMenu>
