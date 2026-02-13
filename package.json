@@ -2,6 +2,9 @@
   "name": "app",
   "type": "module",
   "version": "0.0.1",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -71,7 +74,7 @@
     "react-dom": "^19.2.4",
     "react-dropzone": "^14.4.0",
     "react-hook-form": "^7.71.1",
-    "recharts": "^3.7.0",
+    "recharts": "^2.15.4",
     "resend": "^6.9.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
