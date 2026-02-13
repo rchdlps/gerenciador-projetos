@@ -41,7 +41,8 @@ function QualityMetricsManager({ projectId }: { projectId: string }) {
             const res = await api.quality[':projectId'].metrics.$get({ param: { projectId } })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     const addMutation = useMutation({
@@ -195,7 +196,8 @@ function QualityChecklistManager({ projectId }: { projectId: string }) {
             const res = await api.quality[':projectId'].checklist.$get({ param: { projectId } })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     const addMutation = useMutation({

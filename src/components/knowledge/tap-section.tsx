@@ -32,7 +32,8 @@ export function TAPSection({ projectId }: { projectId: string }) {
             })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     useEffect(() => {

@@ -46,7 +46,8 @@ function MilestoneManager({ projectId }: { projectId: string }) {
             const res = await api.schedule[':projectId'].milestones.$get({ param: { projectId } })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     const addMutation = useMutation({
@@ -212,7 +213,8 @@ function DependencyManager({ projectId }: { projectId: string }) {
             const res = await api.schedule[':projectId'].dependencies.$get({ param: { projectId } })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     const addMutation = useMutation({
