@@ -177,7 +177,7 @@ export function NotificationComposer({
                         "border-2",
                         status.type === "success"
                             ? "border-primary bg-primary/10 text-primary-foreground bg-primary text-black dark:text-primary-foreground font-semibold"
-                            : "border-destructive bg-destructive/5 text-destructive-foreground dark:bg-destructive/10"
+                            : "border-destructive bg-destructive/5 text-red-900 dark:text-red-300 dark:bg-destructive/10"
                     )}
                 >
                     {status.type === "error" && <AlertCircle className="h-4 w-4" />}

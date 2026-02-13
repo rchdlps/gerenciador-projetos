@@ -22,6 +22,7 @@ type NotificationPreviewProps = {
         type: "activity" | "system";
         priority: "normal" | "high" | "urgent";
         targetType: string;
+        targetIds: string[];
         selectedItems: SelectedItem[];
         scheduledFor?: Date;
     };
@@ -52,7 +53,7 @@ export function NotificationPreview({
                                     {data.targetType === "all"
                                         ? "todos os usuários do sistema"
                                         : data.targetType === "role"
-                                            ? "todos os gestores da organização"
+                                            ? `membros com cargo ${data.targetIds.map(r => r === "secretario" ? "Administrador" : r === "gestor" ? "Editor" : "Visualizador").join(", ")}`
                                             : `${data.selectedItems.length} destinatários`}
                                 </strong>
                                 . Esta ação não pode ser desfeita.
@@ -102,7 +103,7 @@ export function NotificationPreview({
                         )}
                         {data.targetType === "role" && (
                             <p className="text-sm font-medium">
-                                Todos os gestores da organização
+                                {data.targetIds.map(r => r === "secretario" ? "Administrador" : r === "gestor" ? "Editor" : "Visualizador").join(", ")}
                             </p>
                         )}
                         {(data.targetType === "user" || data.targetType === "organization" || data.targetType === "multi-org") && (

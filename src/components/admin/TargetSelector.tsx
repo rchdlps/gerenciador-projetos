@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -119,7 +120,12 @@ export function TargetSelector({
                     onTargetTypeChange(newType);
                     // Clear selections when type changes
                     setSelectedItems([]);
-                    onTargetIdsChange([]);
+                    // Auto-populate targetIds for role type
+                    if (newType === "role") {
+                        onTargetIdsChange(["gestor"]);
+                    } else {
+                        onTargetIdsChange([]);
+                    }
                 }}
             >
                 <div className="flex items-center space-x-2">
@@ -139,7 +145,7 @@ export function TargetSelector({
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="role" id="target-role" disabled={!organizationId} />
                     <Label htmlFor="target-role" className="cursor-pointer font-normal">
-                        Todos os gestores {!organizationId && "(requer contexto org)"}
+                        Por cargo na organização {!organizationId && "(requer contexto org)"}
                     </Label>
                 </div>
 
@@ -236,13 +242,46 @@ export function TargetSelector({
                 </div>
             )}
 
+            {/* Role checkboxes for 'role' target type */}
+            {targetType === "role" && (
+                <div className="space-y-3 border rounded-lg p-4">
+                    <Label className="text-sm font-medium">Selecione os cargos</Label>
+                    {([
+                        { value: "secretario", label: "Administrador" },
+                        { value: "gestor", label: "Editor" },
+                        { value: "viewer", label: "Visualizador" },
+                    ] as const).map((role) => (
+                        <div key={role.value} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`role-${role.value}`}
+                                checked={targetIds.includes(role.value)}
+                                onCheckedChange={(checked) => {
+                                    const newIds = checked
+                                        ? [...targetIds, role.value]
+                                        : targetIds.filter((id) => id !== role.value);
+                                    onTargetIdsChange(newIds);
+                                }}
+                            />
+                            <Label htmlFor={`role-${role.value}`} className="cursor-pointer font-normal">
+                                {role.label}
+                            </Label>
+                        </div>
+                    ))}
+                    {targetIds.length === 0 && (
+                        <p className="text-sm text-destructive">Selecione pelo menos um cargo</p>
+                    )}
+                </div>
+            )}
+
             {/* Target count display */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="font-medium">
                     {targetType === "all"
                         ? "⚠️ Todos os usuários serão notificados"
                         : targetType === "role"
-                            ? `Todos os gestores da organização serão notificados`
+                            ? targetIds.length > 0
+                                ? `Membros com cargo ${targetIds.map(r => r === "secretario" ? "Administrador" : r === "gestor" ? "Editor" : "Visualizador").join(", ")} serão notificados`
+                                : "Selecione pelo menos um cargo"
                             : selectedItems.length > 0
                                 ? `${selectedItems.length} ${targetType === "user" ? "usuário(s)" : "organização(ões)"} selecionado(s)`
                                 : "Nenhum alvo selecionado"}
