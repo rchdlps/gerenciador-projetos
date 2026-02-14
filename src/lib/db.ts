@@ -5,11 +5,17 @@ import * as schema from '../../db/schema';
 
 neonConfig.webSocketConstructor = ws;
 
-const connectionString = process.env.DATABASE_URL || (import.meta as any).env?.DATABASE_URL;
+const isProd = process.env.USE_PROD_DB === 'true' || (import.meta as any).env?.USE_PROD_DB === 'true';
+
+const connectionString = isProd
+    ? (process.env.DATABASE_URL_PROD || (import.meta as any).env?.DATABASE_URL_PROD)
+    : (process.env.DATABASE_URL || (import.meta as any).env?.DATABASE_URL);
 
 if (!connectionString) {
-    throw new Error("DATABASE_URL is not set");
+    throw new Error(isProd ? "DATABASE_URL_PROD is not set" : "DATABASE_URL is not set");
 }
+
+console.log(`🔌 Database connected to: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 
 export const client = new Pool({ connectionString });
 export const db = drizzle(client, { schema });
