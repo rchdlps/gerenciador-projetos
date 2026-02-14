@@ -1,0 +1,36 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { NotificationDetails } from "@/components/notifications/NotificationDetails";
+import { getNotificationById, markAsRead } from "@/lib/notification";
+import { auth } from "@/lib/auth";
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+
+if (!session) {
+  return Astro.redirect("/login");
+}
+
+const user = session.user;
+const { id } = Astro.params;
+
+if (!id) {
+    return Astro.redirect("/notifications");
+}
+
+const notification = await getNotificationById(id, user.id);
+
+if (!notification) {
+    return Astro.redirect("/notifications?error=not-found");
+}
+
+// Mark as read when viewing details
+if (!notification.isRead) {
+    await markAsRead(id, user.id);
+}
+---
+
+<DashboardLayout title={notification.title}>
+  <div class="container mx-auto py-6">
+    <NotificationDetails client:load notification={notification} />
+  </div>
+</DashboardLayout>

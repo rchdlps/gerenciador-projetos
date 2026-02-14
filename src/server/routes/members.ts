@@ -8,8 +8,11 @@ import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
 import { sendMemberAddedEmail, sendMemberInviteEmail } from '@/lib/email/client'
 import { nanoid } from 'nanoid'
+import { requireAuth, type AuthVariables } from '../middleware/auth'
 
-const app = new Hono()
+const app = new Hono<{ Variables: AuthVariables }>()
+
+app.use('*', requireAuth)
 
 // Helper to get session
 const getSession = async (c: any) => {

@@ -31,7 +31,8 @@ export function KnowledgeAreas({ projectId }: { projectId: string }) {
             const res = await api['knowledge-areas'][':projectId'].$get({ param: { projectId } })
             if (!res.ok) throw new Error()
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>

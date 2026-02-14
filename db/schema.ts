@@ -156,6 +156,7 @@ export const knowledgeAreas = pgTable("knowledge_areas", {
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => ({
     projectIdIdx: index('karea_project_idx').on(t.projectId),
+    projectAreaIdx: index('karea_project_area_idx').on(t.projectId, t.area),
 }));
 
 export const projectPhases = pgTable("project_phases", {
@@ -428,3 +429,9 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
         references: [stakeholders.id],
     }),
 }));
+
+// Export admin notification schemas
+export * from "./admin-notifications";
+
+// Re-export notifications schema
+export * from './notifications';

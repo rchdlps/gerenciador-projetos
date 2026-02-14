@@ -63,7 +63,8 @@ export default function RiskView({ projectId }: RiskViewProps) {
                 } catch { }
             }
             return data
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     // Attachments Query
@@ -75,7 +76,8 @@ export default function RiskView({ projectId }: RiskViewProps) {
             if (!res.ok) return []
             return res.json() as Promise<Attachment[]>
         },
-        enabled: !!ka?.id
+        enabled: !!ka?.id,
+        staleTime: 1000 * 60 * 2,
     })
 
     // Save risk data

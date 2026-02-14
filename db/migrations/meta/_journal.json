@@ -8,6 +8,13 @@
       "when": 1770565194783,
       "tag": "0000_organic_hercules",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770667017013,
+      "tag": "0001_daily_sue_storm",
+      "breakpoints": true
     }
   ]
 }

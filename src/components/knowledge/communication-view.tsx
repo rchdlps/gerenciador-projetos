@@ -24,7 +24,8 @@ export default function CommunicationView({ projectId }: { projectId: string }) 
             const res = await api.communication[":projectId"].$get({ param: { projectId } })
             if (!res.ok) throw new Error("Failed to fetch communication data")
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     // Mutations

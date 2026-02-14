@@ -1,0 +1,12 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { NotificationList } from "@/components/notifications/NotificationList";
+
+// TODO: Add auth check or use middleware/session
+---
+
+<DashboardLayout title="Minhas Notificações">
+  <div class="container mx-auto py-6">
+    <NotificationList client:load />
+  </div>
+</DashboardLayout>

@@ -18,10 +18,13 @@ export function useUserRole() {
     // If super admin, they have all permissions
     if (session?.isSuperAdmin) {
         return {
-            role: 'admin', // Treat as admin for UI logic
+            role: 'secretario' as const,
             isViewer: false,
+            isGestor: false,
+            isSecretario: true,
             isAdmin: true,
             isSuperAdmin: true,
+            canSendNotifications: true,
             isLoading,
             activeOrg
         }
@@ -33,8 +36,11 @@ export function useUserRole() {
     return {
         role,
         isViewer: role === 'viewer',
-        isAdmin: role === 'admin' || role === 'owner',
+        isGestor: role === 'gestor',
+        isSecretario: role === 'secretario',
+        isAdmin: role === 'secretario',
         isSuperAdmin: false,
+        canSendNotifications: role === 'secretario',
         isLoading,
         activeOrg
     }

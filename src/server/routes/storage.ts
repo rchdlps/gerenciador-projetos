@@ -8,8 +8,11 @@ import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
+import { requireAuth, type AuthVariables } from '../middleware/auth'
 
-const app = new Hono()
+const app = new Hono<{ Variables: AuthVariables }>()
+
+app.use('*', requireAuth)
 
 // Middleware helper
 const getSession = async (c: any) => {

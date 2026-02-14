@@ -24,7 +24,8 @@ export default function ProcurementView({ projectId }: { projectId: string }) {
             const res = await api.procurement[":projectId"].$get({ param: { projectId } })
             if (!res.ok) throw new Error("Failed to fetch procurement data")
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     // 2. Mutations

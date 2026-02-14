@@ -7,8 +7,11 @@ import { knowledgeAreas, projects, users, knowledgeAreaChanges, memberships } fr
 import { eq, and, desc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
+import { requireAuth, type AuthVariables } from '../middleware/auth'
 
-const app = new Hono()
+const app = new Hono<{ Variables: AuthVariables }>()
+
+app.use('*', requireAuth)
 
 const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers });
@@ -21,20 +24,17 @@ app.get('/:projectId', async (c) => {
 
     const projectId = c.req.param('projectId')
 
-    // Verify Access
+    // Verify Access — parallel queries
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
+    const [[user], [membership]] = await Promise.all([
+        db.select().from(users).where(eq(users.id, session.user.id)),
+        db.select().from(memberships).where(and(
             eq(memberships.userId, session.user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
+    ])
 
     if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
@@ -55,20 +55,17 @@ app.put('/:projectId/:area',
         const area = c.req.param('area')
         const { content } = c.req.valid('json')
 
-        // Verify Access
+        // Verify Access — parallel queries
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
+        const [[user], [membership]] = await Promise.all([
+            db.select().from(users).where(eq(users.id, session.user.id)),
+            db.select().from(memberships).where(and(
                 eq(memberships.userId, session.user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
+        ])
 
         if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
@@ -138,20 +135,17 @@ app.patch('/:projectId/:area',
         const area = c.req.param('area')
         const { content } = c.req.valid('json')
 
-        // Verify Access
+        // Verify Access — parallel queries
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
+        const [[user], [membership]] = await Promise.all([
+            db.select().from(users).where(eq(users.id, session.user.id)),
+            db.select().from(memberships).where(and(
                 eq(memberships.userId, session.user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
+        ])
 
         if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
@@ -216,20 +210,17 @@ app.get('/:projectId/:area', async (c) => {
     const projectId = c.req.param('projectId')
     const area = c.req.param('area')
 
-    // Verify Access
+    // Verify Access — parallel queries
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
+    const [[user], [membership]] = await Promise.all([
+        db.select().from(users).where(eq(users.id, session.user.id)),
+        db.select().from(memberships).where(and(
             eq(memberships.userId, session.user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
+    ])
 
     if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)

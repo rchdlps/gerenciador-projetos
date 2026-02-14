@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Neon)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (MinIO/Hetzner).
+This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Neon)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (Hetzner Object Storage).
 
-The application manages projects across multiple organizations (secretarias), with role-based access control, knowledge area tracking based on project management methodologies (PMBoK-inspired), task management, stakeholders, calendaring, procurement, communication plans, quality metrics, and comprehensive audit logging.
+The application manages projects across multiple organizations (secretarias), with role-based access control, knowledge area tracking based on project management methodologies (PMBoK-inspired), task management, stakeholders, calendaring, procurement, communication plans, quality metrics, comprehensive audit logging, and a real-time notification system.
 
 ## Common Commands
 
@@ -29,13 +29,14 @@ npx tsx scripts/seed-knowledge.ts # Seed knowledge areas only
 
 ### Testing
 ```bash
-npm test                 # Run unit and integration tests in watch mode
-npm run test:ui          # Open Vitest UI for interactive testing
-npm run test:run         # Run tests once (CI mode)
-npm run test:coverage    # Run tests with coverage report
-npm run test:e2e         # Run end-to-end tests with Playwright
-npm run test:e2e:ui      # Open Playwright UI for interactive E2E testing
-npm run test:e2e:debug   # Run E2E tests in debug mode
+npm test                             # Run unit and integration tests in watch mode
+npm run test:ui                      # Open Vitest UI for interactive testing
+npm run test:run                     # Run tests once (CI mode)
+npm run test:coverage                # Run tests with coverage report
+npx vitest run src/path/to/file      # Run a single test file
+npm run test:e2e                     # Run end-to-end tests with Playwright
+npm run test:e2e:ui                  # Open Playwright UI for interactive E2E testing
+npm run test:e2e:debug               # Run E2E tests in debug mode
 ```
 
 ## Architecture Overview
@@ -123,6 +124,10 @@ All Hono routes follow a consistent pattern:
 - `src/server/routes/board.ts` - Kanban board columns/cards
 - `src/server/routes/knowledge-areas.ts` - Knowledge area content management
 - `src/server/routes/admin.ts` - Admin endpoints (user/org management, audit logs)
+- `src/server/routes/admin-notifications.ts` - Admin notification management (scheduling, broadcast)
+- `src/server/routes/notifications.ts` - User notification inbox (read/unread)
+- `src/server/routes/members.ts` - Organization membership management
+- `src/server/routes/org-session.ts` - Organization context switching
 - `src/server/routes/storage.ts` - S3 pre-signed URL generation
 - And more: appointments, schedule, quality, communication, procurement, project-charter
 
@@ -173,6 +178,22 @@ const { data: projects } = useQuery({
 - `resourceId`: ID of the affected resource
 - `metadata`: JSON object with additional context
 
+### Notification System
+
+The notification system has two delivery paths:
+
+**Real-time:** Pusher (`pusher` / `pusher-js`) delivers notifications instantly to connected clients. The server sends events via `src/pages/api/pusher/` endpoints; the React client subscribes using `PUBLIC_PUSHER_KEY` / `PUBLIC_PUSHER_CLUSTER`.
+
+**Background Jobs:** Inngest (`inngest` package) handles scheduled/batch notification delivery. Functions are defined in `src/lib/inngest/functions/` and served at `src/pages/api/inngest.ts`. Admin can schedule notifications via `src/server/routes/admin-notifications.ts`.
+
+**Email:** Resend (`resend` package) sends transactional emails (e.g., invitations, password reset). Templates are in `src/lib/email/`.
+
+**Database tables:** `notifications` (per-user inbox), referenced by `src/server/routes/notifications.ts`.
+
+### Reusable Query Helpers
+
+`src/lib/queries/` contains shared Drizzle query functions used across multiple routes (e.g., checking project access, fetching org memberships). Prefer extracting common queries here rather than duplicating them across route files.
+
 ## Important Conventions
 
 ### Type Safety
@@ -215,10 +236,13 @@ See `.env.example` for required variables:
 - `DATABASE_URL`: Neon PostgreSQL connection string
 - `BETTER_AUTH_SECRET`: Auth secret key
 - `BETTER_AUTH_URL`: Base URL for auth callbacks
-- `S3_ENDPOINT`: S3-compatible storage endpoint
-- `S3_REGION`: Region (use `us-east-1` for compatibility)
-- `S3_ACCESS_KEY` / `S3_SECRET_KEY`: Storage credentials
-- `S3_BUCKET_NAME`: Bucket name
+- `S3_ENDPOINT` / `S3_REGION` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET_NAME`: Hetzner Object Storage
+- `RESEND_API_KEY`: Email delivery via Resend
+- `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`: Inngest background jobs
+- `PUSHER_APP_ID` / `PUSHER_KEY` / `PUSHER_SECRET` / `PUSHER_CLUSTER`: Real-time events (server)
+- `PUBLIC_PUSHER_KEY` / `PUBLIC_PUSHER_CLUSTER`: Real-time events (client-side, exposed to browser)
+- `SENTRY_AUTH_TOKEN`: Error tracking
+- `PUBLIC_URL`: Base URL for the app (used in email links, etc.)
 
 ## Database Seeding
 

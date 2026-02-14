@@ -67,7 +67,8 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
                 } catch { }
             }
             return data
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     // Attachments Query
@@ -79,7 +80,8 @@ export default function ResourceView({ projectId }: ResourceViewProps) {
             if (!res.ok) return []
             return res.json() as Promise<Attachment[]>
         },
-        enabled: !!ka?.id
+        enabled: !!ka?.id,
+        staleTime: 1000 * 60 * 2,
     })
 
     // Save resource data

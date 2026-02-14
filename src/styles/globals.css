@@ -29,6 +29,12 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -67,6 +73,12 @@
     --ring: 160 38% 34%;
 
     --radius: 0.75rem;
+
+    --chart-1: 160 38% 34%;
+    --chart-2: 44 89% 62%;
+    --chart-3: 199 89% 48%;
+    --chart-4: 271 91% 65%;
+    --chart-5: 160 60% 45%;
   }
 
   .dark {
@@ -99,6 +111,12 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 160 38% 34%;
+
+    --chart-1: 160 38% 44%;
+    --chart-2: 44 89% 72%;
+    --chart-3: 199 89% 58%;
+    --chart-4: 271 91% 75%;
+    --chart-5: 160 60% 55%;
   }
 }
 

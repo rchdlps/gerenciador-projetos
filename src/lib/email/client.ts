@@ -161,3 +161,62 @@ export async function sendVerificationEmail(to: string, verificationLink: string
         html,
     });
 }
+
+type DigestNotification = {
+    title: string;
+    message: string;
+    createdAt: Date;
+};
+
+export async function sendDailyDigestEmail(to: string, userName: string, notifications: DigestNotification[]) {
+    const notificationItems = notifications.map(n => {
+        const time = new Date(n.createdAt).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        return `
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+                    <strong>${n.title}</strong>
+                    <p style="margin: 4px 0 0 0; color: #6b7280;">${n.message}</p>
+                </td>
+                <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px; white-space: nowrap;">
+                    ${time}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>📬 Resumo Diário de Notificações</h2>
+            <p>Olá ${userName},</p>
+            <p>Aqui está o resumo das suas notificações das últimas 24 horas:</p>
+            
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <thead>
+                    <tr style="background-color: #f9fafb;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e5e7eb;">Notificação</th>
+                        <th style="padding: 12px; text-align: right; border-bottom: 2px solid #e5e7eb;">Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${notificationItems}
+                </tbody>
+            </table>
+            
+            <p>Total: <strong>${notifications.length}</strong> notificações</p>
+            
+            <a href="${process.env.PUBLIC_URL || 'http://localhost:4321'}" style="display: inline-block; background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 16px 0;">
+                Ver no Sistema
+            </a>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: `📬 Resumo Diário - ${notifications.length} notificações`,
+        html,
+    });
+}
+

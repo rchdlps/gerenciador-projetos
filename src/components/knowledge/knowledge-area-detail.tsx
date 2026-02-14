@@ -47,7 +47,8 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
                 throw new Error("Erro ao carregar dados.")
             }
             return res.json()
-        }
+        },
+        staleTime: 1000 * 60 * 2,
     })
 
     // Attachments Query
@@ -59,7 +60,8 @@ function KnowledgeAreaContent({ projectId, area }: { projectId: string, area: st
             if (!res.ok) return []
             return res.json() as Promise<Attachment[]>
         },
-        enabled: !!ka?.id
+        enabled: !!ka?.id,
+        staleTime: 1000 * 60 * 2,
     })
 
     const handleUpload = async (files: File[]) => {
