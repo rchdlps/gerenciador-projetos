@@ -39,6 +39,7 @@ type TargetSelectorProps = {
     onTargetIdsChange: (ids: string[]) => void;
     onSelectedItemsChange?: (items: (User | Organization)[]) => void;
     organizationId?: string;
+    organizationName?: string;
     isSuperAdmin: boolean;
 };
 
@@ -49,6 +50,7 @@ export function TargetSelector({
     onTargetIdsChange,
     onSelectedItemsChange,
     organizationId,
+    organizationName,
     isSuperAdmin,
 }: TargetSelectorProps) {
     const [searchOpen, setSearchOpen] = useState(false);
@@ -123,6 +125,12 @@ export function TargetSelector({
                     // Auto-populate targetIds for role type
                     if (newType === "role") {
                         onTargetIdsChange(["gestor"]);
+                    } else if (newType === "organization" && !isSuperAdmin && organizationId) {
+                        // Secretario: auto-select their own org
+                        onTargetIdsChange([organizationId]);
+                        const orgItem = { id: organizationId, name: organizationName || "Minha Organização" };
+                        setSelectedItems([orgItem]);
+                        onSelectedItemsChange?.([orgItem]);
                     } else {
                         onTargetIdsChange([]);
                     }
@@ -138,7 +146,10 @@ export function TargetSelector({
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="organization" id="target-org" />
                     <Label htmlFor="target-org" className="cursor-pointer font-normal">
-                        Organização inteira
+                        {isSuperAdmin
+                            ? "Organização inteira"
+                            : `Todos da minha organização${organizationName ? ` (${organizationName})` : ""}`
+                        }
                     </Label>
                 </div>
 
@@ -168,8 +179,8 @@ export function TargetSelector({
                 )}
             </RadioGroup>
 
-            {/* Search/Select UI for user, organization, multi-org */}
-            {(targetType === "user" || targetType === "organization" || targetType === "multi-org") && (
+            {/* Search/Select UI for user, organization (super admin only), multi-org */}
+            {(targetType === "user" || (targetType === "organization" && isSuperAdmin) || targetType === "multi-org") && (
                 <div className="space-y-2">
                     <Popover open={searchOpen} onOpenChange={setSearchOpen}>
                         <PopoverTrigger asChild>

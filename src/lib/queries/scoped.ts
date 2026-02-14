@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { projects, memberships, tasks, projectPhases, appointments, stakeholders } from '../../../db/schema'
+import { projects, memberships, tasks, projectPhases, appointments, stakeholders, organizations } from '../../../db/schema'
 import { eq, inArray, desc, and } from 'drizzle-orm'
 
 /**
@@ -77,22 +77,30 @@ export async function scopedProjects(orgIds: string[] | null) {
 }
 
 /**
- * Check if user can access a specific project
+ * Check if user can access a specific project.
+ *
+ * Returns the project and the user's org membership (if any) so callers
+ * can make further role-based decisions (e.g. blocking viewers from writes)
+ * without a second DB round-trip.
  */
 export async function canAccessProject(
     projectId: string,
     userId: string,
     isSuperAdmin: boolean
-): Promise<{ allowed: boolean; project: typeof projects.$inferSelect | null }> {
+): Promise<{
+    allowed: boolean;
+    project: typeof projects.$inferSelect | null;
+    membership: typeof memberships.$inferSelect | null;
+}> {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
 
     if (!project) {
-        return { allowed: false, project: null }
+        return { allowed: false, project: null, membership: null }
     }
 
     // Super admin can access all
     if (isSuperAdmin) {
-        return { allowed: true, project }
+        return { allowed: true, project, membership: null }
     }
 
     // Check org membership
@@ -102,12 +110,12 @@ export async function canAccessProject(
                 eq(memberships.userId, userId),
                 eq(memberships.organizationId, project.organizationId)
             )
-        })
-        return { allowed: !!membership, project }
+        }) ?? null
+        return { allowed: !!membership || project.userId === userId, project, membership }
     }
 
     // Legacy personal project - only owner
-    return { allowed: project.userId === userId, project }
+    return { allowed: project.userId === userId, project, membership: null }
 }
 
 /**
@@ -137,4 +145,12 @@ export async function scopedAppointments(orgIds: string[] | null) {
         .innerJoin(projects, eq(appointments.projectId, projects.id))
         .where(inArray(projects.organizationId, orgIds))
         .orderBy(desc(appointments.date))
+}
+/**
+ * Get all organizations for super admins
+ */
+export async function getAllOrganizations() {
+    return db.query.organizations.findMany({
+        orderBy: desc(organizations.code)
+    })
 }

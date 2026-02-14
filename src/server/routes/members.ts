@@ -9,6 +9,7 @@ import { createAuditLog } from '@/lib/audit-logger'
 import { sendMemberAddedEmail, sendMemberInviteEmail } from '@/lib/email/client'
 import { nanoid } from 'nanoid'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+import { canAssignRole } from '@/lib/permissions'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -17,17 +18,6 @@ app.use('*', requireAuth)
 // Helper to get session
 const getSession = async (c: any) => {
     return await auth.api.getSession({ headers: c.req.raw.headers })
-}
-
-// Role hierarchy check
-const canAssignRole = (userRole: string, targetRole: string, isSuperAdmin: boolean): boolean => {
-    if (isSuperAdmin) return true
-    const roleHierarchy = ['viewer', 'gestor', 'secretario']
-    const userRoleIndex = roleHierarchy.indexOf(userRole)
-    const targetRoleIndex = roleHierarchy.indexOf(targetRole)
-    // User can only assign roles at or below their level
-    // Gestor cannot assign secretario
-    return targetRoleIndex <= userRoleIndex && userRoleIndex >= 1 // At least gestor
 }
 
 // GET /api/members

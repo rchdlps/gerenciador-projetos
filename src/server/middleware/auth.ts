@@ -1,11 +1,10 @@
 import { createMiddleware } from 'hono/factory'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { memberships, organizations } from '../../../db/schema'
+import { memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-
-type Role = 'secretario' | 'gestor' | 'viewer'
+import { ORG_ROLES, hasMinRole, type OrgRole } from '@/lib/permissions'
 
 export type AuthVariables = {
     user: typeof auth.$Infer.Session.user
@@ -43,27 +42,26 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async 
     await next()
 })
 
-export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async (c, next) => {
+/**
+ * Organization-level access middleware. Checks membership + optional role hierarchy.
+ *
+ * Best suited for **org-scoped routes** where `orgId` is available as a param or header
+ * (e.g., member management, org settings). For **project-scoped routes**, prefer
+ * `canAccessProject()` from `@/lib/queries/scoped` — it handles the project→org lookup
+ * chain and returns the membership for viewer checks in a single call.
+ */
+export const requireOrgAccess = (requiredRole?: OrgRole) => createMiddleware(async (c, next) => {
     const user = c.get('user')
     if (!user) {
         throw new HTTPException(401, { message: 'Unauthorized' })
     }
 
-    // Attempt to get Organization ID from params, query, or header
-    // Strategy: Look for :orgId param, or explicit header X-Organization-ID
-    // For now, let's assume specific routes will use :orgId param mostly.
-    // Or we stick to project-based access where we look up the project first.
-
-    // For specific Organization Management routes:
     const orgId = c.req.param('orgId') || c.req.header('X-Organization-ID')
 
     if (!orgId) {
-        // If no org context, we can't check org access. 
-        // Logic depends on usage. For now, let's assume this middleware is used on routes WITH orgId.
         throw new HTTPException(400, { message: 'Organization Context Missing' })
     }
 
-    // Check Membership
     const membership = await db.query.memberships.findFirst({
         where: and(
             eq(memberships.userId, user.id),
@@ -72,7 +70,6 @@ export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async 
     })
 
     if (!membership) {
-        // Check if Super Admin? (Not implemented yet, but good hook)
         if (user.globalRole === 'super_admin') {
             await next()
             return
@@ -82,11 +79,7 @@ export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async 
 
     // Role Hierarchy Check
     if (requiredRole) {
-        const roles: Role[] = ['viewer', 'gestor', 'secretario']
-        const userRoleIndex = roles.indexOf(membership.role as Role)
-        const requiredRoleIndex = roles.indexOf(requiredRole)
-
-        if (userRoleIndex < requiredRoleIndex) {
+        if (!hasMinRole(membership.role, requiredRole)) {
             throw new HTTPException(403, { message: 'Forbidden: Insufficient Permissions' })
         }
     }

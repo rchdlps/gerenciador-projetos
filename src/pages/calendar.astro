@@ -1,6 +1,47 @@
 ---
 import DashboardLayout from "../layouts/DashboardLayout.astro";
 import { CalendarPage } from "@/components/calendar/calendar-page";
+import { db } from "@/lib/db";
+import { users, sessions } from "../../db/schema";
+import { eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
+import { getScopedOrgIds, scopedAppointments } from "@/lib/queries/scoped";
+import { getDatedTasks } from "@/lib/queries/tasks";
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session) return Astro.redirect("/login");
+
+// Fetch full user to check role
+const [currentUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id));
+const isSuperAdmin = currentUser?.globalRole === "super_admin";
+
+// Get active org from session
+const [sessionData] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, session.session.id));
+const activeOrgId = sessionData?.activeOrganizationId || null;
+
+// Determine scoped orgs
+const orgIds = await getScopedOrgIds(
+    session.user.id,
+    activeOrgId,
+    isSuperAdmin,
+);
+
+// Fetch data in parallel
+const [tasks, appointments] = await Promise.all([
+    getDatedTasks(orgIds),
+    scopedAppointments(orgIds),
+]);
+
+const initialData = {
+    tasks,
+    appointments,
+};
 ---
 
 <DashboardLayout title="Calendário Geral">
@@ -11,11 +52,12 @@ import { CalendarPage } from "@/components/calendar/calendar-page";
                     Calendário Consolidado
                 </h2>
                 <p class="text-muted-foreground">
-                    Visualize todos os prazos e compromissos de todos os seus projetos.
+                    Visualize todos os prazos e compromissos de todos os seus
+                    projetos.
                 </p>
             </div>
         </div>
 
-        <CalendarPage client:load />
+        <CalendarPage client:load initialData={initialData} />
     </div>
 </DashboardLayout>

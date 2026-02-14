@@ -41,12 +41,10 @@ app.get('/', async (c) => {
         }).from(organizations)
     }
 
-    // Get active org ID from session
-    const [currentSession] = await db.select()
-        .from(sessions)
-        .where(eq(sessions.id, session.id))
-
-    const activeOrgId = currentSession?.activeOrganizationId || null
+    // Get active org ID from a fresh DB query (better-auth session object
+    // may not include custom columns like activeOrganizationId)
+    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
+    const activeOrgId = sessionRow?.activeOrganizationId || null
 
     // Find active org details (check both memberships and all orgs for super admin)
     let activeOrg = null

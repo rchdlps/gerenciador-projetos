@@ -26,8 +26,9 @@ const getSession = async (c: any) => {
 
 // Get Metrics for Project
 app.get('/:projectId/metrics', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
 
@@ -35,18 +36,15 @@ app.get('/:projectId/metrics', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -65,8 +63,9 @@ app.post('/:projectId/metrics',
         currentValue: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
@@ -75,18 +74,15 @@ app.post('/:projectId/metrics',
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -104,8 +100,9 @@ app.post('/:projectId/metrics',
 
 // Delete Metric
 app.delete('/metrics/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -116,18 +113,15 @@ app.delete('/metrics/:id', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, metric.projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -140,8 +134,9 @@ app.delete('/metrics/:id', async (c) => {
 
 // Get Checklist for Project
 app.get('/:projectId/checklist', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
 
@@ -149,18 +144,15 @@ app.get('/:projectId/checklist', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -177,8 +169,9 @@ app.post('/:projectId/checklist',
         item: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
@@ -187,18 +180,15 @@ app.post('/:projectId/checklist',
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -219,8 +209,9 @@ app.patch('/checklist/:id',
         completed: z.boolean()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const id = c.req.param('id')
         const data = c.req.valid('json')
@@ -232,18 +223,15 @@ app.patch('/checklist/:id',
         const [project] = await db.select().from(projects).where(eq(projects.id, checklist.projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -258,8 +246,9 @@ app.patch('/checklist/:id',
 
 // Delete Checklist Item
 app.delete('/checklist/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -270,18 +259,15 @@ app.delete('/checklist/:id', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, checklist.projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 

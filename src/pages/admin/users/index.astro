@@ -1,11 +1,31 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { AdminUsersWrapper } from "@/components/admin/users/wrapper";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { memberships } from "../../../../db/schema";
+import { eq } from "drizzle-orm";
 
-// Note: Authentication protection is handled by middleware but we need React Query context
-// so we use a wrapper component that renders the Provider + Child in one React Root.
+const session = await auth.api.getSession({ headers: Astro.request.headers });
 
-// Note: Authentication protection is handled by middleware
+if (!session) {
+  return Astro.redirect("/login");
+}
+
+// Admin guard: only super_admin or org secretario/gestor can manage users
+const isSuperAdmin = session.user.globalRole === "super_admin";
+if (!isSuperAdmin) {
+  const userMemberships = await db
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(eq(memberships.userId, session.user.id));
+  const canManageUsers = userMemberships.some(
+    (m) => m.role === "secretario" || m.role === "gestor",
+  );
+  if (!canManageUsers) {
+    return Astro.redirect("/dashboard");
+  }
+}
 ---
 
 <DashboardLayout title="Gerenciamento de Usuários">

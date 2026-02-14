@@ -12,16 +12,15 @@ const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
+
 
 // 1. MILESTONES
 
 // Get Milestones for Project
 app.get('/:projectId/milestones', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
 
@@ -29,18 +28,15 @@ app.get('/:projectId/milestones', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
     const milestones = await db.select().from(projectMilestones)
@@ -58,8 +54,9 @@ app.post('/:projectId/milestones',
         phase: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
@@ -68,17 +65,15 @@ app.post('/:projectId/milestones',
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -96,8 +91,9 @@ app.post('/:projectId/milestones',
 
 // Delete Milestone
 app.delete('/milestones/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -108,16 +104,14 @@ app.delete('/milestones/:id', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, milestone.projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -130,8 +124,9 @@ app.delete('/milestones/:id', async (c) => {
 
 // Get Dependencies for Project
 app.get('/:projectId/dependencies', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
 
@@ -139,18 +134,15 @@ app.get('/:projectId/dependencies', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
     const deps = await db.select().from(projectDependencies)
@@ -167,8 +159,9 @@ app.post('/:projectId/dependencies',
         type: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
@@ -177,18 +170,15 @@ app.post('/:projectId/dependencies',
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -206,8 +196,9 @@ app.post('/:projectId/dependencies',
 
 // Delete Dependency
 app.delete('/dependencies/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -218,18 +209,15 @@ app.delete('/dependencies/:id', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, dependency.projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     // Check if user is a member of the organization
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 

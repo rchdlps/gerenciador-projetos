@@ -14,7 +14,7 @@ import {
 } from "@/lib/admin-notifications";
 import { db } from "@/lib/db";
 import { users, organizations, memberships } from "../../../db/schema"; // organizations used in /targets org search
-import { eq, or, and, ilike } from "drizzle-orm";
+import { eq, or, and, ilike, inArray } from "drizzle-orm";
 
 const adminNotificationsRouter = new Hono<{ Variables: AuthVariables }>();
 
@@ -23,7 +23,7 @@ adminNotificationsRouter.use("*", requireAuth);
 
 /**
  * Middleware: Check if user has permission to send notifications
- * Allowed: super_admin, org secretario, org gestor
+ * Allowed: super_admin, org secretario
  */
 const requireNotificationPermission = async (c: any, next: any) => {
     const user = c.get("user");
@@ -63,22 +63,10 @@ adminNotificationsRouter.use("*", requireNotificationPermission);
 /**
  * Helper to get user context and validate permissions
  */
-async function getUserContext(userId: string, orgId?: string | null) {
+async function getUserContext(user: any, orgId?: string | null) {
     // If no orgId, check if they are actually a super admin globally
     if (!orgId) {
-        // We need to fetch the user to check global role if not passed, 
-        // but typically this helper is used where we might trust the caller's context?
-        // Actually, the route handler `c.get('user')` has the user with globalRole.
-        // But this helper only takes userId. 
-        // Let's safe guard: strictly return 'viewer' if not orgId, unless we verify super_admin.
-        // Since we can't easily verify super_admin here without extra DB call or passing user obj,
-        // and the middleware already checked global permissions for the *route* access,
-        // we should be careful. 
-        // However, for API safety, let's do a quick DB check or require passing the user object.
-        // Refactoring to take the user object is better.
-
-        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-        if (user?.globalRole === "super_admin") {
+        if (user.globalRole === "super_admin") {
             return { role: "super_admin", orgId: null };
         }
         return { role: "viewer", orgId: null };
@@ -87,7 +75,7 @@ async function getUserContext(userId: string, orgId?: string | null) {
     const membership = await db
         .select()
         .from(memberships)
-        .where(and(eq(memberships.userId, userId), eq(memberships.organizationId, orgId)))
+        .where(and(eq(memberships.userId, user.id), eq(memberships.organizationId, orgId)))
         .limit(1);
 
     return {
@@ -113,7 +101,7 @@ const sendSchema = z.object({
 adminNotificationsRouter.post("/send", zValidator("json", sendSchema), async (c) => {
     const user = c.get("user");
     const orgId = c.req.query("orgId");
-    const context = await getUserContext(user.id, orgId);
+    const context = await getUserContext(user, orgId);
     const body = c.req.valid("json");
 
     // Validate permissions for target type
@@ -125,6 +113,26 @@ adminNotificationsRouter.post("/send", zValidator("json", sendSchema), async (c)
 
         if (body.targetType === "organization" && body.targetIds[0] !== context.orgId) {
             return c.json({ error: "Forbidden: Can only send to your organization" }, 403);
+        }
+
+        // For user targeting, validate all target users belong to the secretario's org
+        if (body.targetType === "user" && context.orgId && body.targetIds.length > 0) {
+            const orgMembers = await db
+                .select({ userId: memberships.userId })
+                .from(memberships)
+                .where(
+                    and(
+                        eq(memberships.organizationId, context.orgId),
+                        inArray(memberships.userId, body.targetIds)
+                    )
+                );
+            const validUserIds = new Set(orgMembers.map((m) => m.userId));
+            const invalidIds = body.targetIds.filter((id) => !validUserIds.has(id));
+            if (invalidIds.length > 0) {
+                return c.json({
+                    error: "Forbidden: Some target users are not members of your organization",
+                }, 403);
+            }
         }
     }
 
@@ -163,7 +171,7 @@ const scheduleSchema = sendSchema.extend({
 adminNotificationsRouter.post("/schedule", zValidator("json", scheduleSchema), async (c) => {
     const user = c.get("user");
     const orgId = c.req.query("orgId");
-    const context = await getUserContext(user.id, orgId);
+    const context = await getUserContext(user, orgId);
     const body = c.req.valid("json");
 
     // Same permission checks as /send
@@ -174,6 +182,26 @@ adminNotificationsRouter.post("/schedule", zValidator("json", scheduleSchema), a
 
         if (body.targetType === "organization" && body.targetIds[0] !== context.orgId) {
             return c.json({ error: "Forbidden: Can only send to your organization" }, 403);
+        }
+
+        // For user targeting, validate all target users belong to the secretario's org
+        if (body.targetType === "user" && context.orgId && body.targetIds.length > 0) {
+            const orgMembers = await db
+                .select({ userId: memberships.userId })
+                .from(memberships)
+                .where(
+                    and(
+                        eq(memberships.organizationId, context.orgId),
+                        inArray(memberships.userId, body.targetIds)
+                    )
+                );
+            const validUserIds = new Set(orgMembers.map((m) => m.userId));
+            const invalidIds = body.targetIds.filter((id) => !validUserIds.has(id));
+            if (invalidIds.length > 0) {
+                return c.json({
+                    error: "Forbidden: Some target users are not members of your organization",
+                }, 403);
+            }
         }
     }
 
@@ -321,7 +349,7 @@ adminNotificationsRouter.get("/targets", async (c) => {
     const orgId = c.req.query("orgId");
 
     // Validate permission and get context
-    const context = await getUserContext(user.id, orgId);
+    const context = await getUserContext(user, orgId);
 
     if (context.role !== "super_admin" && !context.orgId) {
         return c.json({ error: "Organization context required" }, 403);

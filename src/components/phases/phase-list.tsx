@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
 import { PhaseAccordion } from "./phase-accordion"
@@ -242,12 +242,23 @@ export function PhaseList({ projectId }: PhaseListProps) {
         }
     }
 
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
     if (isLoading) {
         return <div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
     }
 
+    if (!mounted) {
+        return null // or a skeleton/loading state to avoid hydration mismatch
+    }
+
     return (
         <DndContext
+            id="phase-list-dnd"
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}

@@ -3,13 +3,23 @@ import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { KnowledgeAreasPage } from "@/components/dashboard/knowledge-areas-page";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { db } from "@/lib/db";
+import { knowledgeAreas } from "../../../../db/schema";
+
 import { auth } from "@/lib/auth";
+import { eq } from "drizzle-orm";
 
 const session = await auth.api.getSession({ headers: Astro.request.headers });
 if (!session) return Astro.redirect("/login");
 
 const { id } = Astro.params;
 if (!id) return Astro.redirect("/");
+
+// SSR Data Fetching
+const initialData = await db
+    .select()
+    .from(knowledgeAreas)
+    .where(eq(knowledgeAreas.projectId, id));
 ---
 
 <DashboardLayout title="Áreas de Conhecimento">
@@ -38,6 +48,10 @@ if (!id) return Astro.redirect("/");
             </p>
         </div>
 
-        <KnowledgeAreasPage client:load projectId={id} />
+        <KnowledgeAreasPage
+            client:load
+            projectId={id}
+            initialData={initialData}
+        />
     </div>
 </DashboardLayout>

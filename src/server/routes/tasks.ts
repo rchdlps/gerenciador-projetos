@@ -8,74 +8,30 @@ import { eq, or, isNotNull, and, inArray, asc } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+import { getDatedTasks } from '@/lib/queries/tasks'
+import { getScopedOrgIds } from '@/lib/queries/scoped'
+import { sessions } from '../../../db/schema'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
-
 // Get All Dated Tasks (Global Calendar)
 app.get('/dated', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    let tasksQuery;
+    // Get active org from a fresh DB query (better-auth session object
+    // may not include custom columns like activeOrganizationId)
+    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
+    const activeOrgId = sessionRow?.activeOrganizationId || null
 
-    // Filter to ensure task has at least one date
-    const dateCondition = (t: any) => or(isNotNull(t.startDate), isNotNull(t.endDate))
+    const orgIds = await getScopedOrgIds(user.id, activeOrgId, isSuperAdmin)
+    const results = await getDatedTasks(orgIds)
 
-    if (user && user.globalRole === 'super_admin') {
-        tasksQuery = db.select({
-            id: tasks.id,
-            title: tasks.title,
-            status: tasks.status,
-            priority: tasks.priority,
-            startDate: tasks.startDate,
-            endDate: tasks.endDate,
-            projectId: projectPhases.projectId,
-            projectName: projects.name
-        })
-            .from(tasks)
-            .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
-            .innerJoin(projects, eq(projectPhases.projectId, projects.id))
-            .where(dateCondition(tasks))
-            .orderBy(asc(tasks.endDate))
-    } else {
-        const userMemberships = await db.select({ orgId: memberships.organizationId })
-            .from(memberships)
-            .where(eq(memberships.userId, session.user.id))
-
-        const orgIds = userMemberships.map(m => m.orgId)
-
-        if (orgIds.length === 0) return c.json([])
-
-        tasksQuery = db.select({
-            id: tasks.id,
-            title: tasks.title,
-            status: tasks.status,
-            priority: tasks.priority,
-            startDate: tasks.startDate,
-            endDate: tasks.endDate,
-            projectId: projectPhases.projectId,
-            projectName: projects.name
-        })
-            .from(tasks)
-            .innerJoin(projectPhases, eq(tasks.phaseId, projectPhases.id))
-            .innerJoin(projects, eq(projectPhases.projectId, projects.id))
-            .where(and(
-                inArray(projects.organizationId, orgIds),
-                dateCondition(tasks)
-            ))
-            .orderBy(asc(tasks.endDate))
-    }
-
-    const results = await tasksQuery
     return c.json(results)
 })
 
@@ -93,8 +49,9 @@ app.post('/',
         status: z.string().optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const data = c.req.valid('json')
 
@@ -105,22 +62,20 @@ app.post('/',
         const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         // Check if user is a member of the organization
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
         // Viewers cannot create tasks
-        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+        if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
             return c.json({ error: 'Visualizadores não podem criar tarefas' }, 403)
         }
 
@@ -140,7 +95,7 @@ app.post('/',
 
         // Audit log
         await createAuditLog({
-            userId: session.user.id,
+            userId: user.id,
             organizationId: project?.organizationId || null,
             action: 'CREATE',
             resource: 'task',
@@ -162,8 +117,9 @@ app.patch('/reorder',
         }))
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const { items } = c.req.valid('json')
 
@@ -176,20 +132,19 @@ app.patch('/reorder',
             if (phase) {
                 const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
                 if (project) {
-                    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
                     const [membership] = await db.select()
                         .from(memberships)
                         .where(and(
-                            eq(memberships.userId, session.user.id),
+                            eq(memberships.userId, user.id),
                             eq(memberships.organizationId, project.organizationId!)
                         ))
 
-                    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+                    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
                         return c.json({ error: 'Forbidden' }, 403)
                     }
 
                     // Viewers cannot reorder tasks
-                    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+                    if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
                         return c.json({ error: 'Visualizadores não podem reordenar tarefas' }, 403)
                     }
                 }
@@ -225,8 +180,9 @@ app.patch('/:id',
         status: z.string().optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const id = c.req.param('id')
         const data = c.req.valid('json')
@@ -241,21 +197,19 @@ app.patch('/:id',
         const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
         // Viewers cannot update tasks
-        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+        if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
             return c.json({ error: 'Visualizadores não podem editar tarefas' }, 403)
         }
         const updateData: any = { ...data }
@@ -273,7 +227,7 @@ app.patch('/:id',
 
         // Audit log
         await createAuditLog({
-            userId: session.user.id,
+            userId: user.id,
             organizationId: project?.organizationId || null,
             action: 'UPDATE',
             resource: 'task',
@@ -287,8 +241,9 @@ app.patch('/:id',
 
 // Delete Task
 app.delete('/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -300,21 +255,19 @@ app.delete('/:id', async (c) => {
     const [project] = phase ? await db.select().from(projects).where(eq(projects.id, phase.projectId)) : [null]
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
     // Viewers cannot delete tasks
-    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+    if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
         return c.json({ error: 'Visualizadores não podem excluir tarefas' }, 403)
     }
 
@@ -323,7 +276,7 @@ app.delete('/:id', async (c) => {
     // Audit log
     if (task) { // task is guaranteed to exist here due to the check above
         await createAuditLog({
-            userId: session.user.id,
+            userId: user.id,
             organizationId: project?.organizationId || null,
             action: 'DELETE',
             resource: 'task',

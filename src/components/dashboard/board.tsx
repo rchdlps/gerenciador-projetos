@@ -179,7 +179,7 @@ export function ScrumbanBoard({ projectId }: BoardProps) {
         });
     };
 
-    const handleDragEnd = async (event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         setActiveId(null);
         setActiveCard(null);
@@ -191,26 +191,16 @@ export function ScrumbanBoard({ projectId }: BoardProps) {
         const activeId = String(active.id);
         const overId = String(over.id);
 
-        // At this point, thanks to handleDragOver, the item might already be in the dest column in local state?
-        // Actually, dnd-kit resets state on drag end if we don't commit it?
-        // No, we updated queryClient data, so the UI is already showing it in the new place.
-        // We just need to persist the FINAL state and order.
-
-        // However, handleDragOver doesn't run on the very last drop frame sometimes.
-        // We should recalculate the final move to be safe and persist it.
-
         const currentColumns = queryClient.getQueryData<BoardColumn[]>(['board', projectId]) || [];
 
-        // Find where the item IS now (should be in dest column if DragOver ran)
+        // Find where the item IS now (might be in dest column if DragOver ran)
         const sourceColumn = currentColumns.find(col => col.cards.some(c => c.id === activeId));
-
-        // If we dropped on a container or item, find that column
         const destColumn = currentColumns.find(col => col.id === overId) ||
             currentColumns.find(col => col.cards.some(c => c.id === overId));
 
         if (!sourceColumn || !destColumn) return;
 
-        // Perform the final reorder in memory to get clean payload
+        // Perform the final reorder in memory to get clean payload and commit to cache
         const newColumns = JSON.parse(JSON.stringify(currentColumns)) as BoardColumn[];
         const sourceColIdx = newColumns.findIndex(c => c.id === sourceColumn.id);
         const destColIdx = newColumns.findIndex(c => c.id === destColumn.id);
@@ -221,25 +211,32 @@ export function ScrumbanBoard({ projectId }: BoardProps) {
         const oldIndex = sourceCards.findIndex(c => c.id === activeId);
         const cardToMove = sourceCards[oldIndex];
 
+        let didChange = false;
+
+        // Detect if this was a cross-column move (DragOver may have already moved it)
+        const wasCrossColumnMove = sourceColumnId && sourceColumnId !== sourceColumn.id;
+
         // If simple reorder in same column
         if (sourceColumn.id === destColumn.id) {
             const overIndex = destCards.findIndex(c => c.id === overId);
-            // Use arrayMove equivalent logic
             if (oldIndex !== overIndex && overIndex !== -1) {
+                // arrayMove logic
                 const [removed] = destCards.splice(oldIndex, 1);
                 destCards.splice(overIndex, 0, removed);
-                queryClient.setQueryData(['board', projectId], newColumns);
+                didChange = true;
+            }
+
+            // If DragOver already moved the card cross-column, sourceColumn === destColumn
+            // but the DB still has the old status. Force persist.
+            if (wasCrossColumnMove) {
+                // Ensure status matches the current column
+                cardToMove.status = sourceColumn.id;
+                didChange = true;
             }
         } else {
-            // Should have been handled by DragOver, but handle edge case if DragOver didn't fire?
-            // If DragOver fired, sourceColumn === destColumn (the new one).
-            // So we likely fall into the block above.
-            // If DragOver didn't fire (fast drop?), we handle cross-column here.
-
-            // Remove from source
+            // Move to different column (DragOver didn't fire or didn't process)
             sourceCards.splice(oldIndex, 1);
 
-            // Add to dest
             let newIndex;
             if (destColumn.id === overId) {
                 newIndex = destCards.length;
@@ -250,31 +247,32 @@ export function ScrumbanBoard({ projectId }: BoardProps) {
 
             cardToMove.status = destColumn.id;
             destCards.splice(newIndex, 0, cardToMove);
-            queryClient.setQueryData(['board', projectId], newColumns);
+            didChange = true;
         }
 
-        // --- Persist to Backend ---
-        // We calculate updates based on the FINAL state of newColumns
-        const updates: { id: string, status: string, order: number }[] = [];
+        if (didChange) {
+            queryClient.setQueryData(['board', projectId], newColumns);
 
-        // We only really need to send updates for the modified columns
-        // For simplicity, let's send updates for all cards in modified columns (source and dest)
-        const columnsToUpdate = new Set([sourceColumn.id, destColumn.id]);
-        if (sourceColumnId) columnsToUpdate.add(sourceColumnId);
+            // --- Persist to Backend ---
+            const updates: { id: string, status: string, order: number }[] = [];
+            const columnsToUpdate = new Set([sourceColumn.id, destColumn.id]);
+            if (sourceColumnId) columnsToUpdate.add(sourceColumnId);
 
-        newColumns.forEach(col => {
-            if (columnsToUpdate.has(col.id)) {
-                col.cards.forEach((card, index) => {
-                    updates.push({
-                        id: card.id,
-                        status: col.id,
-                        order: index
+            newColumns.forEach(col => {
+                if (columnsToUpdate.has(col.id)) {
+                    col.cards.forEach((card, index) => {
+                        updates.push({
+                            id: card.id,
+                            status: col.id,
+                            order: index
+                        });
                     });
-                });
-            }
-        });
+                }
+            });
 
-        await reorderTasks.mutateAsync(updates);
+            // Fire and forget (mutation handles error rollback)
+            reorderTasks.mutate(updates);
+        }
     };
 
     if (isLoading) return <div>Carregando Quadro...</div>

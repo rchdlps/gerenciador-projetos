@@ -12,10 +12,7 @@ const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-// Helper to get session
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
+
 
 // GET /api/admin/users
 // Returns users based on permissions:
@@ -26,14 +23,14 @@ const getSession = async (c: any) => {
 // - Super Admin: All users + search + global role info
 // - User: Only users in their same organization(s)
 app.get('/users', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const search = c.req.query('q') || ''
 
     // 1. Check Global Role
-    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-    const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
     let query = db.select({
         id: users.id,
@@ -62,7 +59,7 @@ app.get('/users', async (c) => {
         .orderBy(desc(users.createdAt))
 
     // 2. Apply Filters
-    console.log(`[Admin] User: ${session.user.id}, IsSuper: ${isSuperAdmin}`)
+    console.log(`[Admin] User: ${user.id}, IsSuper: ${isSuperAdmin}`)
 
     if (isSuperAdmin) {
         // Super Admin sees everything + Global Search
@@ -75,7 +72,7 @@ app.get('/users', async (c) => {
         // Regular User: Filter by Shared Organization
         const myMemberships = await db.select({ orgId: memberships.organizationId })
             .from(memberships)
-            .where(eq(memberships.userId, session.user.id))
+            .where(eq(memberships.userId, user.id))
 
         const myOrgIds = myMemberships.map(m => m.orgId)
         console.log(`[Admin] My Orgs: ${myOrgIds}`)
@@ -112,12 +109,14 @@ app.get('/users', async (c) => {
 
 // GET /api/admin/organizations
 // Helper to get allowed organizations for the dropdown
+// GET /api/admin/organizations
+// Helper to get allowed organizations for the dropdown
 app.get('/organizations', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
-    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-    const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
     let orgsQuery = db.select({
         id: organizations.id,
@@ -130,7 +129,7 @@ app.get('/organizations', async (c) => {
             .from(memberships)
             .where(
                 and(
-                    eq(memberships.userId, session.user.id),
+                    eq(memberships.userId, user.id),
                     inArray(memberships.role, ['secretario', 'gestor'])
                 )
             )
@@ -160,14 +159,14 @@ app.post('/users',
         })).optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const { name, email, image, globalRole, organizationId, orgRole, memberships: providedMemberships } = c.req.valid('json')
 
         // 1. Permission Check
-        const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-        const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
         // Consolidate memberships (legacy + new array)
         const membershipsToCreate = [...(providedMemberships || [])]
@@ -189,7 +188,7 @@ app.post('/users',
                 const [membership] = await db.select()
                     .from(memberships)
                     .where(and(
-                        eq(memberships.userId, session.user.id),
+                        eq(memberships.userId, user.id),
                         eq(memberships.organizationId, m.organizationId),
                         inArray(memberships.role, ['secretario', 'gestor'])
                     ))
@@ -254,7 +253,7 @@ app.post('/users',
 
         // Audit log
         await createAuditLog({
-            userId: session.user.id,
+            userId: user.id,
             organizationId: null, // Global action or we could pick the first org
             action: 'CREATE',
             resource: 'user',
@@ -285,16 +284,16 @@ app.patch('/users/:id',
         })).optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const userIdToUpdate = c.req.param('id')
         const { name, globalRole, isActive, organizationId, orgRole, memberships: newMemberships } = c.req.valid('json')
         console.log(`[Admin] PATCH /users/${userIdToUpdate}`, { name, globalRole, isActive, memberships: newMemberships })
 
         // 1. Permission Check
-        const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-        const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
         // If not super admin, must be admin of organizationId
         if (!isSuperAdmin) {
@@ -308,7 +307,7 @@ app.patch('/users/:id',
                     const [membership] = await db.select()
                         .from(memberships)
                         .where(and(
-                            eq(memberships.userId, session.user.id),
+                            eq(memberships.userId, user.id),
                             eq(memberships.organizationId, m.organizationId),
                             inArray(memberships.role, ['secretario', 'gestor'])
                         ))
@@ -403,19 +402,19 @@ app.patch('/users/:id',
 // DELETE /api/admin/users/:id
 // Delete a user - Super Admin only
 app.delete('/users/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const userIdToDelete = c.req.param('id')
 
     // 1. Only Super Admin can delete users
-    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-    if (currentUser?.globalRole !== 'super_admin') {
+    if (user.globalRole !== 'super_admin') {
         return c.json({ error: 'Apenas Super Admins podem excluir usuários' }, 403)
     }
 
     // 2. Cannot delete yourself
-    if (userIdToDelete === session.user.id) {
+    if (userIdToDelete === user.id) {
         return c.json({ error: 'Você não pode excluir a si mesmo' }, 400)
     }
 
@@ -452,7 +451,7 @@ app.delete('/users/:id', async (c) => {
 
     // 8. Audit log
     await createAuditLog({
-        userId: session.user.id,
+        userId: user.id,
         organizationId: null,
         action: 'DELETE',
         resource: 'user',
@@ -469,8 +468,9 @@ app.delete('/users/:id', async (c) => {
 // GET /api/admin/audit-logs
 // Fetch audit logs with user information, filtering, pagination, and search
 app.get('/audit-logs', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     // Get query parameters
     const page = parseInt(c.req.query('page') || '1')
@@ -485,8 +485,7 @@ app.get('/audit-logs', async (c) => {
     const offset = (page - 1) * limit
 
     // Check if user is super admin
-    const [currentUser] = await db.select().from(users).where(eq(users.id, session.user.id))
-    const isSuperAdmin = currentUser?.globalRole === 'super_admin'
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
     // Build dynamic where conditions
     const conditions: any[] = []
@@ -521,7 +520,7 @@ app.get('/audit-logs', async (c) => {
     if (!isSuperAdmin) {
         const myMemberships = await db.select({ orgId: memberships.organizationId })
             .from(memberships)
-            .where(eq(memberships.userId, session.user.id))
+            .where(eq(memberships.userId, user.id))
 
         const myOrgIds = myMemberships.map(m => m.orgId)
         if (myOrgIds.length > 0) {

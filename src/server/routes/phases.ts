@@ -10,6 +10,9 @@ import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
+import { getProjectPhases } from '@/lib/queries/phases'
+import { canAccessProject } from '@/lib/queries/scoped'
+
 const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
@@ -29,65 +32,14 @@ app.get('/:projectId', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    // Fetch full user to check role
+    // Access Check using shared utility
     const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+    const isSuperAdmin = user?.globalRole === 'super_admin'
 
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
+    const { allowed } = await canAccessProject(projectId, session.user.id, isSuperAdmin)
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
-
-    const phases = await db.select().from(projectPhases)
-        .where(eq(projectPhases.projectId, projectId))
-        .orderBy(asc(projectPhases.order), asc(projectPhases.createdAt))
-
-    // Fetch tasks for each phase
-    const fasesWithTasks = await Promise.all(phases.map(async phase => {
-        const localTasksRaw = await db.select({
-            task: tasks,
-            assigneeUser: users,
-            assigneeStakeholder: stakeholders
-        })
-            .from(tasks)
-            .leftJoin(users, eq(tasks.assigneeId, users.id))
-            .leftJoin(stakeholders, eq(tasks.stakeholderId, stakeholders.id))
-            .where(eq(tasks.phaseId, phase.id))
-            .orderBy(asc(tasks.order))
-
-        const localTasks = localTasksRaw.map(({ task, assigneeUser, assigneeStakeholder }) => {
-            let assignee = null
-            if (assigneeStakeholder) {
-                assignee = {
-                    id: assigneeStakeholder.id,
-                    name: assigneeStakeholder.name,
-                    image: null, // Stakeholders don't have images yet
-                    role: assigneeStakeholder.role,
-                    type: 'stakeholder'
-                }
-            } else if (assigneeUser) {
-                assignee = {
-                    id: assigneeUser.id,
-                    name: assigneeUser.name,
-                    image: assigneeUser.image,
-                    type: 'user'
-                }
-            }
-
-            return {
-                ...task,
-                assignee
-            }
-        })
-
-        return { ...phase, tasks: localTasks }
-    }))
+    const fasesWithTasks = await getProjectPhases(projectId)
 
     return c.json(fasesWithTasks)
 })

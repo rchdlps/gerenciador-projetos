@@ -1,13 +1,11 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import { NotificationComposer } from "@/components/admin/NotificationComposer";
-import { ScheduledNotificationsList } from "@/components/admin/ScheduledNotificationsList";
-import { NotificationStats } from "@/components/admin/NotificationStats";
-import { db } from "@/lib/db";
-import { users, memberships, notificationSendLogs, notificationDeliveries } from "../../../db/schema";
-import { desc, eq, sql, and } from "drizzle-orm";
-
+import { AdminNotificationsWrapper } from "@/components/admin/AdminNotificationsWrapper";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { memberships } from "../../../db/schema";
+import { eq } from "drizzle-orm";
+import app from "@/server/app";
 
 const session = await auth.api.getSession({ headers: Astro.request.headers });
 
@@ -15,74 +13,37 @@ if (!session) {
   return Astro.redirect("/login");
 }
 
-const user = session.user;
-
-let isOrgAdmin = false;
-let organizationId = undefined;
-
-// We need to get the active organization from the session or request context
-// Since this is an Astro page, we might rely on the client-side context, but for server-side rendering/protection:
-// We can check if the user is a member of any organization as admin if no specific org is active in session (simplification)
-// OR better: we check the 'activeOrgId' if available in session/cookie. 
-// For now, let's fetch if they are 'secretario' in any org (permission to view the page).
-// The composer will handle specific org selection validation.
-
-if (user.globalRole === "super_admin") {
-    // Super admin has access
-} else {
-    // Check if user is 'secretario' in at least one organization
-    const adminMemberships = await db
-        .select()
-        .from(memberships)
-        .where(
-            and(
-                eq(memberships.userId, user.id),
-                eq(memberships.role, 'secretario')
-            )
-        )
-        .limit(1);
-
-    if (adminMemberships.length > 0) {
-        isOrgAdmin = true;
-        organizationId = adminMemberships[0].organizationId; 
-        // Note: If user is admin of multiple, we might default to the first one effectively acting as "context"
-        // Ideally we'd get the header/cookie for active org.
-    } else {
-        return Astro.redirect("/dashboard");
-    }
+// Admin guard: only super_admin or org secretario can access
+const isSuperAdmin = session.user.globalRole === "super_admin";
+if (!isSuperAdmin) {
+  const userMemberships = await db
+    .select({ role: memberships.role })
+    .from(memberships)
+    .where(eq(memberships.userId, session.user.id));
+  const isSecretario = userMemberships.some((m) => m.role === "secretario");
+  if (!isSecretario) {
+    return Astro.redirect("/dashboard");
+  }
 }
 
+let orgSessionData = null;
+try {
+  const res = await app.request("http://localhost/api/org-session", {
+    headers: Astro.request.headers,
+    method: "GET",
+  });
+
+  if (res.ok) {
+    orgSessionData = await res.json();
+  }
+} catch (error) {
+  console.error(
+    "Failed to fetch server-side org session for notifications:",
+    error,
+  );
+}
 ---
 
 <DashboardLayout title="Gerenciar Notificações">
-  <div class="container mx-auto py-6 space-y-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-3xl font-bold tracking-tight">Gerenciar Notificações</h1>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
-      <div class="space-y-6">
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-          <h2 class="text-xl font-semibold mb-4">Enviar Nova Notificação</h2>
-          <NotificationComposer 
-            client:load 
-            isSuperAdmin={user.globalRole === "super_admin"} 
-            organizationId={organizationId}
-          />
-        </div>
-      </div>
-
-      <div class="space-y-6">
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-           <h2 class="text-xl font-semibold mb-4">Estatísticas de Envio</h2>
-           <NotificationStats client:visible organizationId={organizationId} />
-        </div>
-
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-          <h2 class="text-xl font-semibold mb-4">Notificações Agendadas</h2>
-          <ScheduledNotificationsList isSuperAdmin={user.globalRole === "super_admin"} organizationId={organizationId} client:visible />
-        </div>
-      </div>
-    </div>
-  </div>
+  <AdminNotificationsWrapper client:load initialData={orgSessionData} />
 </DashboardLayout>

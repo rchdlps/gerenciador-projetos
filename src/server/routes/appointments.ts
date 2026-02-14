@@ -14,28 +14,21 @@ const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
-
 // Get All Appointments (Global Calendar)
 app.get('/', async (c) => {
-    const authSession = await getSession(c)
-    if (!authSession) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, authSession.user.id))
-    const isSuperAdmin = user?.globalRole === 'super_admin'
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Get active org from session
-    const [sessionData] = await db.select()
-        .from(sessions)
-        .where(eq(sessions.id, authSession.session.id))
-
-    const activeOrgId = sessionData?.activeOrganizationId || null
+    // Get active org from a fresh DB query (better-auth session object
+    // may not include custom columns like activeOrganizationId)
+    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
+    const activeOrgId = sessionRow?.activeOrganizationId || null
 
     // Use centralized scoped query logic with active org from session
-    const orgIds = await getScopedOrgIds(authSession.user.id, activeOrgId, isSuperAdmin)
+    const orgIds = await getScopedOrgIds(user.id, activeOrgId, isSuperAdmin)
     const results = await scopedAppointments(orgIds)
 
     return c.json(results)
@@ -43,8 +36,9 @@ app.get('/', async (c) => {
 
 // Get Appointments for Project
 app.get('/:projectId', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
 
@@ -76,8 +70,9 @@ app.post('/',
         date: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const { projectId, description, date } = c.req.valid('json')
 
@@ -85,17 +80,15 @@ app.post('/',
         const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
         if (!project) return c.json({ error: 'Project not found' }, 404)
 
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
         const [membership] = await db.select()
             .from(memberships)
             .where(and(
-                eq(memberships.userId, session.user.id),
+                eq(memberships.userId, user.id),
                 eq(memberships.organizationId, project.organizationId!)
             ))
 
         // Check access
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
             return c.json({ error: 'Forbidden' }, 403)
         }
 
@@ -114,7 +107,7 @@ app.post('/',
 
         // Audit log
         await createAuditLog({
-            userId: session.user.id,
+            userId: user.id,
             organizationId: project.organizationId,
             action: 'CREATE',
             resource: 'appointment',
@@ -128,8 +121,9 @@ app.post('/',
 
 // Delete Appointment
 app.delete('/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -140,17 +134,15 @@ app.delete('/:id', async (c) => {
     const [project] = await db.select().from(projects).where(eq(projects.id, appointment.projectId))
     if (!project) return c.json({ error: 'Project not found' }, 404)
 
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
     const [membership] = await db.select()
         .from(memberships)
         .where(and(
-            eq(memberships.userId, session.user.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, project.organizationId!)
         ))
 
     // Check access
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
+    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
@@ -163,7 +155,7 @@ app.delete('/:id', async (c) => {
 
     // Audit log
     await createAuditLog({
-        userId: session.user.id,
+        userId: user.id,
         organizationId: project.organizationId,
         action: 'DELETE',
         resource: 'appointment',

@@ -61,7 +61,7 @@ export function NotificationStats({ organizationId }: { organizationId?: string 
         return () => {
             window.removeEventListener("notification:updated", handleUpdate);
         };
-    }, []);
+    }, [organizationId]);
 
     if (isLoading) {
         return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-pulse">

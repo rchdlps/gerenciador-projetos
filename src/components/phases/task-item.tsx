@@ -72,13 +72,47 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
             }
             return res.json()
         },
-        onSuccess: () => {
+        onMutate: async (newStatus: string) => {
+            // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+            await queryClient.cancelQueries({ queryKey: ["phases", projectId] })
+
+            // Snapshot the previous value
+            const previousPhases = queryClient.getQueryData(["phases", projectId])
+
+            // Optimistically update to the new value
+            queryClient.setQueryData(["phases", projectId], (old: any) => {
+                if (!old) return old
+
+                return old.map((phase: any) => {
+                    // Find the task in the phases
+                    const taskIndex = phase.tasks.findIndex((t: any) => t.id === task.id)
+                    if (taskIndex !== -1) {
+                        // Create a new task object with updated status
+                        const updatedTasks = [...phase.tasks]
+                        updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], status: newStatus }
+                        return { ...phase, tasks: updatedTasks }
+                    }
+                    return phase
+                })
+            })
+
+            // Return a context object with the snapshotted value
+            return { previousPhases }
+        },
+        onError: (err, newStatus, context) => {
+            // If the mutation fails, use the context returned from onMutate to roll back
+            if (context?.previousPhases) {
+                queryClient.setQueryData(["phases", projectId], context.previousPhases)
+            }
+            toast.error("Erro ao atualizar status")
+        },
+        onSettled: () => {
+            // Always refetch after error or success:
             queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
             queryClient.invalidateQueries({ queryKey: ["board", projectId] })
-            toast.success("Status atualizado!")
         },
-        onError: (error: Error) => {
-            toast.error(error.message || "Erro ao atualizar status")
+        onSuccess: () => {
+            toast.success("Status atualizado!")
         }
     })
 

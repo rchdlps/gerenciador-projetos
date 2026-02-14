@@ -13,10 +13,7 @@ const app = new Hono<{ Variables: AuthVariables }>()
 app.use('*', requireAuth)
 
 app.get('/', async (c) => {
-    const sessionUser = c.get('user')
-
-    // Fetch full user to check role logic
-    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
+    const user = c.get('user')
 
     // Super Admin sees all organizations
     if (user && user.globalRole === 'super_admin') {
@@ -37,17 +34,14 @@ app.get('/', async (c) => {
     })
         .from(memberships)
         .innerJoin(organizations, eq(memberships.organizationId, organizations.id))
-        .where(eq(memberships.userId, sessionUser.id))
+        .where(eq(memberships.userId, user.id))
 
     return c.json(userOrgs)
 })
 
 app.get('/:id', async (c) => {
-    const sessionUser = c.get('user')
+    const user = c.get('user')
     const id = c.req.param('id')
-
-    // Fetch full user for role check
-    const [user] = await db.select().from(users).where(eq(users.id, sessionUser.id))
 
     const [org] = await db.select().from(organizations).where(eq(organizations.id, id))
     if (!org) return c.json({ error: 'Not found' }, 404)
@@ -60,7 +54,7 @@ app.get('/:id', async (c) => {
     // Check membership
     const membership = await db.query.memberships.findFirst({
         where: and(
-            eq(memberships.userId, sessionUser.id),
+            eq(memberships.userId, user.id),
             eq(memberships.organizationId, id)
         )
     })
@@ -84,9 +78,7 @@ app.post('/',
         const user = c.get('user') as any
 
         if (user.globalRole !== 'super_admin') {
-            // We allow for now if it's the first org or dev mode, but ideally this is strict.
-            // For this task, let's just log it or strict enforce if we are sure user is admin.
-            // return c.json({ error: 'Forbidden' }, 403)
+            return c.json({ error: 'Forbidden' }, 403)
         }
 
         const { name, code, logoUrl, secretario, secretariaAdjunta, diretoriaTecnica } = c.req.valid('json')
