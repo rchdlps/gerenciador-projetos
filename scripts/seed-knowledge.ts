@@ -8,8 +8,17 @@ import { eq, and } from 'drizzle-orm';
 
 neonConfig.webSocketConstructor = ws;
 
-const connectionString = process.env.DATABASE_URL!;
-if (!connectionString) throw new Error("No DATABASE_URL");
+const isProd = process.env.USE_PROD_DB === 'true';
+
+const connectionString = isProd
+    ? process.env.DATABASE_URL_PROD!
+    : process.env.DATABASE_URL!;
+
+if (!connectionString) {
+    throw new Error(isProd ? "DATABASE_URL_PROD is not set" : "DATABASE_URL is not set");
+}
+
+console.log(`🔌 Database connected to: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 
 const client = new Pool({ connectionString });
 const db = drizzle(client, { schema });

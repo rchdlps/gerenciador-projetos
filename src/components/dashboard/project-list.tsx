@@ -48,6 +48,7 @@ export function ProjectList() {
             setSelectedOrg(activeOrgId) // Auto-select for creation too
         } else {
             setFilterOrg("all")
+            setSelectedOrg("") // Reset selection in global view to force manual selection
         }
     }, [activeOrgId])
 
@@ -75,8 +76,11 @@ export function ProjectList() {
     })
 
     // Auto-select first organization if available
+    // Auto-select first organization ONLY if we are forced into a context (optional, but safer to let user choose in global mode)
+    // Actually, based on requirements, we want to force selection in Global Mode.
+    // So we only auto-select if there is only 1 organization defined or if we are not in global mode (which is handled above).
     useEffect(() => {
-        if (organizations && organizations.length > 0 && !selectedOrg) {
+        if (organizations && organizations.length === 1 && !selectedOrg) {
             setSelectedOrg(organizations[0].id)
         }
     }, [organizations])
@@ -144,8 +148,20 @@ export function ProjectList() {
         <div className="space-y-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b pb-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Projetos</h2>
-                    <p className="text-muted-foreground mt-1">Gerencie e acompanhe seus projetos por Secretaria</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                        Projetos
+                        {!activeOrgId && (
+                            <span className="text-sm font-medium bg-amber-100 text-amber-700 px-3 py-1 rounded-full border border-amber-200 shadow-sm animate-in fade-in slide-in-from-left-2">
+                                Visão Global ({organizations?.length || 0} Secretarias) Modo Visualização
+                            </span>
+                        )}
+                    </h2>
+                    <p className="text-muted-foreground mt-1">
+                        {!activeOrgId
+                            ? "Visualizando projetos de todas as suas secretarias vinculadas"
+                            : "Gerencie e acompanhe seus projetos desta Secretaria"
+                        }
+                    </p>
                 </div>
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>

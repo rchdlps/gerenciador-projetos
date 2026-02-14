@@ -3,11 +3,13 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+const isProd = process.env.USE_PROD_DB === 'true';
+
 export default defineConfig({
     schema: "./db/schema.ts",
     out: "./db/migrations",
     dialect: "postgresql",
     dbCredentials: {
-        url: process.env.DATABASE_URL!,
+        url: isProd ? process.env.DATABASE_URL_PROD! : process.env.DATABASE_URL!,
     },
 });
