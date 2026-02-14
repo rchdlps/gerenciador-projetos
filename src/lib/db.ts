@@ -1,9 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../../db/schema';
-
-neonConfig.webSocketConstructor = ws;
 
 const isProd = process.env.USE_PROD_DB === 'true' || (import.meta as any).env?.USE_PROD_DB === 'true';
 
@@ -17,5 +14,5 @@ if (!connectionString) {
 
 console.log(`🔌 Database connected to: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 
-export const client = new Pool({ connectionString });
+export const client = postgres(connectionString);
 export const db = drizzle(client, { schema });
