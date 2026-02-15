@@ -13,70 +13,92 @@ const app = new Hono<{ Variables: AuthVariables }>()
 app.use('*', requireAuth)
 
 // GET /api/admin/users
-app.get('/users', async (c) => {
-    const user = c.get('user')
-    if (!user) return c.json({ error: 'Unauthorized' }, 401)
+app.get('/users',
+    zValidator('query', z.object({
+        q: z.string().optional().default(''),
+        limit: z.coerce.number().min(1).max(200).optional().default(50),
+        offset: z.coerce.number().min(0).optional().default(0),
+    })),
+    async (c) => {
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
-    const search = c.req.query('q') || ''
-    const isSuperAdmin = user.globalRole === 'super_admin'
+        const { q: search, limit, offset } = c.req.valid('query')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-    let query = db.select({
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        image: users.image,
-        globalRole: users.globalRole,
-        isActive: users.isActive,
-        createdAt: users.createdAt,
-        organizations: sql<any[]>`COALESCE(
-            json_agg(
-                json_build_object(
-                    'id', ${organizations.id},
-                    'name', ${organizations.name},
-                    'role', ${memberships.role}
-                )
-            ) FILTER (WHERE ${organizations.id} IS NOT NULL),
-            '[]'
-        )`
-    })
-        .from(users)
-        .leftJoin(memberships, eq(users.id, memberships.userId))
-        .leftJoin(organizations, eq(memberships.organizationId, organizations.id))
-        .groupBy(users.id)
-        .orderBy(desc(users.createdAt))
+        // Build the base data query
+        let query = db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            image: users.image,
+            globalRole: users.globalRole,
+            isActive: users.isActive,
+            createdAt: users.createdAt,
+            organizations: sql<any[]>`COALESCE(
+                json_agg(
+                    json_build_object(
+                        'id', ${organizations.id},
+                        'name', ${organizations.name},
+                        'role', ${memberships.role}
+                    )
+                ) FILTER (WHERE ${organizations.id} IS NOT NULL),
+                '[]'
+            )`
+        })
+            .from(users)
+            .leftJoin(memberships, eq(users.id, memberships.userId))
+            .leftJoin(organizations, eq(memberships.organizationId, organizations.id))
+            .groupBy(users.id)
+            .orderBy(desc(users.createdAt))
 
-    if (isSuperAdmin) {
-        if (search) {
-            query.where(
-                sql`${users.name} ILIKE ${`%${search}%`} OR ${users.email} ILIKE ${`%${search}%`}`
-            )
+        // Build where condition based on role and search
+        let whereCondition: ReturnType<typeof sql> | undefined = undefined
+
+        if (isSuperAdmin) {
+            if (search) {
+                whereCondition = sql`${users.name} ILIKE ${'%' + search + '%'} OR ${users.email} ILIKE ${'%' + search + '%'}`
+            }
+        } else {
+            const myMemberships = await db.select({ orgId: memberships.organizationId })
+                .from(memberships)
+                .where(eq(memberships.userId, user.id))
+
+            const myOrgIds = myMemberships.map(m => m.orgId)
+
+            if (myOrgIds.length === 0) {
+                return c.json({ data: [], meta: { isSuperAdmin, total: 0, limit, offset } })
+            }
+
+            whereCondition = search
+                ? sql`${memberships.organizationId} IN (${sql.join(myOrgIds.map(id => sql`${id}`), sql`, `)}) AND (${users.name} ILIKE ${'%' + search + '%'} OR ${users.email} ILIKE ${'%' + search + '%'})`
+                : sql`${memberships.organizationId} IN (${sql.join(myOrgIds.map(id => sql`${id}`), sql`, `)})`
         }
-    } else {
-        const myMemberships = await db.select({ orgId: memberships.organizationId })
-            .from(memberships)
-            .where(eq(memberships.userId, user.id))
 
-        const myOrgIds = myMemberships.map(m => m.orgId)
-
-        if (myOrgIds.length === 0) {
-            return c.json({ data: [], meta: { isSuperAdmin, total: 0 } })
+        if (whereCondition) {
+            query.where(whereCondition)
         }
 
-        query.where(
-            and(
-                inArray(memberships.organizationId, myOrgIds),
-                search ? sql`${users.name} ILIKE ${`%${search}%`} OR ${users.email} ILIKE ${`%${search}%`}` : undefined
-            )
-        )
+        // Run data query with pagination + count query in parallel
+        const countQuery = db.select({ count: sql<number>`count(DISTINCT ${users.id})::int` })
+            .from(users)
+            .leftJoin(memberships, eq(users.id, memberships.userId))
+
+        if (whereCondition) {
+            countQuery.where(whereCondition)
+        }
+
+        const [results, countResult] = await Promise.all([
+            query.limit(limit).offset(offset),
+            countQuery,
+        ])
+
+        return c.json({
+            data: results,
+            meta: { isSuperAdmin, total: countResult[0]?.count ?? 0, limit, offset }
+        })
     }
-
-    const results = await query
-
-    return c.json({
-        data: results,
-        meta: { isSuperAdmin, total: results.length }
-    })
-})
+)
 
 // GET /api/admin/organizations
 app.get('/organizations', async (c) => {
