@@ -179,8 +179,8 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
                                     }
                                 }}
                             >
-                                <div className="flex items-center gap-2">
-                                    <p className="text-sm font-semibold truncate text-foreground flex-1">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <p className="text-sm font-semibold truncate text-foreground flex-1 min-w-0">
                                         {notification.title}
                                     </p>
                                     {!notification.isRead && (
