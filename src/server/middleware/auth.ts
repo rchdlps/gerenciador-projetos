@@ -1,12 +1,13 @@
 import { createMiddleware } from 'hono/factory'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { memberships } from '../../../db/schema'
+import { memberships, sessions } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { ORG_ROLES, hasMinRole, type OrgRole } from '@/lib/permissions'
 
 export type AuthVariables = {
+    activeOrgId: string | null
     user: typeof auth.$Infer.Session.user
     session: typeof auth.$Infer.Session.session
     membership?: typeof memberships.$inferSelect
@@ -116,6 +117,11 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async 
 
     c.set('user', session.user)
     c.set('session', session.session)
+
+    // Fetch activeOrganizationId once (avoids redundant session queries in routes)
+    const [sessionRow] = await db.select({ activeOrganizationId: sessions.activeOrganizationId })
+        .from(sessions).where(eq(sessions.id, session.session.id))
+    c.set('activeOrgId', sessionRow?.activeOrganizationId || null)
     await next()
 })
 
