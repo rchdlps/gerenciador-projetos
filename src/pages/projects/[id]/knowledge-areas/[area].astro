@@ -3,10 +3,10 @@ import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { KnowledgeAreaDetail } from "@/components/knowledge/knowledge-area-detail";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { auth } from "@/lib/auth";
+import { getPageContext } from "@/lib/queries/page-context";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-if (!session) return Astro.redirect("/login");
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
 const { id, area } = Astro.params;
 if (!id || !area) return Astro.redirect("/");
@@ -27,7 +27,11 @@ const AREA_TITLES: Record<string, string> = {
 const title = AREA_TITLES[area] || "Área de Conhecimento";
 ---
 
-<DashboardLayout title={`${title} - Áreas de Conhecimento`}>
+<DashboardLayout
+    title={`${title} - Áreas de Conhecimento`}
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <div class="space-y-6">
         <div class="flex items-center gap-2">
             <Button variant="ghost" class="pl-0 hover:bg-transparent" asChild>

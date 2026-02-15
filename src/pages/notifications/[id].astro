@@ -2,34 +2,28 @@
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { NotificationDetails } from "@/components/notifications/NotificationDetails";
 import { getNotificationById, markAsRead } from "@/lib/notification";
-import { auth } from "@/lib/auth";
+import { getPageContext } from "@/lib/queries/page-context";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-if (!session) {
-  return Astro.redirect("/login");
-}
-
-const user = session.user;
 const { id } = Astro.params;
+if (!id) return Astro.redirect("/notifications");
 
-if (!id) {
-    return Astro.redirect("/notifications");
-}
+const notification = await getNotificationById(id, ctx.user.id);
+if (!notification) return Astro.redirect("/notifications?error=not-found");
 
-const notification = await getNotificationById(id, user.id);
-
-if (!notification) {
-    return Astro.redirect("/notifications?error=not-found");
-}
-
-// Mark as read when viewing details
+// Mark as read (non-blocking — don't await, fire-and-forget)
 if (!notification.isRead) {
-    await markAsRead(id, user.id);
+    markAsRead(id, ctx.user.id).catch(() => {});
 }
 ---
 
-<DashboardLayout title={notification.title}>
+<DashboardLayout
+    title={notification.title}
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
   <div class="container mx-auto py-6">
     <NotificationDetails client:load notification={notification} />
   </div>

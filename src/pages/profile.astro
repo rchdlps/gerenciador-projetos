@@ -1,9 +1,17 @@
 ---
 import Layout from "../layouts/DashboardLayout.astro";
 import { ProfileForm } from "@/components/profile/profile-form";
+import { getPageContext } from "@/lib/queries/page-context";
+
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 ---
 
-<Layout title="Meu Perfil">
+<Layout
+    title="Meu Perfil"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <div class="space-y-6">
         <div>
             <h1 class="text-3xl font-bold tracking-tight text-slate-900">
