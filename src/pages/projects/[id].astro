@@ -1,74 +1,42 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { ProjectPage } from "@/components/dashboard/project-page";
-import { auth } from "@/lib/auth";
-
+import { getPageContext } from "@/lib/queries/page-context";
 import { db } from "@/lib/db";
-import { projects, users } from "../../../db/schema";
+import { projects } from "../../../db/schema";
 import { eq } from "drizzle-orm";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-if (!session) return Astro.redirect("/login");
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
 const { id } = Astro.params;
 if (!id) return Astro.redirect("/");
 
-// 1. Fetch User (Global Role), Active Session (Active Org), Project, and Memberships (Access) in Parallel
+// Fetch project (the only page-specific query needed)
+const [project] = await db.select().from(projects).where(eq(projects.id, id));
 
-// User Query
-const userQuery = db.select().from(users).where(eq(users.id, session.user.id));
-
-// Session Query (Active Org)
-const sessionQuery = db.query.sessions.findFirst({
-    where: (sessions, { eq }) => eq(sessions.id, session.session.id),
-});
-
-// Project Query
-const projectQuery = db.select().from(projects).where(eq(projects.id, id));
-
-// Memberships Query (All user memberships to check access against project.organizationId)
-// We fetch all because it's usually a small list and saves a round trip compared to checking just one if we didn't know the orgId yet
-const membershipsQuery = db.query.memberships.findMany({
-    where: (memberships, { eq }) => eq(memberships.userId, session.user.id),
-});
-
-const [[currentUser], sessionData, [project], userMemberships] =
-    await Promise.all([
-        userQuery,
-        sessionQuery,
-        projectQuery,
-        membershipsQuery,
-    ]);
-
-// 2. Access Control Logic (In-Memory)
-
+// Access control (in-memory using data from getPageContext)
 let allowed = false;
-
 if (project) {
-    const isSuperAdmin = currentUser?.globalRole === "super_admin";
-
-    if (isSuperAdmin) {
+    if (ctx.isSuperAdmin) {
         allowed = true;
-    } else if (project.userId === session.user.id) {
-        // Personal project owner
+    } else if (project.userId === ctx.session.user.id) {
         allowed = true;
     } else if (project.organizationId) {
-        // Check if user is member of the project's organization
-        const hasMembership = userMemberships.some(
-            (m) => m.organizationId === project.organizationId,
-        );
-        allowed = hasMembership;
+        // orgIds already contains the user's accessible org IDs
+        allowed = ctx.orgIds === null || ctx.orgIds.includes(project.organizationId);
     }
 }
 
 if (!allowed || !project) {
-    return Astro.redirect("/dashboard"); // Or 404/403 page
+    return Astro.redirect("/dashboard");
 }
-
-// We are reverting to CSR for this page to fix performance/interactivity issues
-// Data will be fetched on the client side by `ProjectDetails` component
 ---
 
-<DashboardLayout title={`Projeto: ${project.name}`}>
+<DashboardLayout
+    title={`Projeto: ${project.name}`}
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <ProjectPage client:load id={id} />
 </DashboardLayout>

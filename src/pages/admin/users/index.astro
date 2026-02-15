@@ -1,26 +1,15 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { AdminUsersWrapper } from "@/components/admin/users/wrapper";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { memberships } from "../../../../db/schema";
-import { eq } from "drizzle-orm";
+import { getPageContext } from "@/lib/queries/page-context";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-
-if (!session) {
-  return Astro.redirect("/login");
-}
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
 // Admin guard: only super_admin or org secretario/gestor can manage users
-const isSuperAdmin = session.user.globalRole === "super_admin";
-if (!isSuperAdmin) {
-  const userMemberships = await db
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(eq(memberships.userId, session.user.id));
-  const canManageUsers = userMemberships.some(
-    (m) => m.role === "secretario" || m.role === "gestor",
+if (!ctx.isSuperAdmin) {
+  const canManageUsers = ctx.orgSessionData?.organizations?.some(
+    (o: any) => o.role === "secretario" || o.role === "gestor",
   );
   if (!canManageUsers) {
     return Astro.redirect("/dashboard");
@@ -28,6 +17,10 @@ if (!isSuperAdmin) {
 }
 ---
 
-<DashboardLayout title="Gerenciamento de Usuários">
+<DashboardLayout
+    title="Gerenciamento de Usuários"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <AdminUsersWrapper client:only="react" />
 </DashboardLayout>

@@ -2,72 +2,36 @@
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { DashboardWrapper } from "@/components/dashboard/wrapper";
 import ProjectListFallback from "@/components/dashboard/ProjectListFallback.astro";
-import { auth } from "@/lib/auth";
-import app from "@/server/app";
-import { db } from "@/lib/db";
-import { users, sessions } from "../../db/schema";
-import { eq } from "drizzle-orm";
-import { getScopedOrgIds, scopedProjects } from "@/lib/queries/scoped";
+import { getPageContext } from "@/lib/queries/page-context";
+import { scopedProjects } from "@/lib/queries/scoped";
 import { type projects } from "../../db/schema";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-if (!session) {
-    return Astro.redirect("/login");
-}
-
-let orgSessionData = null;
 let initialProjects: (typeof projects.$inferSelect)[] = [];
 
 try {
-    // 1. Fetch org session data from the Hono API (same source as the sidebar)
-    //    This ensures the project list and sidebar always agree on active org.
-    const orgRes = await app.request("http://localhost/api/org-session", {
-        headers: Astro.request.headers,
-        method: "GET",
-    });
-
-    if (orgRes.ok) {
-        orgSessionData = await orgRes.json();
-    }
-
-    // 2. Read activeOrganizationId from a fresh DB query (not from better-auth
-    //    session object, which may not include custom columns).
-    const [sessionData] = await db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.id, session.session.id));
-    const activeOrgId = sessionData?.activeOrganizationId || null;
-
-    // 3. Determine user role
-    const [currentUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.id, session.user.id));
-    const isSuperAdmin = currentUser?.globalRole === "super_admin";
-
-    // 4. Calculate scoped org IDs and fetch projects
-    const orgIds = await getScopedOrgIds(
-        session.user.id,
-        activeOrgId,
-        isSuperAdmin,
-    );
-    initialProjects = await scopedProjects(orgIds);
+    initialProjects = await scopedProjects(ctx.orgIds);
 } catch (error) {
-    console.error("Failed to fetch server-side data:", error);
+    console.error("Failed to fetch projects:", error);
 }
 ---
 
-<DashboardLayout title="Dashboard - Gerenciador de Projetos">
+<DashboardLayout
+    title="Dashboard - Gerenciador de Projetos"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <DashboardWrapper
         client:load
-        initialData={orgSessionData}
+        initialData={ctx.orgSessionData}
         initialProjects={initialProjects}
     >
         <ProjectListFallback
             slot="fallback"
             initialProjects={initialProjects}
-            organizations={orgSessionData?.organizations ?? []}
+            organizations={ctx.orgSessionData?.organizations ?? []}
         />
     </DashboardWrapper>
 </DashboardLayout>

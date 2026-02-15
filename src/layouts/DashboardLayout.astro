@@ -10,18 +10,23 @@ import app from "@/server/app";
 
 interface Props {
 	title: string;
+	/** Pre-fetched session from the page — avoids a duplicate auth.api.getSession() call */
+	session?: typeof auth.$Infer.Session | null;
+	/** Pre-fetched org session data from the page — avoids a duplicate /api/org-session call */
+	orgSessionData?: any;
 }
 
-const { title } = Astro.props;
-const session = await auth.api.getSession({
+const { title, session: propSession, orgSessionData: propOrgSession } = Astro.props;
+
+// Use pre-fetched session if available, otherwise fetch (fallback for simple pages)
+const session = propSession !== undefined ? propSession : await auth.api.getSession({
 	headers: Astro.request.headers,
 });
 
-let orgSessionData = null;
-if (session?.user) {
+// Use pre-fetched org session data if available, otherwise fetch
+let orgSessionData = propOrgSession !== undefined ? propOrgSession : null;
+if (orgSessionData === null && session?.user) {
 	try {
-		// Construct a request to the Hono app to get org session data
-		// We use a dummy domain but keep the path and headers (logic relies on headers/cookies)
 		const res = await app.request("http://localhost/api/org-session", {
 			headers: Astro.request.headers,
 			method: "GET",

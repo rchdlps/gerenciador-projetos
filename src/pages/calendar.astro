@@ -1,50 +1,27 @@
 ---
 import DashboardLayout from "../layouts/DashboardLayout.astro";
 import { CalendarPage } from "@/components/calendar/calendar-page";
-import { db } from "@/lib/db";
-import { users, sessions } from "../../db/schema";
-import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { getScopedOrgIds, scopedAppointments } from "@/lib/queries/scoped";
+import { getPageContext } from "@/lib/queries/page-context";
+import { scopedAppointments } from "@/lib/queries/scoped";
 import { getDatedTasks } from "@/lib/queries/tasks";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-if (!session) return Astro.redirect("/login");
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-// Fetch full user to check role
-const [currentUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, session.user.id));
-const isSuperAdmin = currentUser?.globalRole === "super_admin";
-
-// Get active org from session
-const [sessionData] = await db
-    .select()
-    .from(sessions)
-    .where(eq(sessions.id, session.session.id));
-const activeOrgId = sessionData?.activeOrganizationId || null;
-
-// Determine scoped orgs
-const orgIds = await getScopedOrgIds(
-    session.user.id,
-    activeOrgId,
-    isSuperAdmin,
-);
-
-// Fetch data in parallel
+// Fetch tasks and appointments in parallel
 const [tasks, appointments] = await Promise.all([
-    getDatedTasks(orgIds),
-    scopedAppointments(orgIds),
+    getDatedTasks(ctx.orgIds),
+    scopedAppointments(ctx.orgIds),
 ]);
 
-const initialData = {
-    tasks,
-    appointments,
-};
+const initialData = { tasks, appointments };
 ---
 
-<DashboardLayout title="Calendário Geral">
+<DashboardLayout
+    title="Calendário Geral"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <div class="space-y-6 animate-in fade-in duration-500">
         <div class="flex items-center justify-between">
             <div>

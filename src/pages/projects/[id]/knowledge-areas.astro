@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/lib/db";
 import { knowledgeAreas } from "../../../../db/schema";
-
-import { auth } from "@/lib/auth";
+import { getPageContext } from "@/lib/queries/page-context";
 import { eq } from "drizzle-orm";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-if (!session) return Astro.redirect("/login");
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
 const { id } = Astro.params;
 if (!id) return Astro.redirect("/");
@@ -22,7 +21,11 @@ const initialData = await db
     .where(eq(knowledgeAreas.projectId, id));
 ---
 
-<DashboardLayout title="Áreas de Conhecimento">
+<DashboardLayout
+    title="Áreas de Conhecimento"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <div class="space-y-6">
         <div class="flex items-center gap-2">
             <Button

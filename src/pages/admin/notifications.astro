@@ -1,49 +1,26 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { AdminNotificationsWrapper } from "@/components/admin/AdminNotificationsWrapper";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { memberships } from "../../../db/schema";
-import { eq } from "drizzle-orm";
-import app from "@/server/app";
+import { getPageContext } from "@/lib/queries/page-context";
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-
-if (!session) {
-  return Astro.redirect("/login");
-}
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
 // Admin guard: only super_admin or org secretario can access
-const isSuperAdmin = session.user.globalRole === "super_admin";
-if (!isSuperAdmin) {
-  const userMemberships = await db
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(eq(memberships.userId, session.user.id));
-  const isSecretario = userMemberships.some((m) => m.role === "secretario");
+if (!ctx.isSuperAdmin) {
+  const isSecretario = ctx.orgSessionData?.organizations?.some(
+    (o: any) => o.role === "secretario"
+  );
   if (!isSecretario) {
     return Astro.redirect("/dashboard");
   }
 }
-
-let orgSessionData = null;
-try {
-  const res = await app.request("http://localhost/api/org-session", {
-    headers: Astro.request.headers,
-    method: "GET",
-  });
-
-  if (res.ok) {
-    orgSessionData = await res.json();
-  }
-} catch (error) {
-  console.error(
-    "Failed to fetch server-side org session for notifications:",
-    error,
-  );
-}
 ---
 
-<DashboardLayout title="Gerenciar Notificações">
-  <AdminNotificationsWrapper client:load initialData={orgSessionData} />
+<DashboardLayout
+  title="Gerenciar Notificações"
+  session={ctx.session}
+  orgSessionData={ctx.orgSessionData}
+>
+  <AdminNotificationsWrapper client:load initialData={ctx.orgSessionData} />
 </DashboardLayout>
