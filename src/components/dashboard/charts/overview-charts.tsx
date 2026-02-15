@@ -51,6 +51,12 @@ const barChartConfig = {
     progress: { label: "Progresso (%)", color: "hsl(var(--chart-5))" },
 } satisfies ChartConfig
 
+function ChartSkeleton({ height = "280px" }: { height?: string }) {
+    return (
+        <div className={`animate-pulse rounded-lg bg-muted/50`} style={{ height }} />
+    )
+}
+
 export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg, completionRate }: OverviewChartsProps) {
     const { completed, recorrente, total } = completionRate;
     const totalCompleted = completed + recorrente;
@@ -91,6 +97,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
+                            <React.Suspense fallback={<ChartSkeleton />}>
                             <ChartContainer config={typeConfig} className="h-[280px] w-full min-h-[280px] min-w-[200px]">
                                 <PieChart>
                                     <Pie
@@ -110,6 +117,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                                     />
                                 </PieChart>
                             </ChartContainer>
+                            </React.Suspense>
                         </CardContent>
                     </Card>
 
@@ -122,6 +130,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pb-10">
+                            <React.Suspense fallback={<ChartSkeleton />}>
                             <ChartContainer config={statusConfig} className="h-[280px] w-full min-h-[280px] min-w-[200px]">
                                 <PieChart>
                                     <Pie
@@ -139,6 +148,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                                     />
                                 </PieChart>
                             </ChartContainer>
+                            </React.Suspense>
                         </CardContent>
                     </Card>
 
@@ -228,6 +238,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                         <CardTitle className="text-sm font-medium text-emerald-700">Progresso Geral por Secretaria</CardTitle>
                     </CardHeader>
                     <CardContent>
+                        <React.Suspense fallback={<ChartSkeleton height="300px" />}>
                         <ChartContainer config={barChartConfig} className="h-[300px] w-full min-h-[300px] min-w-[200px]">
                             <BarChart data={barData} accessibilityLayer>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -254,6 +265,7 @@ export function OverviewCharts({ projectsByType, projectsByStatus, projectsByOrg
                                 />
                             </BarChart>
                         </ChartContainer>
+                        </React.Suspense>
                     </CardContent>
                 </Card>
             </div>
