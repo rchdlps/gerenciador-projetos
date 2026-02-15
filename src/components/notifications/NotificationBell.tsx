@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Providers } from "@/components/providers";
 import { Bell, Check, CheckCheck, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,14 @@ type NotificationBellProps = {
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {
+    return (
+        <Providers>
+            <NotificationBellInner userId={userId} />
+        </Providers>
+    );
+}
+
+function NotificationBellInner({ userId }: NotificationBellProps) {
     const [isOpen, setIsOpen] = useState(false);
     const queryClient = useQueryClient();
 
