@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, client } from '@/lib/db'
 import { tasks } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
@@ -48,16 +48,22 @@ app.patch('/reorder',
 
         const { items } = c.req.valid('json')
 
-        await db.transaction(async (tx) => {
-            for (const item of items) {
-                await tx.update(tasks)
-                    .set({
-                        status: item.status,
-                        order: item.order
-                    })
-                    .where(eq(tasks.id, item.id))
-            }
-        })
+        if (items.length === 0) return c.json({ success: true })
+
+        // Bulk update: single query instead of N sequential updates
+        // Uses postgres-js parameterized query to prevent SQL injection
+        const ids = items.map(i => i.id)
+        const statuses = items.map(i => i.status)
+        const orders = items.map(i => i.order)
+
+        await client`
+            UPDATE tasks SET
+                status = bulk.status,
+                "order" = bulk.ord
+            FROM unnest(${ids}::text[], ${statuses}::text[], ${orders}::integer[])
+                AS bulk(id, status, ord)
+            WHERE tasks.id = bulk.id
+        `
 
         return c.json({ success: true })
     }
