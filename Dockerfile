@@ -10,7 +10,9 @@ RUN npm install -g npm@latest && \
 # Copy package files first (better layer caching)
 COPY package.json package-lock.json ./
 
-RUN npm ci
+# Skip install scripts to avoid broken esbuild validation in deprecated @esbuild-kit/core-utils,
+# then rebuild argon2 native module separately
+RUN npm ci --ignore-scripts && npm rebuild argon2
 
 # Copy source code
 COPY . .
@@ -30,7 +32,7 @@ RUN npm install -g npm@latest && \
 
 # Copy package files and install production deps only
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts && npm rebuild argon2
 
 # Copy built output from build stage
 COPY --from=build /app/dist ./dist
