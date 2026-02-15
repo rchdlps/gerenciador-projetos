@@ -1,5 +1,6 @@
 ---
 import "@/styles/globals.css";
+import { ClientRouter } from "astro:transitions";
 import { Header } from "@/components/layout/header";
 import { SidebarWithProvider } from "@/components/layout/sidebar-with-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -63,21 +64,113 @@ if (orgSessionData === null && session?.user) {
 		/>
 		<meta property="og:image" content="/og-image.png" />
 
+		<ClientRouter />
 		<title>{title}</title>
 	</head>
 	<body class="bg-background min-h-screen font-sans antialiased">
-		<Header client:load user={session?.user} />
+		<!-- Loading bar: animated during View Transitions -->
+		<div id="nav-loading-bar" class="nav-loading-bar" aria-hidden="true"></div>
+
+		<Header transition:persist="header" client:load user={session?.user} />
 		<div class="flex">
 			<SidebarWithProvider
+				transition:persist="sidebar"
 				client:load
 				user={session?.user}
 				initialData={orgSessionData}
 				initialPath={Astro.url.pathname}
 			/>
-			<main class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8">
+			<main
+				class="flex-1 container mx-auto max-w-7xl p-6 sm:p-8"
+				transition:animate="fade"
+			>
 				<slot />
 			</main>
 		</div>
-		<Toaster client:load />
+		<Toaster transition:persist="toaster" client:load />
+
+		<style is:global>
+			/* ── Navigation loading bar ── */
+			.nav-loading-bar {
+				position: fixed;
+				top: 0;
+				left: 0;
+				height: 3px;
+				width: 0%;
+				background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--secondary)));
+				z-index: 9999;
+				opacity: 0;
+				transition: none;
+				pointer-events: none;
+			}
+			.nav-loading-bar.loading {
+				opacity: 1;
+				animation: nav-bar-grow 8s cubic-bezier(0.1, 0.5, 0.3, 1) forwards;
+			}
+			.nav-loading-bar.done {
+				width: 100% !important;
+				opacity: 0;
+				transition: opacity 0.3s ease 0.1s;
+			}
+			@keyframes nav-bar-grow {
+				0%   { width: 0%; }
+				10%  { width: 30%; }
+				30%  { width: 55%; }
+				50%  { width: 70%; }
+				80%  { width: 85%; }
+				100% { width: 95%; }
+			}
+
+			/* ── Smooth fade for main content ── */
+			@keyframes fade-in {
+				from { opacity: 0; transform: translateY(4px); }
+				to   { opacity: 1; transform: translateY(0); }
+			}
+			@keyframes fade-out {
+				from { opacity: 1; transform: translateY(0); }
+				to   { opacity: 0; transform: translateY(-4px); }
+			}
+			::view-transition-old(main-content) {
+				animation: fade-out 0.15s ease-out both;
+			}
+			::view-transition-new(main-content) {
+				animation: fade-in 0.2s ease-in 0.1s both;
+			}
+
+			/* Prevent sidebar/header from flashing during transitions */
+			::view-transition-old(header-bar),
+			::view-transition-new(header-bar),
+			::view-transition-old(sidebar-nav),
+			::view-transition-new(sidebar-nav) {
+				animation: none;
+			}
+		</style>
+
+		<script>
+			// Loading bar logic — event listeners are added once and persist across
+			// View Transition navigations (Astro doesn't re-run <script> tags by default).
+			const bar = document.getElementById('nav-loading-bar');
+
+			if (bar) {
+				document.addEventListener('astro:before-preparation', () => {
+					bar.style.width = '0%';
+					bar.classList.remove('done');
+					bar.classList.add('loading');
+				});
+
+				document.addEventListener('astro:after-swap', () => {
+					bar.classList.remove('loading');
+					bar.classList.add('done');
+				});
+
+				document.addEventListener('astro:page-load', () => {
+					// Clean up after transition completes
+					setTimeout(() => {
+						bar.classList.remove('loading', 'done');
+						bar.style.width = '0%';
+					}, 400);
+				});
+			}
+		</script>
 	</body>
 </html>

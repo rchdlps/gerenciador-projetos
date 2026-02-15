@@ -12,9 +12,14 @@ export function Sidebar({ user, initialPath }: { user?: any, initialPath?: strin
     const activeOrg = orgContext?.activeOrg
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            setCurrentPath(window.location.pathname)
-        }
+        if (typeof window === "undefined") return
+
+        setCurrentPath(window.location.pathname)
+
+        // Update active link when Astro View Transitions navigate
+        const onPageLoad = () => setCurrentPath(window.location.pathname)
+        document.addEventListener('astro:page-load', onPageLoad)
+        return () => document.removeEventListener('astro:page-load', onPageLoad)
     }, [])
 
     // Check if user is super admin (globalRole is a custom field)
