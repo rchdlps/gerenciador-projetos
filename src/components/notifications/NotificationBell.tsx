@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,76 +28,60 @@ type NotificationBellProps = {
 };
 
 export function NotificationBell({ userId }: NotificationBellProps) {
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
+    const queryClient = useQueryClient();
 
-    // Fetch initial notifications
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const [notifRes, countRes] = await Promise.all([
-                    fetch("/api/notifications?limit=10"),
-                    fetch("/api/notifications/unread-count"),
-                ]);
+    // Fetch unread count (always active, polls every 30s as fallback)
+    const { data: unreadCount = 0 } = useQuery({
+        queryKey: ['notifications', 'unread-count'],
+        queryFn: async () => {
+            const res = await fetch("/api/notifications/unread-count");
+            if (!res.ok) return 0;
+            const data = await res.json();
+            return data.count || 0;
+        },
+        refetchInterval: 30_000,
+    });
 
-                if (notifRes.ok) {
-                    const data = await notifRes.json();
-                    setNotifications(data.notifications || []);
-                }
+    // Fetch notification list (only when dropdown is open)
+    const { data: notifications = [], isLoading } = useQuery({
+        queryKey: ['notifications', 'recent'],
+        queryFn: async () => {
+            const res = await fetch("/api/notifications?limit=10");
+            if (!res.ok) return [];
+            const data = await res.json();
+            return (data.notifications || []) as Notification[];
+        },
+        enabled: isOpen,
+    });
 
-                if (countRes.ok) {
-                    const data = await countRes.json();
-                    setUnreadCount(data.count || 0);
-                }
-            } catch (error) {
-                console.error("Failed to fetch notifications:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchNotifications();
-    }, []);
-
-    // Handle real-time notifications
-    const handleNewNotification = useCallback((notification: PusherNotification) => {
-        const newNotif: Notification = {
-            ...notification,
-            isRead: false,
-        };
-
-        setNotifications((prev) => [newNotif, ...prev.slice(0, 9)]);
-        setUnreadCount((prev) => prev + 1);
-    }, []);
-
-    // Subscribe to real-time updates
-    usePusher({ userId, onNotification: handleNewNotification });
-
-    // Mark single notification as read
-    const markAsRead = async (id: string) => {
-        try {
-            await fetch(`/api/notifications/${id}/read`, { method: "POST" });
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-            );
-            setUnreadCount((prev) => Math.max(0, prev - 1));
-        } catch (error) {
-            console.error("Failed to mark as read:", error);
-        }
-    };
+    // Mark single as read
+    const markReadMutation = useMutation({
+        mutationFn: (id: string) => fetch(`/api/notifications/${id}/read`, { method: "POST" }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        },
+    });
 
     // Mark all as read
-    const markAllAsRead = async () => {
-        try {
-            await fetch("/api/notifications/read-all", { method: "POST" });
-            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-            setUnreadCount(0);
-        } catch (error) {
-            console.error("Failed to mark all as read:", error);
-        }
-    };
+    const markAllReadMutation = useMutation({
+        mutationFn: () => fetch("/api/notifications/read-all", { method: "POST" }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        },
+    });
+
+    // Handle real-time Pusher notifications
+    const handleNewNotification = useCallback((notification: PusherNotification) => {
+        queryClient.setQueryData<number>(['notifications', 'unread-count'], (old) => (old ?? 0) + 1);
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
+    }, [queryClient]);
+
+    usePusher({ userId, onNotification: handleNewNotification });
+
+    // Wrapper functions to match existing JSX onClick handlers
+    const markAsRead = (id: string) => markReadMutation.mutate(id);
+    const markAllAsRead = () => markAllReadMutation.mutate();
 
     // Format relative time
     const formatTime = (dateString: string) => {
