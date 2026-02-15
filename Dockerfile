@@ -3,8 +3,9 @@ FROM node:22-slim AS build
 
 WORKDIR /app
 
-# Install build dependencies for native modules (argon2)
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Update npm and install build dependencies for native modules (argon2)
+RUN npm install -g npm@latest && \
+    apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files first (better layer caching)
 COPY package.json package-lock.json ./
@@ -23,8 +24,9 @@ FROM node:22-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime dependencies for native modules (argon2)
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+# Update npm and install runtime dependencies for native modules (argon2)
+RUN npm install -g npm@latest && \
+    apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Copy package files and install production deps only
 COPY package.json package-lock.json ./
