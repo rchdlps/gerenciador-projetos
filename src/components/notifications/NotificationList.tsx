@@ -130,7 +130,8 @@ export function NotificationList() {
 
     const handleBulkRead = async () => {
         try {
-            await fetch("/api/notifications/read-all", { method: "POST" });
+            const res = await fetch("/api/notifications/read-all", { method: "POST" });
+            if (!res.ok) throw new Error("Failed to mark all as read");
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
             toast.success("Todas marcadas como lidas");
         } catch {

@@ -43,28 +43,45 @@ adminNotificationsRouter.use("*", async (c, next) => {
         return next();
     }
 
-    if (!orgId) {
-        return c.json({ error: "Organization context required" }, 403);
+    if (orgId) {
+        // Specific org: check secretario membership in that org
+        const [membership] = await db
+            .select({ role: memberships.role })
+            .from(memberships)
+            .where(
+                and(
+                    eq(memberships.userId, user.id),
+                    eq(memberships.organizationId, orgId),
+                    eq(memberships.role, "secretario")
+                )
+            )
+            .limit(1);
+
+        if (!membership) {
+            return c.json({ error: "Forbidden: Insufficient permissions" }, 403);
+        }
+
+        c.set("notificationContext" as any, { role: membership.role, orgId });
+        return next();
     }
 
-    // Single membership query — shared across all handlers
-    const [membership] = await db
+    // No org selected: allow if user is secretario in any org
+    const [anySecretario] = await db
         .select({ role: memberships.role })
         .from(memberships)
         .where(
             and(
                 eq(memberships.userId, user.id),
-                eq(memberships.organizationId, orgId),
                 eq(memberships.role, "secretario")
             )
         )
         .limit(1);
 
-    if (!membership) {
+    if (!anySecretario) {
         return c.json({ error: "Forbidden: Insufficient permissions" }, 403);
     }
 
-    c.set("notificationContext" as any, { role: membership.role, orgId });
+    c.set("notificationContext" as any, { role: "secretario", orgId: null });
     await next();
 });
 

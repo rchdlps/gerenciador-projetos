@@ -1,4 +1,4 @@
-import { useUserRole } from "@/hooks/use-user-role";
+import { useActiveOrg } from "@/contexts/org-context";
 import { NotificationComposer } from "./NotificationComposer";
 import { NotificationStats } from "./NotificationStats";
 import { ScheduledNotificationsList } from "./ScheduledNotificationsList";
@@ -6,7 +6,14 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export function AdminNotificationsDashboard() {
-    const { isSuperAdmin, canSendNotifications, activeOrg, isLoading } = useUserRole();
+    const { activeOrg, organizations, isSuperAdmin, isLoading } = useActiveOrg();
+
+    // Determine if user can send: secretario in active org, or secretario in any org (aggregate view)
+    const canSendNotifications = isSuperAdmin || (
+        activeOrg
+            ? activeOrg.role === 'secretario'
+            : organizations.some(o => o.role === 'secretario')
+    );
 
     if (isLoading) {
         return (

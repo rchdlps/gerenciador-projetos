@@ -66,7 +66,10 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
 
     // Mark single as read
     const markReadMutation = useMutation({
-        mutationFn: (id: string) => fetch(`/api/notifications/${id}/read`, { method: "POST" }),
+        mutationFn: async (id: string) => {
+            const res = await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+            if (!res.ok) throw new Error("Failed to mark as read");
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
         },
@@ -74,7 +77,10 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
 
     // Mark all as read
     const markAllReadMutation = useMutation({
-        mutationFn: () => fetch("/api/notifications/read-all", { method: "POST" }),
+        mutationFn: async () => {
+            const res = await fetch("/api/notifications/read-all", { method: "POST" });
+            if (!res.ok) throw new Error("Failed to mark all as read");
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
         },
