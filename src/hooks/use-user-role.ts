@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
+import { ORG_ROLES, type OrgRole } from "@/lib/permissions"
 
 export function useUserRole() {
     const { data: session, isLoading } = useQuery({
@@ -12,7 +13,6 @@ export function useUserRole() {
         staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     })
 
-    const activeOrgId = session?.activeOrganizationId
     const activeOrg = session?.activeOrganization
 
     // If super admin, they have all permissions
@@ -30,8 +30,18 @@ export function useUserRole() {
         }
     }
 
-    // Standard role check
-    const role = activeOrg?.role || 'viewer' // Default to viewer if no role found (safety)
+    // When an org is selected, use that org's role.
+    // When no org is selected (aggregate view), use the highest role across all orgs.
+    let role: string = 'viewer'
+    if (activeOrg?.role) {
+        role = activeOrg.role
+    } else if (session?.organizations?.length) {
+        role = session.organizations.reduce((highest: string, org: { role: string }) => {
+            const currentIdx = ORG_ROLES.indexOf(highest as OrgRole)
+            const orgIdx = ORG_ROLES.indexOf(org.role as OrgRole)
+            return orgIdx > currentIdx ? org.role : highest
+        }, 'viewer')
+    }
 
     return {
         role,
