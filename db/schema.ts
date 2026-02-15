@@ -108,6 +108,7 @@ export const projects = pgTable("projects", {
     orgIdIdx: index('project_org_idx').on(t.organizationId),
     statusIdx: index('project_status_idx').on(t.status),
     typeIdx: index('project_type_idx').on(t.type),
+    orgStatusIdx: index('project_org_status_idx').on(t.organizationId, t.status),
 }));
 
 export const stakeholders = pgTable("stakeholders", {
@@ -190,6 +191,7 @@ export const tasks = pgTable("tasks", {
     assigneeIdIdx: index('task_assignee_idx').on(t.assigneeId),
     statusIdx: index('task_status_idx').on(t.status),
     priorityIdx: index('task_priority_idx').on(t.priority),
+    datesIdx: index('task_dates_idx').on(t.startDate, t.endDate),
 }));
 
 export const appointments = pgTable("appointments", {

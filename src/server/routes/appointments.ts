@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { appointments, projects, sessions } from '../../../db/schema'
+import { appointments, projects } from '../../../db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { getScopedOrgIds, scopedAppointments, canAccessProject } from '@/lib/queries/scoped'
@@ -21,10 +21,8 @@ app.get('/', async (c) => {
 
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Get active org from a fresh DB query (better-auth session object
-    // may not include custom columns like activeOrganizationId)
-    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
-    const activeOrgId = sessionRow?.activeOrganizationId || null
+    // Get active org from middleware-cached value
+    const activeOrgId = c.get('activeOrgId')
 
     // Use centralized scoped query logic with active org from session
     const orgIds = await getScopedOrgIds(user.id, activeOrgId, isSuperAdmin)

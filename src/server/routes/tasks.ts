@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects, memberships, sessions } from '../../../db/schema'
+import { tasks, projectPhases, projects, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
@@ -64,10 +64,8 @@ app.get('/dated', async (c) => {
 
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Get active org from a fresh DB query (better-auth session object
-    // may not include custom columns like activeOrganizationId)
-    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
-    const activeOrgId = sessionRow?.activeOrganizationId || null
+    // Get active org from middleware-cached value
+    const activeOrgId = c.get('activeOrgId')
 
     const orgIds = await getScopedOrgIds(user.id, activeOrgId, isSuperAdmin)
     const results = await getDatedTasks(orgIds)

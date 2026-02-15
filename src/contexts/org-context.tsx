@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export interface Organization {
     id: string
@@ -6,6 +7,12 @@ export interface Organization {
     code: string
     logoUrl: string | null
     role: string
+}
+
+interface OrgSessionData {
+    activeOrganizationId: string | null
+    organizations: Organization[]
+    isSuperAdmin: boolean
 }
 
 interface OrgContextType {
@@ -30,70 +37,60 @@ interface OrgProviderProps {
 }
 
 export function OrgProvider({ children, initialData }: OrgProviderProps) {
-    const [activeOrgId, setActiveOrgId] = useState<string | null>(initialData?.activeOrganizationId ?? null)
-    const [organizations, setOrganizations] = useState<Organization[]>(initialData?.organizations ?? [])
-    const [isLoading, setIsLoading] = useState(!initialData)
-    const [isSuperAdmin, setIsSuperAdmin] = useState(initialData?.isSuperAdmin ?? false)
+    const queryClient = useQueryClient()
 
-    const fetchOrgSession = async () => {
-        try {
+    const { data: orgSession, isLoading } = useQuery<OrgSessionData>({
+        queryKey: ['org-session'],
+        queryFn: async () => {
             const res = await fetch('/api/org-session')
             if (!res.ok) throw new Error('Failed to fetch org session')
-            const data = await res.json()
+            return res.json()
+        },
+        staleTime: 60_000,
+        initialData: initialData ? {
+            activeOrganizationId: initialData.activeOrganizationId,
+            organizations: initialData.organizations,
+            isSuperAdmin: initialData.isSuperAdmin ?? false,
+        } : undefined,
+    })
 
-            setActiveOrgId(data.activeOrganizationId)
-            setOrganizations(data.organizations)
-            setIsSuperAdmin(data.isSuperAdmin ?? false)
-
-            // Auto-select first org ONLY for non-super-admins with SINGLE org
-            // Super admins and multi-org users can have null = "view all"
-            if (!data.activeOrganizationId && !data.isSuperAdmin) {
-                if (data.organizations.length === 1) {
-                    await switchOrg(data.organizations[0].id)
-                }
-            }
-        } catch (err) {
-            console.error('[OrgContext] Error fetching org session:', err)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    const switchOrg = async (orgId: string | null) => {
-        try {
+    const switchMutation = useMutation({
+        mutationFn: async (orgId: string | null) => {
             const res = await fetch('/api/org-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ organizationId: orgId })
+                body: JSON.stringify({ organizationId: orgId }),
             })
-
             if (!res.ok) {
                 const error = await res.json()
                 throw new Error(error.error || 'Failed to switch organization')
             }
-
-            setActiveOrgId(orgId)
-
-            // Reload page to refresh all data with new org context
+        },
+        onSuccess: () => {
+            // Org switch affects all data — reload page to refresh SSR context
             window.location.reload()
-        } catch (err) {
-            console.error('[OrgContext] Error switching org:', err)
-            throw err
+        },
+    })
+
+    const activeOrgId = orgSession?.activeOrganizationId ?? null
+    const organizations = orgSession?.organizations ?? []
+    const isSuperAdmin = orgSession?.isSuperAdmin ?? false
+    const activeOrg = organizations.find(o => o.id === activeOrgId) || null
+
+    // Auto-select first org for non-super-admins with single org
+    useEffect(() => {
+        if (!activeOrgId && !isSuperAdmin && organizations.length === 1) {
+            switchMutation.mutate(organizations[0].id)
         }
+    }, [activeOrgId, isSuperAdmin, organizations.length])
+
+    const switchOrg = async (orgId: string | null) => {
+        await switchMutation.mutateAsync(orgId)
     }
 
-    useEffect(() => {
-        if (!initialData) {
-            fetchOrgSession()
-        } else if (!initialData.activeOrganizationId && !initialData.isSuperAdmin) {
-            // Auto-select first org ONLY for non-super-admins with SINGLE org
-            if (initialData.organizations.length === 1) {
-                switchOrg(initialData.organizations[0].id)
-            }
-        }
-    }, [])
-
-    const activeOrg = organizations.find(o => o.id === activeOrgId) || null
+    const refetch = async () => {
+        await queryClient.invalidateQueries({ queryKey: ['org-session'] })
+    }
 
     return (
         <OrgContext.Provider value={{
@@ -103,7 +100,7 @@ export function OrgProvider({ children, initialData }: OrgProviderProps) {
             isLoading,
             isSuperAdmin,
             switchOrg,
-            refetch: fetchOrgSession
+            refetch,
         }}>
             {children}
         </OrgContext.Provider>

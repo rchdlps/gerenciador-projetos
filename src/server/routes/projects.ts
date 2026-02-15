@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projects, projectPhases, sessions, memberships } from '../../../db/schema'
+import { projects, projectPhases, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -15,13 +15,11 @@ app.use('*', requireAuth)
 
 app.get('/', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
 
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Get active org from session (custom column not in session object)
-    const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, session.id))
-    const activeOrgId = sessionRow?.activeOrganizationId || null
+    // Get active org from middleware-cached value
+    const activeOrgId = c.get('activeOrgId')
 
     const orgIds = await getScopedOrgIds(user.id, activeOrgId, isSuperAdmin)
     const userProjects = await scopedProjects(orgIds)

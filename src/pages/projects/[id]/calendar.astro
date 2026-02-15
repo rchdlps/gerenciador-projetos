@@ -27,6 +27,6 @@ if (!id) return Astro.redirect("/");
             </div>
         </div>
 
-        <CalendarPage client:load projectId={id!} />
+        <CalendarPage client:visible projectId={id!} />
     </div>
 </DashboardLayout>

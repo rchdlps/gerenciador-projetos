@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getCachedSession } from '@/server/middleware/auth'
 import { users, sessions, memberships, organizations } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
+import { createTTLCache } from '@/lib/cache'
 
 export type PageContext = {
     session: typeof auth.$Infer.Session
@@ -19,6 +20,25 @@ type OrgSessionData = {
     activeOrganization: any
     isSuperAdmin: boolean
     organizations: any[]
+}
+
+const orgListCache = createTTLCache<any[]>(5 * 60_000) // 5 min TTL
+
+async function getCachedOrgList() {
+    const cached = orgListCache.get('all')
+    if (cached) return cached
+    const orgs = await db.select({
+        id: organizations.id,
+        name: organizations.name,
+        code: organizations.code,
+        logoUrl: organizations.logoUrl,
+    }).from(organizations)
+    orgListCache.set('all', orgs)
+    return orgs
+}
+
+export function invalidateOrgCache() {
+    orgListCache.invalidate()
 }
 
 /**
@@ -43,7 +63,7 @@ export async function getPageContext(
 
     const isSuperAdmin = session.user.globalRole === 'super_admin'
 
-    // Batch 2: session row + memberships (with org details) + allOrgs (super admin)
+    // Batch 2: session row + memberships (with org details) + allOrgs (super admin, cached)
     // No separate user query — session.user already has id, globalRole, isActive
     const [sessionRows, membershipWithOrgs, allOrgs] = await Promise.all([
         db.select().from(sessions).where(eq(sessions.id, session.session.id)),
@@ -52,14 +72,7 @@ export async function getPageContext(
             where: eq(memberships.userId, session.user.id),
             with: { organization: true },
         }),
-        isSuperAdmin
-            ? db.select({
-                id: organizations.id,
-                name: organizations.name,
-                code: organizations.code,
-                logoUrl: organizations.logoUrl,
-            }).from(organizations)
-            : Promise.resolve([]),
+        isSuperAdmin ? getCachedOrgList() : Promise.resolve([]),
     ])
 
     const sessionRow = sessionRows[0]

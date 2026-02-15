@@ -13,9 +13,8 @@ import {
 import { OverviewCharts } from "@/components/dashboard/charts/overview-charts";
 
 import { db } from "@/lib/db";
-import { projects, users } from "../../db/schema";
-import { count, inArray } from "drizzle-orm";
 import { getPageContext } from "@/lib/queries/page-context";
+import { getDashboardStats } from "@/lib/queries/dashboard";
 
 // Single call gets auth + user + org scope + sidebar data
 const ctx = await getPageContext(Astro.request.headers);
@@ -23,101 +22,19 @@ if (!ctx) return Astro.redirect("/login");
 
 const { isSuperAdmin, activeOrgId, orgIds, orgSessionData } = ctx;
 
-const shouldFilter = orgIds !== null && orgIds.length > 0;
 const showEmptyState = orgIds !== null && orgIds.length === 0;
 
-// Fetch ALL dashboard data in a single parallel batch
-// allProjects (with relations) contains everything we need for metrics + charts
-let usersCount = { count: 0 };
-let allProjects: any[] = [];
+// Fetch dashboard stats using SQL aggregates (instead of loading all rows)
+const stats = showEmptyState ? null : await getDashboardStats(orgIds);
 
-if (!showEmptyState) {
-    const projectsQuery = shouldFilter
-        ? db.query.projects.findMany({
-            where: inArray(projects.organizationId, orgIds!),
-            with: { phases: { with: { tasks: true } }, organization: true },
-        })
-        : db.query.projects.findMany({
-            with: { phases: { with: { tasks: true } }, organization: true },
-        });
-
-    // Run both queries in parallel
-    const [totalUsers, projectsResult] = await Promise.all([
-        db.select({ count: count() }).from(users),
-        projectsQuery,
-    ]);
-
-    usersCount = totalUsers[0];
-    allProjects = projectsResult;
-} else {
-    const [totalUsers] = await db.select({ count: count() }).from(users);
-    usersCount = totalUsers;
-}
-
-// Compute ALL metrics in-memory from allProjects (zero extra DB queries)
-const projectsCount = { count: allProjects.length };
-
-const allTasks = allProjects.flatMap((p: any) =>
-    p.phases.flatMap((ph: any) => ph.tasks)
-);
-const activeTasksCount = allTasks.filter((t: any) => t.status !== "done").length;
-const completedTasksCount = allTasks.filter((t: any) => t.status === "done").length;
-
-// Charts: Projects by Type
-const projectsByTypeMap = new Map<string, number>();
-allProjects.forEach((p: any) => {
-    const type = p.type || "Projeto";
-    projectsByTypeMap.set(type, (projectsByTypeMap.get(type) || 0) + 1);
-});
-const projectsByType = Array.from(projectsByTypeMap.entries()).map(
-    ([name, value]) => ({ name, value }),
-);
-if (projectsByType.length === 0) projectsByType.push({ name: "N/A", value: 0 });
-
-// Charts: Project Status
-const projectsByStatusMap = new Map<string, number>();
-const statusLabels: Record<string, string> = {
-    em_andamento: "Em Andamento",
-    concluido: "Concluído",
-    suspenso: "Suspenso",
-    cancelado: "Cancelado",
-    recorrente: "Recorrente",
-    proposta: "Proposta",
-    planejamento: "Planejamento",
-};
-Object.keys(statusLabels).forEach((key) => projectsByStatusMap.set(key, 0));
-allProjects.forEach((p: any) => {
-    const status = p.status || "em_andamento";
-    projectsByStatusMap.set(status, (projectsByStatusMap.get(status) || 0) + 1);
-});
-const projectsByStatus = Array.from(projectsByStatusMap.entries())
-    .filter(([_, value]) => value > 0)
-    .map(([key, value]) => ({ name: statusLabels[key] || key, value }));
-
-// Charts: Progress per Organization
-const orgStats = new Map<string, { total: number; done: number }>();
-allProjects.forEach((p: any) => {
-    if (p.organization) {
-        const orgName = p.organization.code || p.organization.name;
-        const current = orgStats.get(orgName) || { total: 0, done: 0 };
-        const pTasks = p.phases.flatMap((ph: any) => ph.tasks);
-        orgStats.set(orgName, {
-            total: current.total + pTasks.length,
-            done: current.done + pTasks.filter((t: any) => t.status === "done").length,
-        });
-    }
-});
-const projectsByOrg = Array.from(orgStats.entries()).map(([name, stats]) => ({
-    name,
-    progress: stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0,
-}));
-if (projectsByOrg.length === 0) projectsByOrg.push({ name: "N/A", progress: 0 });
-
-const completionRate = {
-    completed: projectsByStatusMap.get("concluido") || 0,
-    recorrente: projectsByStatusMap.get("recorrente") || 0,
-    total: allProjects.length,
-};
+const projectsCount = { count: stats?.totalProjects ?? 0 };
+const usersCount = { count: stats?.totalUsers ?? 0 };
+const activeTasksCount = stats?.activeTasksCount ?? 0;
+const completedTasksCount = stats?.completedTasksCount ?? 0;
+const projectsByType = stats?.projectsByType ?? [];
+const projectsByStatus = stats?.projectsByStatus ?? [];
+const projectsByOrg = stats?.projectsByOrg ?? [];
+const completionRate = stats?.completionRate ?? { completed: 0, recorrente: 0, total: 0 };
 
 // Get active org name from orgSessionData (no extra DB query needed)
 const activeOrgName = orgSessionData?.activeOrganization?.name || "Todas as Secretarias";
@@ -326,7 +243,7 @@ const activeOrgName = orgSessionData?.activeOrganization?.name || "Todas as Secr
                             </div>
                         </div>
                         <OverviewCharts
-                            client:load
+                            client:visible
                             projectsByType={projectsByType}
                             projectsByStatus={projectsByStatus}
                             projectsByOrg={projectsByOrg}
