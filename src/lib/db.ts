@@ -1,9 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../../db/schema';
-
-neonConfig.webSocketConstructor = ws;
 
 const isProd = process.env.USE_PROD_DB === 'true' || (import.meta as any).env?.USE_PROD_DB === 'true';
 
@@ -15,7 +12,12 @@ if (!connectionString) {
     throw new Error(isProd ? "DATABASE_URL_PROD is not set" : "DATABASE_URL is not set");
 }
 
+import { LatencyLogger } from './latency-logger';
+
 console.log(`🔌 Database connected to: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 
-export const client = new Pool({ connectionString });
-export const db = drizzle(client, { schema });
+export const client = postgres(connectionString);
+export const db = drizzle(client, {
+    schema,
+    logger: process.env.DB_LOGGING === 'true' ? new LatencyLogger() : undefined
+});

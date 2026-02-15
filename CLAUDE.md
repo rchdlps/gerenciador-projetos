@@ -55,9 +55,12 @@ npm run test:e2e:debug               # Run E2E tests in debug mode
 - **Configuration:** `src/lib/auth.ts` sets up email/password auth
 - **API Endpoints:** `src/pages/api/auth/[...all].ts` handles auth routes
 - **Middleware:** `src/server/middleware/auth.ts` provides:
-  - `getSession`: Optionally loads session
-  - `requireAuth`: Enforces authentication
+  - `getSession`: Optionally loads session (uses in-memory cache)
+  - `requireAuth`: Enforces authentication (uses in-memory cache)
   - `requireOrgAccess(role?)`: Checks organization membership and role hierarchy
+  - `getCachedSession(headers)`: Exported cached session resolver (used by SSR `getPageContext()`)
+  - `invalidateSessionCache(token?)`: Clears cached session (call after org-switch, sign-out)
+- **Session Cache:** In-memory cache with 30s TTL avoids hitting the DB on every API request. Concurrent requests with the same token share a single in-flight promise (deduplication). Max 500 entries with LRU-style cleanup.
 - **User Roles:**
   - **Global Roles:** `super_admin` (full access) | `user` (normal)
   - **Organization Roles:** `secretario` > `gestor` > `viewer` (hierarchical permissions)
@@ -105,9 +108,9 @@ All Hono routes follow a consistent pattern:
 1. **Import:** Use Hono, zValidator, db, and schemas
 2. **Middleware:** Apply `requireAuth` or `requireOrgAccess(role?)` at route or app level
 3. **Validation:** Use `zValidator('json', schema)` for request body validation with Zod
-4. **Authorization:** Check user's organization membership/role (or super_admin bypass)
-5. **Database Operations:** Use Drizzle ORM queries
-6. **Audit Logging:** Call `createAuditLog()` for CREATE/UPDATE/DELETE actions (non-blocking)
+4. **Authorization:** Use `c.get('user')` from middleware — never call `auth.api.getSession()` again inside handlers. For project-scoped routes, use `canAccessProject()` from `@/lib/queries/scoped`
+5. **Database Operations:** Use Drizzle ORM queries. Parallelize independent queries with `Promise.all`
+6. **Audit Logging:** Call `createAuditLog()` fire-and-forget (no `await`) for CREATE/UPDATE/DELETE actions
 7. **Response:** Return JSON with proper status codes
 
 **Example Routes:**
@@ -168,7 +171,7 @@ const { data: projects } = useQuery({
 
 **Function:** `createAuditLog()` in `src/lib/audit-logger.ts`
 
-**Usage:** Call after CREATE/UPDATE/DELETE operations in API routes. Non-blocking (errors logged but don't fail the operation).
+**Usage:** Call fire-and-forget (no `await`) after CREATE/UPDATE/DELETE operations in API routes. Errors are logged but never fail the main operation or block the response.
 
 **Fields:**
 - `userId`: Who performed the action
@@ -194,6 +197,157 @@ The notification system has two delivery paths:
 
 `src/lib/queries/` contains shared Drizzle query functions used across multiple routes (e.g., checking project access, fetching org memberships). Prefer extracting common queries here rather than duplicating them across route files.
 
+### SSR Page Context
+
+**File:** `src/lib/queries/page-context.ts`
+
+`getPageContext(headers)` is the shared SSR helper for all authenticated Astro pages. It fetches auth session, active org, and scoped org IDs in 2 sequential batches (down from 6-10 sequential queries):
+
+- **Batch 1:** `getCachedSession(headers)` — session validation using the in-memory cache
+- **Batch 2:** `Promise.all([sessionRow, membershipsWithOrgs, allOrgs?])` — session row + memberships (with org details via `with: { organization: true }`) + all orgs (super admin only)
+
+Returns `{ session, user, sessionRow, isSuperAdmin, activeOrgId, orgIds, orgSessionData }`. Pages pass `session` and `orgSessionData` to `DashboardLayout` to avoid duplicate client-side fetches.
+
+## Performance Patterns
+
+The codebase follows consistent performance patterns across all API routes and SSR pages. These patterns were applied systematically to every route file in `src/server/routes/`.
+
+### 1. Session Caching (auth middleware)
+
+`auth.api.getSession()` hits the database on every call (~600-800ms with remote DB). The auth middleware caches sessions in-memory:
+
+- **30-second TTL** — sessions are re-validated at most once every 30 seconds per token
+- **In-flight deduplication** — concurrent requests with the same token share a single DB call
+- **Max 500 entries** with LRU-style cleanup
+- **Cache invalidation** — call `invalidateSessionCache(token)` after org-switch or sign-out
+
+```typescript
+// In route handlers: NEVER call auth.api.getSession() directly
+// Use c.get('user') and c.get('session') from middleware instead
+const user = c.get('user')    // Already cached by middleware
+const session = c.get('session')
+
+// In SSR pages: use getCachedSession() instead of auth.api.getSession()
+import { getCachedSession } from '@/server/middleware/auth'
+const session = await getCachedSession(headers)
+```
+
+### 2. Never Re-fetch User Data
+
+The `requireAuth` middleware already provides the authenticated user via `c.get('user')`. Never call `db.select().from(users).where(eq(users.id, ...))` to re-fetch the same user — it's redundant.
+
+```typescript
+// WRONG — redundant DB call
+const [user] = await db.select().from(users).where(eq(users.id, c.get('user').id))
+
+// CORRECT — already available from middleware
+const user = c.get('user')
+const isSuperAdmin = user.globalRole === 'super_admin'
+```
+
+### 3. Parallelize Independent Queries
+
+Use `Promise.all` for queries that don't depend on each other:
+
+```typescript
+// WRONG — sequential (each query waits for the previous)
+const members = await db.query.memberships.findMany(...)
+const org = await db.select().from(organizations).where(...)
+const invitations = await db.select().from(invitations).where(...)
+
+// CORRECT — parallel (all queries run simultaneously)
+const [members, org, invitations] = await Promise.all([
+    db.query.memberships.findMany(...),
+    db.select().from(organizations).where(...),
+    db.select().from(invitations).where(...),
+])
+```
+
+### 4. Fire-and-Forget Audit Logs
+
+Audit logs should never block the API response. Don't `await` them:
+
+```typescript
+// WRONG — blocks response until audit log is written
+await createAuditLog({ ... })
+return c.json(result)
+
+// CORRECT — fire and forget
+createAuditLog({ ... })
+return c.json(result)
+```
+
+### 5. Use canAccessProject() for Project-Scoped Routes
+
+Instead of manually querying memberships + project + org, use the centralized helper:
+
+```typescript
+import { canAccessProject } from '@/lib/queries/scoped'
+
+const { allowed, project, membership } = await canAccessProject(projectId, user.id, isSuperAdmin)
+if (!allowed) return c.json({ error: 'Forbidden' }, 403)
+```
+
+### 6. Batch Inserts
+
+When creating multiple rows, use a single insert with an array of values:
+
+```typescript
+// WRONG — 5 sequential inserts
+for (const phase of phases) {
+    await db.insert(projectPhases).values(phase)
+}
+
+// CORRECT — single batched insert
+await db.insert(projectPhases).values(phases)
+```
+
+### 7. Include Relations in Queries
+
+Avoid sequential lookups by including related data via `with`:
+
+```typescript
+// WRONG — fetch memberships, then loop to fetch each org
+const memberships = await db.query.memberships.findMany({ where: ... })
+for (const m of memberships) {
+    const org = await db.select().from(organizations).where(eq(organizations.id, m.organizationId))
+}
+
+// CORRECT — include org details in one query
+const memberships = await db.query.memberships.findMany({
+    where: ...,
+    with: { organization: true },
+})
+```
+
+### 8. Parallel Notification Delivery
+
+When sending notifications to multiple users, use `Promise.allSettled` for parallel delivery with error tracking:
+
+```typescript
+const results = await Promise.allSettled(
+    userIds.map(userId => emitNotification({ userId, ... }))
+)
+const sentCount = results.filter(r => r.status === 'fulfilled').length
+const failedCount = results.filter(r => r.status === 'rejected').length
+```
+
+### 9. Resilient Fan-Out Pattern (Notifications)
+
+`emitNotification()` in `src/lib/notification.ts` uses a resilient fan-out:
+1. **DB store** (critical path) — notification is persisted immediately
+2. **Pusher** (real-time) — fire-and-forget `.catch()` for instant delivery
+3. **Inngest** (side-effects) — fire-and-forget `.catch()` for email/analytics
+
+The DB is the source of truth. Pusher and Inngest are best-effort — failures don't block or lose notifications.
+
+### 10. better-auth Session Pitfalls
+
+- `activeOrganizationId` is on the `sessions` DB table but **NOT** in `session.additionalFields`
+- **NEVER** read from `(session as any).activeOrganizationId` — it's unreliable
+- **ALWAYS** query the session row directly: `db.select().from(sessions).where(eq(sessions.id, session.id))`
+- The session create hook in `auth.ts` uses a targeted `SELECT isActive` query (not full user row) for performance
+
 ## Important Conventions
 
 ### Type Safety
@@ -217,10 +371,13 @@ The notification system has two delivery paths:
 
 ### Database Queries
 
-- Use Drizzle query builder (prefer `db.query.*` for relations)
+- Use Drizzle query builder (prefer `db.query.*` for relations, especially with `with:` for joins)
 - For complex queries, use `db.select().from().where()`
 - Always handle cascading deletes via schema foreign keys or manual cleanup
 - Use transactions for multi-table operations
+- Parallelize independent queries with `Promise.all` (see Performance Patterns)
+- Use batch inserts (`db.insert().values([...])`) instead of loops
+- Never re-fetch user data that middleware already provides via `c.get('user')`
 
 ### Component Patterns
 

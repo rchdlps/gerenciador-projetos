@@ -28,14 +28,19 @@ type Organization = {
     logoUrl?: string
 }
 
-export function ProjectList() {
+
+interface ProjectListProps {
+    initialProjects?: Project[]
+}
+
+export function ProjectList({ initialProjects }: ProjectListProps) {
     const queryClient = useQueryClient()
     const [isOpen, setIsOpen] = useState(false)
     const [name, setName] = useState("")
     const [desc, setDesc] = useState("")
     const [type, setType] = useState("Projeto")
     const [status, setStatus] = useState("em_andamento")
-    const { activeOrgId, isSuperAdmin } = useActiveOrg() // Get global context
+    const { activeOrgId, isSuperAdmin, organizations, isLoading: isLoadingOrgs } = useActiveOrg() // Get global context
     const [selectedOrg, setSelectedOrg] = useState<string>("") // Local state for creation
 
     // Initialize filter based on active context
@@ -55,16 +60,6 @@ export function ProjectList() {
     const [searchTerm, setSearchTerm] = useState("")
     const [filterStatus, setFilterStatus] = useState("all")
 
-    // Fetch User Organizations
-    const { data: organizations, isLoading: isLoadingOrgs } = useQuery<Organization[]>({
-        queryKey: ['organizations'],
-        queryFn: async () => {
-            const res = await api.organizations.$get()
-            if (!res.ok) throw new Error("Failed to fetch organizations")
-            return res.json()
-        }
-    })
-
     // Fetch Projects (Backend filters by user membership)
     const { data: projects, isLoading } = useQuery<Project[]>({
         queryKey: ['projects'],
@@ -72,7 +67,8 @@ export function ProjectList() {
             const res = await api.projects.$get()
             if (!res.ok) throw new Error("Failed to fetch projects")
             return res.json()
-        }
+        },
+        initialData: initialProjects
     })
 
     // Auto-select first organization if available

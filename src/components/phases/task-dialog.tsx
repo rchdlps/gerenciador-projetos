@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api } from "@/lib/api-client"
 import { toast } from "sonner"
-import { useQueryClient, useQuery } from "@tanstack/react-query"
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileUpload } from "@/components/ui/file-upload"
 import { AttachmentList, type Attachment } from "@/components/attachments/attachment-list"
@@ -140,70 +140,139 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
         }
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setLoading(true)
+    // Optimistic Create Mutation
+    const createMutation = useMutation({
+        mutationFn: async (newTask: any) => {
+            const res = await api.tasks.$post({ json: newTask })
+            if (!res.ok) throw new Error("Erro ao criar tarefa")
+            return res.json()
+        },
+        onMutate: async (newTask) => {
+            await queryClient.cancelQueries({ queryKey: ["phases", projectId] })
+            await queryClient.cancelQueries({ queryKey: ["board", projectId] })
 
-        try {
-            let finalTaskId = task?.id
+            const previousPhases = queryClient.getQueryData(["phases", projectId])
+            const previousBoard = queryClient.getQueryData(["board", projectId])
 
-            if (task) {
-                // Update
-                const res = await api.tasks[":id"].$patch({
-                    param: { id: task.id },
-                    json: {
-                        title,
-                        description,
-                        startDate: startDate || null,
-                        endDate: endDate || null,
-                        stakeholderId: stakeholderId === "unassigned" ? null : stakeholderId,
-                        status,
-                        priority
+            // Optimistic Update for Phases
+            queryClient.setQueryData(["phases", projectId], (old: any) => {
+                if (!old) return old
+                return old.map((phase: any) => {
+                    if (phase.id === phaseId) {
+                        return {
+                            ...phase,
+                            tasks: [
+                                ...(phase.tasks || []),
+                                {
+                                    id: `temp-${Date.now()}`, // Temp ID
+                                    ...newTask,
+                                    status: newTask.status || 'todo',
+                                    priority: newTask.priority || 'medium',
+                                    assignee: stakeholders?.find((s: any) => s.id === newTask.stakeholderId) || null
+                                }
+                            ]
+                        }
                     }
+                    return phase
                 })
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({ error: 'Erro ao atualizar tarefa' }))
-                    throw new Error((data as any).error || 'Erro ao atualizar tarefa')
-                }
-                toast.success("Tarefa atualizada!")
-            } else {
-                // Create
-                const res = await api.tasks.$post({
-                    json: {
-                        phaseId,
-                        title,
-                        description,
-                        startDate: startDate || undefined,
-                        endDate: endDate || undefined,
-                        stakeholderId: stakeholderId === "unassigned" ? undefined : stakeholderId,
-                        status,
-                        priority
-                    }
+            })
+
+            return { previousPhases, previousBoard }
+        },
+        onError: (err, variables, context) => {
+            if (context?.previousPhases) queryClient.setQueryData(["phases", projectId], context.previousPhases)
+            if (context?.previousBoard) queryClient.setQueryData(["board", projectId], context.previousBoard)
+            toast.error("Erro ao criar tarefa")
+        },
+        onSuccess: (data) => {
+            toast.success("Tarefa criada!")
+            // Determine if we need to do uploads (now that we have real ID)
+            if (pendingFiles.length > 0 && data.id) {
+                toast.info("Enviando anexos...")
+                processUploads(pendingFiles, data.id).then(() => {
+                    toast.success("Anexos enviados!")
+                    queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
                 })
-                if (!res.ok) {
-                    const data = await res.json().catch(() => ({ error: 'Erro ao criar tarefa' }))
-                    throw new Error((data as any).error || 'Erro ao criar tarefa')
-                }
-                const newTask = await res.json()
-                finalTaskId = newTask.id
-                toast.success("Tarefa criada!")
             }
-
-            // Process Pending Uploads if creating new task
-            if (!task && pendingFiles.length > 0 && finalTaskId) {
-                toast.info("Task created. Uploading " + pendingFiles.length + " attachments...")
-                await processUploads(pendingFiles, finalTaskId)
-                toast.success("Todos os anexos foram enviados!")
-            }
-
+        },
+        onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
             queryClient.invalidateQueries({ queryKey: ["board", projectId] })
-            onOpenChange(false)
-        } catch (error) {
-            toast.error((error as Error).message || "Erro ao salvar tarefa")
-            console.error(error)
-        } finally {
-            setLoading(false)
+        }
+    })
+
+    // Optimistic Update Mutation
+    const updateMutation = useMutation({
+        mutationFn: async (updatedTask: any) => {
+            const res = await api.tasks[":id"].$patch({
+                param: { id: task.id },
+                json: updatedTask
+            })
+            if (!res.ok) throw new Error("Erro ao atualizar tarefa")
+            return res.json()
+        },
+        onMutate: async (updatedTask) => {
+            await queryClient.cancelQueries({ queryKey: ["phases", projectId] })
+            await queryClient.cancelQueries({ queryKey: ["board", projectId] })
+
+            const previousPhases = queryClient.getQueryData(["phases", projectId])
+            const previousBoard = queryClient.getQueryData(["board", projectId])
+
+            // Optimistic Update
+            queryClient.setQueryData(["phases", projectId], (old: any) => {
+                if (!old) return old
+                return old.map((phase: any) => {
+                    const taskIndex = phase.tasks.findIndex((t: any) => t.id === task.id)
+                    if (taskIndex !== -1) {
+                        const newTasks = [...phase.tasks]
+                        newTasks[taskIndex] = { ...newTasks[taskIndex], ...updatedTask }
+                        return { ...phase, tasks: newTasks }
+                    }
+                    return phase
+                })
+            })
+            return { previousPhases, previousBoard }
+        },
+        onError: (err, variables, context) => {
+            if (context?.previousPhases) queryClient.setQueryData(["phases", projectId], context.previousPhases)
+            if (context?.previousBoard) queryClient.setQueryData(["board", projectId], context.previousBoard)
+            toast.error("Erro ao atualizar tarefa")
+        },
+        onSuccess: () => {
+            toast.success("Tarefa atualizada!")
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["phases", projectId] })
+            queryClient.invalidateQueries({ queryKey: ["board", projectId] })
+        }
+    })
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+
+        onOpenChange(false) // Close immediately
+
+        if (task) {
+            updateMutation.mutate({
+                title,
+                description,
+                startDate: startDate || null,
+                endDate: endDate || null,
+                stakeholderId: stakeholderId === "unassigned" ? null : stakeholderId,
+                status,
+                priority
+            })
+        } else {
+            createMutation.mutate({
+                phaseId,
+                title,
+                description,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                stakeholderId: stakeholderId === "unassigned" ? undefined : stakeholderId,
+                status,
+                priority
+            })
         }
     }
 

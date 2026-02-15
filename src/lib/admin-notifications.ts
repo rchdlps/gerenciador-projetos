@@ -8,7 +8,7 @@ import {
     organizations,
     memberships,
 } from "../../db/schema";
-import { eq, and, sql, inArray, gte, lt } from "drizzle-orm";
+import { eq, and, sql, inArray, gte, lt, desc } from "drizzle-orm";
 import { emitNotification, storeNotification } from "./notification";
 
 export type TargetType = "user" | "organization" | "role" | "multi-org" | "all";
@@ -144,13 +144,11 @@ export async function sendImmediateNotification(input: SendNotificationInput): P
 
     // Create send log
     const sendLogId = nanoid();
-    let sentCount = 0;
-    let failedCount = 0;
 
-    // Send notification to each user
-    for (const userId of userIds) {
-        try {
-            await emitNotification({
+    // Send notifications in parallel
+    const results = await Promise.allSettled(
+        userIds.map(userId =>
+            emitNotification({
                 userId,
                 type: input.type,
                 title: input.title,
@@ -159,12 +157,15 @@ export async function sendImmediateNotification(input: SendNotificationInput): P
                     link: input.link || undefined,
                     priority: input.priority || "normal"
                 },
-            });
-            sentCount++;
-        } catch (error) {
-            failedCount++;
-            console.error(`Failed to send notification to user ${userId}:`, error);
-        }
+            })
+        )
+    );
+
+    const sentCount = results.filter(r => r.status === "fulfilled").length;
+    const failedCount = results.filter(r => r.status === "rejected").length;
+
+    if (failedCount > 0) {
+        console.error(`[Notification] ${failedCount}/${userIds.length} sends failed`);
     }
 
     // Log the send
@@ -199,6 +200,7 @@ export async function getScheduledNotifications(
         .select()
         .from(scheduledNotifications)
         .where(and(eq(scheduledNotifications.creatorId, creatorId), eq(scheduledNotifications.status, status)))
+        .orderBy(desc(scheduledNotifications.scheduledFor))
         .limit(limit)
         .offset(offset);
 }
@@ -247,6 +249,7 @@ export async function getSendHistory(creatorId: string, limit = 50, offset = 0) 
         .select()
         .from(notificationSendLogs)
         .where(eq(notificationSendLogs.creatorId, creatorId))
+        .orderBy(desc(notificationSendLogs.sentAt))
         .limit(limit)
         .offset(offset);
 }

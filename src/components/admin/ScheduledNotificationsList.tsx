@@ -71,7 +71,7 @@ export function ScheduledNotificationsList({ isSuperAdmin = false, organizationI
         return () => {
             window.removeEventListener("notification:updated", handleUpdate);
         };
-    }, []);
+    }, [organizationId]);
 
     const handleProcessNow = async () => {
         setIsProcessing(true);

@@ -4,90 +4,45 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectPhases, tasks, projects, users, stakeholders, memberships } from '../../../db/schema'
-import { eq, asc, desc, and } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { projectPhases, projects, memberships } from '../../../db/schema'
+import { eq, desc, and } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+
+import { getProjectPhases } from '@/lib/queries/phases'
+import { canAccessProject } from '@/lib/queries/scoped'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
+// Helper: check write access to a project (project + membership in one parallel batch)
+async function checkWriteAccess(
+    projectId: string,
+    userId: string,
+    userGlobalRole: string | null | undefined
+) {
+    const isSuperAdmin = userGlobalRole === 'super_admin'
+    const { allowed, project, membership } = await canAccessProject(projectId, userId, isSuperAdmin)
+    return { allowed, project, membership, isSuperAdmin }
 }
 
 // Get Phases for a Project
 app.get('/:projectId', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    // Access check and data fetch in parallel
+    const [access, fasesWithTasks] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        getProjectPhases(projectId),
+    ])
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
-
-    const phases = await db.select().from(projectPhases)
-        .where(eq(projectPhases.projectId, projectId))
-        .orderBy(asc(projectPhases.order), asc(projectPhases.createdAt))
-
-    // Fetch tasks for each phase
-    const fasesWithTasks = await Promise.all(phases.map(async phase => {
-        const localTasksRaw = await db.select({
-            task: tasks,
-            assigneeUser: users,
-            assigneeStakeholder: stakeholders
-        })
-            .from(tasks)
-            .leftJoin(users, eq(tasks.assigneeId, users.id))
-            .leftJoin(stakeholders, eq(tasks.stakeholderId, stakeholders.id))
-            .where(eq(tasks.phaseId, phase.id))
-            .orderBy(asc(tasks.order))
-
-        const localTasks = localTasksRaw.map(({ task, assigneeUser, assigneeStakeholder }) => {
-            let assignee = null
-            if (assigneeStakeholder) {
-                assignee = {
-                    id: assigneeStakeholder.id,
-                    name: assigneeStakeholder.name,
-                    image: null, // Stakeholders don't have images yet
-                    role: assigneeStakeholder.role,
-                    type: 'stakeholder'
-                }
-            } else if (assigneeUser) {
-                assignee = {
-                    id: assigneeUser.id,
-                    name: assigneeUser.name,
-                    image: assigneeUser.image,
-                    type: 'user'
-                }
-            }
-
-            return {
-                ...task,
-                assignee
-            }
-        })
-
-        return { ...phase, tasks: localTasks }
-    }))
+    if (!access.project) return c.json({ error: 'Project not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
     return c.json(fasesWithTasks)
 })
@@ -99,33 +54,15 @@ app.post('/:projectId',
         description: z.string().optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const { name, description } = c.req.valid('json')
 
-        // Check project access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-
+        const { allowed, project } = await checkWriteAccess(projectId, user.id, user.globalRole)
         if (!project) return c.json({ error: 'Not found' }, 404)
-
-        // Fetch user to get globalRole (session might not have it)
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-        if (!user) return c.json({ error: 'User not found' }, 401)
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        const isOwner = project.userId === session.user.id
-        const isSuperAdmin = user.globalRole === 'super_admin'
-
-        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         // Get max order
         const [max] = await db.select({ value: projectPhases.order })
@@ -145,9 +82,8 @@ app.post('/:projectId',
             order: nextOrder
         }).returning()
 
-        //Audit log
-        await createAuditLog({
-            userId: session.user.id,
+        createAuditLog({
+            userId: user.id,
             organizationId: project.organizationId,
             action: 'CREATE',
             resource: 'phase',
@@ -168,31 +104,15 @@ app.patch('/:projectId/reorder',
         }))
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const { items } = c.req.valid('json')
 
-        // Check project access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project } = await checkWriteAccess(projectId, user.id, user.globalRole)
         if (!project) return c.json({ error: 'Not found' }, 404)
-
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-        if (!user) return c.json({ error: 'User not found' }, 401)
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        const isOwner = project.userId === session.user.id
-        const isSuperAdmin = user.globalRole === 'super_admin'
-
-        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         // Use transaction to update all
         await db.transaction(async (tx) => {
@@ -217,49 +137,47 @@ app.patch('/:id',
         description: z.string().optional()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const id = c.req.param('id')
         const { name, description } = c.req.valid('json')
 
-        // Fetch phase to get projectId
-        const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, id))
-        if (!phase) return c.json({ error: 'Not found' }, 404)
+        // Fetch phase → project in a single join
+        const [row] = await db.select({
+            phase: projectPhases,
+            projectOrgId: projects.organizationId,
+            projectUserId: projects.userId,
+        })
+            .from(projectPhases)
+            .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+            .where(eq(projectPhases.id, id))
 
-        // Check project access
-        const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-        if (!project) return c.json({ error: 'Project not found' }, 404)
+        if (!row) return c.json({ error: 'Not found' }, 404)
 
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-        if (!user) return c.json({ error: 'User not found' }, 401)
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        const isOwner = project.userId === session.user.id
         const isSuperAdmin = user.globalRole === 'super_admin'
-
-        if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
+        if (!isSuperAdmin && row.projectUserId !== user.id && row.projectOrgId) {
+            const [membership] = await db.select()
+                .from(memberships)
+                .where(and(
+                    eq(memberships.userId, user.id),
+                    eq(memberships.organizationId, row.projectOrgId)
+                ))
+            if (!membership) return c.json({ error: 'Forbidden' }, 403)
+        }
 
         const [updatedPhase] = await db.update(projectPhases)
             .set({ ...(name && { name }), ...(description !== undefined && { description }) })
             .where(eq(projectPhases.id, id))
             .returning()
 
-        // Audit log
-        await createAuditLog({
-            userId: session.user.id,
-            organizationId: project.organizationId,
+        createAuditLog({
+            userId: user.id,
+            organizationId: row.projectOrgId,
             action: 'UPDATE',
             resource: 'phase',
             resourceId: id,
-            metadata: { name, projectId: project.id }
+            metadata: { name, projectId: row.phase.projectId }
         })
 
         return c.json(updatedPhase)
@@ -268,46 +186,43 @@ app.patch('/:id',
 
 // Delete Phase
 app.delete('/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
-    // Fetch phase to get projectId
-    const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, id))
-    if (!phase) return c.json({ error: 'Not found' }, 404)
+    // Fetch phase → project in a single join
+    const [row] = await db.select({
+        phase: projectPhases,
+        projectOrgId: projects.organizationId,
+        projectUserId: projects.userId,
+    })
+        .from(projectPhases)
+        .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+        .where(eq(projectPhases.id, id))
 
-    // Check project access
-    const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    if (!row) return c.json({ error: 'Not found' }, 404)
 
-    // Fetch user to get globalRole
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-    if (!user) return c.json({ error: 'User not found' }, 401)
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    const isOwner = project.userId === session.user.id
     const isSuperAdmin = user.globalRole === 'super_admin'
-
-    if (!isOwner && !isSuperAdmin && !membership) return c.json({ error: 'Forbidden' }, 403)
+    if (!isSuperAdmin && row.projectUserId !== user.id && row.projectOrgId) {
+        const [membership] = await db.select()
+            .from(memberships)
+            .where(and(
+                eq(memberships.userId, user.id),
+                eq(memberships.organizationId, row.projectOrgId)
+            ))
+        if (!membership) return c.json({ error: 'Forbidden' }, 403)
+    }
 
     await db.delete(projectPhases).where(eq(projectPhases.id, id))
 
-    // Audit log
-    await createAuditLog({
-        userId: session.user.id,
-        organizationId: project.organizationId,
+    createAuditLog({
+        userId: user.id,
+        organizationId: row.projectOrgId,
         action: 'DELETE',
         resource: 'phase',
         resourceId: id,
-        metadata: { name: phase.name, projectId: project.id }
+        metadata: { name: row.phase.name, projectId: row.phase.projectId }
     })
 
     return c.json({ success: true })

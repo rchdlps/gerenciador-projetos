@@ -64,12 +64,14 @@ type NotificationFormValues = {
 
 type NotificationComposerProps = {
     organizationId?: string;
+    organizationName?: string;
     isSuperAdmin: boolean;
     onSuccess?: () => void;
 };
 
 export function NotificationComposer({
     organizationId,
+    organizationName,
     isSuperAdmin,
     onSuccess,
 }: NotificationComposerProps) {
@@ -300,6 +302,7 @@ export function NotificationComposer({
                             onTargetIdsChange={(val) => form.setValue("targetIds", val)}
                             onSelectedItemsChange={setSelectedItems}
                             organizationId={organizationId}
+                            organizationName={organizationName}
                             isSuperAdmin={isSuperAdmin}
                         />
                         {form.formState.errors.targetIds && (

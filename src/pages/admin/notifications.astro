@@ -1,88 +1,26 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import { NotificationComposer } from "@/components/admin/NotificationComposer";
-import { ScheduledNotificationsList } from "@/components/admin/ScheduledNotificationsList";
-import { NotificationStats } from "@/components/admin/NotificationStats";
-import { db } from "@/lib/db";
-import { users, memberships, notificationSendLogs, notificationDeliveries } from "../../../db/schema";
-import { desc, eq, sql, and } from "drizzle-orm";
+import { AdminNotificationsWrapper } from "@/components/admin/AdminNotificationsWrapper";
+import { getPageContext } from "@/lib/queries/page-context";
 
-import { auth } from "@/lib/auth";
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-
-if (!session) {
-  return Astro.redirect("/login");
+// Admin guard: only super_admin or org secretario can access
+if (!ctx.isSuperAdmin) {
+  const isSecretario = ctx.orgSessionData?.organizations?.some(
+    (o: any) => o.role === "secretario"
+  );
+  if (!isSecretario) {
+    return Astro.redirect("/dashboard");
+  }
 }
-
-const user = session.user;
-
-let isOrgAdmin = false;
-let organizationId = undefined;
-
-// We need to get the active organization from the session or request context
-// Since this is an Astro page, we might rely on the client-side context, but for server-side rendering/protection:
-// We can check if the user is a member of any organization as admin if no specific org is active in session (simplification)
-// OR better: we check the 'activeOrgId' if available in session/cookie. 
-// For now, let's fetch if they are 'secretario' in any org (permission to view the page).
-// The composer will handle specific org selection validation.
-
-if (user.globalRole === "super_admin") {
-    // Super admin has access
-} else {
-    // Check if user is 'secretario' in at least one organization
-    const adminMemberships = await db
-        .select()
-        .from(memberships)
-        .where(
-            and(
-                eq(memberships.userId, user.id),
-                eq(memberships.role, 'secretario')
-            )
-        )
-        .limit(1);
-
-    if (adminMemberships.length > 0) {
-        isOrgAdmin = true;
-        organizationId = adminMemberships[0].organizationId; 
-        // Note: If user is admin of multiple, we might default to the first one effectively acting as "context"
-        // Ideally we'd get the header/cookie for active org.
-    } else {
-        return Astro.redirect("/dashboard");
-    }
-}
-
 ---
 
-<DashboardLayout title="Gerenciar Notificações">
-  <div class="container mx-auto py-6 space-y-8">
-    <div class="flex items-center justify-between">
-      <h1 class="text-3xl font-bold tracking-tight">Gerenciar Notificações</h1>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
-      <div class="space-y-6">
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-          <h2 class="text-xl font-semibold mb-4">Enviar Nova Notificação</h2>
-          <NotificationComposer 
-            client:load 
-            isSuperAdmin={user.globalRole === "super_admin"} 
-            organizationId={organizationId}
-          />
-        </div>
-      </div>
-
-      <div class="space-y-6">
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-           <h2 class="text-xl font-semibold mb-4">Estatísticas de Envio</h2>
-           <NotificationStats client:visible organizationId={organizationId} />
-        </div>
-
-        <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6">
-          <h2 class="text-xl font-semibold mb-4">Notificações Agendadas</h2>
-          <ScheduledNotificationsList isSuperAdmin={user.globalRole === "super_admin"} organizationId={organizationId} client:visible />
-        </div>
-      </div>
-    </div>
-  </div>
+<DashboardLayout
+  title="Gerenciar Notificações"
+  session={ctx.session}
+  orgSessionData={ctx.orgSessionData}
+>
+  <AdminNotificationsWrapper client:load initialData={ctx.orgSessionData} />
 </DashboardLayout>

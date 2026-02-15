@@ -1,9 +1,27 @@
 ---
 import DashboardLayout from "../layouts/DashboardLayout.astro";
 import { CalendarPage } from "@/components/calendar/calendar-page";
+import { getPageContext } from "@/lib/queries/page-context";
+import { scopedAppointments } from "@/lib/queries/scoped";
+import { getDatedTasks } from "@/lib/queries/tasks";
+
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
+
+// Fetch tasks and appointments in parallel
+const [tasks, appointments] = await Promise.all([
+    getDatedTasks(ctx.orgIds),
+    scopedAppointments(ctx.orgIds),
+]);
+
+const initialData = { tasks, appointments };
 ---
 
-<DashboardLayout title="Calendário Geral">
+<DashboardLayout
+    title="Calendário Geral"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <div class="space-y-6 animate-in fade-in duration-500">
         <div class="flex items-center justify-between">
             <div>
@@ -11,11 +29,12 @@ import { CalendarPage } from "@/components/calendar/calendar-page";
                     Calendário Consolidado
                 </h2>
                 <p class="text-muted-foreground">
-                    Visualize todos os prazos e compromissos de todos os seus projetos.
+                    Visualize todos os prazos e compromissos de todos os seus
+                    projetos.
                 </p>
             </div>
         </div>
 
-        <CalendarPage client:load />
+        <CalendarPage client:load initialData={initialData} />
     </div>
 </DashboardLayout>

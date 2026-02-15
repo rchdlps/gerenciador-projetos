@@ -1,12 +1,9 @@
-import 'dotenv/config';
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../db/schema';
 import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
 
-neonConfig.webSocketConstructor = ws;
 
 // --- ENVIRONMENT SWITCHING ---
 const args = process.argv.slice(2);
@@ -25,7 +22,7 @@ if (!connectionString) {
 
 console.log(`🔌 Connecting to ${isProd ? "PRODUCTION" : "DEVELOPMENT"} database...`);
 
-const client = new Pool({ connectionString });
+const client = postgres(connectionString);
 const db = drizzle(client, { schema });
 
 async function seed() {

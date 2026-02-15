@@ -6,68 +6,47 @@ import {
     projectCommunicationPlans,
     projectMeetings,
     knowledgeAreas,
-    users,
-    memberships,
     projects
 } from '../../../db/schema'
 import { eq, and, desc } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
 import { nanoid } from 'nanoid'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+import { canAccessProject } from '@/lib/queries/scoped'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
-
 // GET /api/communication/:projectId
 // Fetch all communication data (Notes, Plan, Meetings)
 app.get('/:projectId', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    // Access check + all 3 data queries in parallel
+    const [access, notesRows, plan, meetings] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        db.select().from(knowledgeAreas).where(
+            and(
+                eq(knowledgeAreas.projectId, projectId),
+                eq(knowledgeAreas.area, 'Comunicacao')
+            )
+        ),
+        db.select().from(projectCommunicationPlans)
+            .where(eq(projectCommunicationPlans.projectId, projectId))
+            .orderBy(desc(projectCommunicationPlans.createdAt)),
+        db.select().from(projectMeetings)
+            .where(eq(projectMeetings.projectId, projectId))
+            .orderBy(desc(projectMeetings.date)),
+    ])
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
+    if (!access.project) return c.json({ error: 'Project not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
-
-    // 1. Fetch Notes (from knowledge_areas)
-    const [notesArea] = await db.select().from(knowledgeAreas).where(
-        and(
-            eq(knowledgeAreas.projectId, projectId),
-            eq(knowledgeAreas.area, 'Comunicacao')
-        )
-    )
-
-    // 2. Fetch Communication Plan
-    const plan = await db.select().from(projectCommunicationPlans)
-        .where(eq(projectCommunicationPlans.projectId, projectId))
-        .orderBy(desc(projectCommunicationPlans.createdAt))
-
-    // 3. Fetch Meetings
-    const meetings = await db.select().from(projectMeetings)
-        .where(eq(projectMeetings.projectId, projectId))
-        .orderBy(desc(projectMeetings.date))
-
+    const notesArea = notesRows[0]
     return c.json({
         notes: notesArea?.content || '',
         notesId: notesArea?.id,
@@ -77,36 +56,21 @@ app.get('/:projectId', async (c) => {
 })
 
 // PUT /api/communication/:projectId/notes
-// Update General Notes
 app.put('/:projectId/notes',
     zValidator('json', z.object({
         content: z.string()
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const { content } = c.req.valid('json')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-        // Verify Access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project } = await canAccessProject(projectId, user.id, isSuperAdmin)
         if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         const [existingArea] = await db.select().from(knowledgeAreas).where(
             and(
@@ -133,7 +97,6 @@ app.put('/:projectId/notes',
 )
 
 // POST /api/communication/:projectId/plan
-// Add Plan Item
 app.post('/:projectId/plan',
     zValidator('json', z.object({
         info: z.string().min(1),
@@ -142,30 +105,16 @@ app.post('/:projectId/plan',
         medium: z.string().min(1)
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-        // Verify Access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project } = await canAccessProject(projectId, user.id, isSuperAdmin)
         if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         const [newItem] = await db.insert(projectCommunicationPlans).values({
             id: nanoid(),
@@ -178,73 +127,49 @@ app.post('/:projectId/plan',
 )
 
 // DELETE /api/communication/plan/:id
-// Delete Plan Item
 app.delete('/plan/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [item] = await db.select().from(projectCommunicationPlans).where(eq(projectCommunicationPlans.id, id))
-    if (!item) return c.json({ error: 'Item not found' }, 404)
+    // Single join: plan item → project
+    const [row] = await db.select({
+        itemId: projectCommunicationPlans.id,
+        projectId: projectCommunicationPlans.projectId,
+    })
+        .from(projectCommunicationPlans)
+        .innerJoin(projects, eq(projects.id, projectCommunicationPlans.projectId))
+        .where(eq(projectCommunicationPlans.id, id))
 
-    const [project] = await db.select().from(projects).where(eq(projects.id, item.projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    if (!row) return c.json({ error: 'Item not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
+    const { allowed } = await canAccessProject(row.projectId, user.id, isSuperAdmin)
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
     await db.delete(projectCommunicationPlans).where(eq(projectCommunicationPlans.id, id))
-
     return c.json({ success: true })
 })
 
 // POST /api/communication/:projectId/meeting
-// Add Meeting
 app.post('/:projectId/meeting',
     zValidator('json', z.object({
         subject: z.string().min(1),
-        date: z.string(), // ISO string from frontend
+        date: z.string(),
         decisions: z.string().optional().default('')
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const { subject, date, decisions } = c.req.valid('json')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-        // Verify Access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project } = await canAccessProject(projectId, user.id, isSuperAdmin)
         if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        // Fetch full user to check role
-        const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         const [newMeeting] = await db.insert(projectMeetings).values({
             id: nanoid(),
@@ -259,37 +184,28 @@ app.post('/:projectId/meeting',
 )
 
 // DELETE /api/communication/meeting/:id
-// Delete Meeting
 app.delete('/meeting/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [meeting] = await db.select().from(projectMeetings).where(eq(projectMeetings.id, id))
-    if (!meeting) return c.json({ error: 'Meeting not found' }, 404)
+    // Single join: meeting → project
+    const [row] = await db.select({
+        meetingId: projectMeetings.id,
+        projectId: projectMeetings.projectId,
+    })
+        .from(projectMeetings)
+        .innerJoin(projects, eq(projects.id, projectMeetings.projectId))
+        .where(eq(projectMeetings.id, id))
 
-    const [project] = await db.select().from(projects).where(eq(projects.id, meeting.projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    if (!row) return c.json({ error: 'Meeting not found' }, 404)
 
-    // Fetch full user to check role
-    const [user] = await db.select().from(users).where(eq(users.id, session.user.id))
-
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, session.user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== session.user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
+    const { allowed } = await canAccessProject(row.projectId, user.id, isSuperAdmin)
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
     await db.delete(projectMeetings).where(eq(projectMeetings.id, id))
-
     return c.json({ success: true })
 })
 

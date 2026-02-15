@@ -1,13 +1,26 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { AdminUsersWrapper } from "@/components/admin/users/wrapper";
+import { getPageContext } from "@/lib/queries/page-context";
 
-// Note: Authentication protection is handled by middleware but we need React Query context
-// so we use a wrapper component that renders the Provider + Child in one React Root.
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-// Note: Authentication protection is handled by middleware
+// Admin guard: only super_admin or org secretario/gestor can manage users
+if (!ctx.isSuperAdmin) {
+  const canManageUsers = ctx.orgSessionData?.organizations?.some(
+    (o: any) => o.role === "secretario" || o.role === "gestor",
+  );
+  if (!canManageUsers) {
+    return Astro.redirect("/dashboard");
+  }
+}
 ---
 
-<DashboardLayout title="Gerenciamento de Usuários">
+<DashboardLayout
+    title="Gerenciamento de Usuários"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
     <AdminUsersWrapper client:only="react" />
 </DashboardLayout>

@@ -1,56 +1,23 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { OrgMembersWrapper } from "@/components/members/wrapper";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { users, memberships, sessions } from "../../db/schema";
-import { eq, and } from "drizzle-orm";
+import { getPageContext } from "@/lib/queries/page-context";
 
-// Get session
-const session = await auth.api.getSession({ headers: Astro.request.headers });
-if (!session) {
-    return Astro.redirect("/login");
-}
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-// Fetch user's full info to check role
-const [currentUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, session.user.id));
+const { isSuperAdmin, activeOrgId, orgSessionData } = ctx;
 
-const isSuperAdmin = currentUser?.globalRole === "super_admin";
-
-// Get active organization from session
-const [sessionData] = await db
-    .select()
-    .from(sessions)
-    .where(eq(sessions.id, session.session.id));
-
-const activeOrgId = sessionData?.activeOrganizationId || null;
-
-// Check user's role in active org
-let userRole: string | null = null;
-let canManage = false;
-
-if (activeOrgId) {
-    const [membership] = await db
-        .select()
-        .from(memberships)
-        .where(
-            and(
-                eq(memberships.userId, session.user.id),
-                eq(memberships.organizationId, activeOrgId)
-            )
-        );
-
-    userRole = membership?.role || null;
-    canManage = isSuperAdmin || userRole === "secretario" || userRole === "gestor";
-} else if (isSuperAdmin) {
-    canManage = true;
-}
+// Check user's role in active org from orgSessionData (no extra DB query)
+const userRole = orgSessionData?.activeOrganization?.role || null;
+const canManage = isSuperAdmin || userRole === "secretario" || userRole === "gestor";
 ---
 
-<DashboardLayout title="Membros da Organização">
+<DashboardLayout
+    title="Membros da Organização"
+    session={ctx.session}
+    orgSessionData={orgSessionData}
+>
     <OrgMembersWrapper
         client:only="react"
         organizationId={activeOrgId}

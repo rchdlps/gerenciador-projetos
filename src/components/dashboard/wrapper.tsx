@@ -4,13 +4,14 @@ import { OrgProvider } from "@/contexts/org-context";
 
 interface DashboardWrapperProps {
     initialData?: any
+    initialProjects?: any[]
 }
 
-export function DashboardWrapper({ initialData }: DashboardWrapperProps) {
+export function DashboardWrapper({ initialData, initialProjects }: DashboardWrapperProps) {
     return (
         <Providers>
             <OrgProvider initialData={initialData}>
-                <ProjectList />
+                <ProjectList initialProjects={initialProjects} />
             </OrgProvider>
         </Providers>
     )

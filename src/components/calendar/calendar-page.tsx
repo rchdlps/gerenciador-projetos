@@ -6,16 +6,16 @@ import { CalendarRightPanel } from "@/components/calendar/calendar-right-panel"
 import { Providers } from "@/components/providers"
 
 
-export function CalendarPage({ projectId }: { projectId?: string }) {
+export function CalendarPage({ projectId, initialData }: { projectId?: string; initialData?: any }) {
     return (
         <Providers>
-            <CalendarPageContent projectId={projectId} />
+            <CalendarPageContent projectId={projectId} initialData={initialData} />
         </Providers>
     )
 }
 
 
-function CalendarPageContent({ projectId }: { projectId?: string }) {
+function CalendarPageContent({ projectId, initialData }: { projectId?: string; initialData?: any }) {
     const [date, setDate] = useState<Date | undefined>(new Date())
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
 
@@ -39,7 +39,8 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
                 if (!res.ok) return []
                 return await res.json()
             }
-        }
+        },
+        initialData: initialData?.tasks
     })
 
     const { data: appointments = [] } = useQuery({
@@ -54,7 +55,8 @@ function CalendarPageContent({ projectId }: { projectId?: string }) {
                 if (!res.ok) return []
                 return await res.json()
             }
-        }
+        },
+        initialData: initialData?.appointments
     })
 
     return (

@@ -24,7 +24,7 @@ const AREAS = [
     { id: "partes", icon: Users2, title: "Partes Interessadas", desc: "Engajamento e gerenciamento de stakeholders" },
 ]
 
-export function KnowledgeAreas({ projectId }: { projectId: string }) {
+export function KnowledgeAreas({ projectId, initialData = [] }: { projectId: string; initialData?: any[] }) {
     const { data: areasData = [], isLoading } = useQuery({
         queryKey: ['knowledge-areas', projectId],
         queryFn: async () => {
@@ -32,6 +32,7 @@ export function KnowledgeAreas({ projectId }: { projectId: string }) {
             if (!res.ok) throw new Error()
             return res.json()
         },
+        initialData,
         staleTime: 1000 * 60 * 2,
     })
 

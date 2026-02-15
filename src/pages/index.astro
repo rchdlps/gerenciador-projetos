@@ -1,31 +1,37 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { DashboardWrapper } from "@/components/dashboard/wrapper";
-import { auth } from "@/lib/auth";
+import ProjectListFallback from "@/components/dashboard/ProjectListFallback.astro";
+import { getPageContext } from "@/lib/queries/page-context";
+import { scopedProjects } from "@/lib/queries/scoped";
+import { type projects } from "../../db/schema";
 
-import app from "@/server/app";
+const ctx = await getPageContext(Astro.request.headers);
+if (!ctx) return Astro.redirect("/login");
 
-const session = await auth.api.getSession({ headers: Astro.request.headers });
+let initialProjects: (typeof projects.$inferSelect)[] = [];
 
-if (!session) {
-    return Astro.redirect("/login");
-}
-
-let orgSessionData = null;
 try {
-    const res = await app.request("http://localhost/api/org-session", {
-        headers: Astro.request.headers,
-        method: "GET",
-    });
-
-    if (res.ok) {
-        orgSessionData = await res.json();
-    }
+    initialProjects = await scopedProjects(ctx.orgIds);
 } catch (error) {
-    console.error("Failed to fetch server-side org session:", error);
+    console.error("Failed to fetch projects:", error);
 }
 ---
 
-<DashboardLayout title="Dashboard - Gerenciador de Projetos">
-    <DashboardWrapper client:load initialData={orgSessionData} />
+<DashboardLayout
+    title="Dashboard - Gerenciador de Projetos"
+    session={ctx.session}
+    orgSessionData={ctx.orgSessionData}
+>
+    <DashboardWrapper
+        client:load
+        initialData={ctx.orgSessionData}
+        initialProjects={initialProjects}
+    >
+        <ProjectListFallback
+            slot="fallback"
+            initialProjects={initialProjects}
+            organizations={ctx.orgSessionData?.organizations ?? []}
+        />
+    </DashboardWrapper>
 </DashboardLayout>

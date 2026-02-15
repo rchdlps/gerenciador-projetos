@@ -14,10 +14,7 @@ const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
 
-// Middleware helper
-const getSession = async (c: any) => {
-    return await auth.api.getSession({ headers: c.req.raw.headers });
-}
+
 
 // Helper to check viewer permission for an entity
 async function checkViewerPermission(entityId: string, entityType: string, userId: string): Promise<{ allowed: boolean, error?: string }> {
@@ -30,25 +27,25 @@ async function checkViewerPermission(entityId: string, entityType: string, userI
 
     let organizationId: string | null = null
 
-    // Get organization from entity
+    // Get organization from entity — use joins to avoid sequential queries
     if (entityType === 'task') {
-        const [task] = await db.select().from(tasks).where(eq(tasks.id, entityId))
-        if (task) {
-            const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId))
-            if (phase) {
-                const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-                organizationId = project?.organizationId || null
-            }
-        }
+        const [row] = await db.select({ orgId: projects.organizationId })
+            .from(tasks)
+            .innerJoin(projectPhases, eq(projectPhases.id, tasks.phaseId))
+            .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+            .where(eq(tasks.id, entityId))
+        organizationId = row?.orgId || null
     } else if (entityType === 'project') {
-        const [project] = await db.select().from(projects).where(eq(projects.id, entityId))
-        organizationId = project?.organizationId || null
+        const [project] = await db.select({ orgId: projects.organizationId })
+            .from(projects)
+            .where(eq(projects.id, entityId))
+        organizationId = project?.orgId || null
     } else if (entityType === 'knowledge_area') {
-        const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, entityId))
-        if (ka) {
-            const [project] = await db.select().from(projects).where(eq(projects.id, ka.projectId))
-            organizationId = project?.organizationId || null
-        }
+        const [row] = await db.select({ orgId: projects.organizationId })
+            .from(knowledgeAreas)
+            .innerJoin(projects, eq(projects.id, knowledgeAreas.projectId))
+            .where(eq(knowledgeAreas.id, entityId))
+        organizationId = row?.orgId || null
     }
 
     if (!organizationId) {
@@ -81,13 +78,14 @@ app.post('/presigned-url',
     })),
     async (c) => {
         try {
-            const session = await getSession(c)
-            if (!session) return c.json({ error: 'Unauthorized' }, 401)
+            const user = c.get('user')
+            const session = c.get('session')
+            if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
             const { fileName, fileType, entityId, entityType } = c.req.valid('json')
 
             // Check viewer permission
-            const permCheck = await checkViewerPermission(entityId, entityType, session.user.id)
+            const permCheck = await checkViewerPermission(entityId, entityType, user.id)
             if (!permCheck.allowed) {
                 return c.json({ error: permCheck.error }, 403)
             }
@@ -118,13 +116,14 @@ app.post('/confirm',
         entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
-        const session = await getSession(c)
-        if (!session) return c.json({ error: 'Unauthorized' }, 401)
+        const user = c.get('user')
+        const session = c.get('session')
+        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
         const data = c.req.valid('json')
 
         // Check viewer permission
-        const permCheck = await checkViewerPermission(data.entityId, data.entityType, session.user.id)
+        const permCheck = await checkViewerPermission(data.entityId, data.entityType, user.id)
         if (!permCheck.allowed) {
             return c.json({ error: permCheck.error }, 403)
         }
@@ -132,13 +131,13 @@ app.post('/confirm',
         const [attachment] = await db.insert(attachments).values({
             id: nanoid(),
             ...data,
-            uploadedBy: session.user.id
+            uploadedBy: user.id
         }).returning()
 
-        // Audit log for file upload
-        await createAuditLog({
-            userId: session.user.id,
-            organizationId: null, // Files don't have direct org association
+        // Audit log is non-blocking; get signed URL in parallel
+        createAuditLog({
+            userId: user.id,
+            organizationId: null,
             action: 'CREATE',
             resource: 'attachment',
             resourceId: attachment.id,
@@ -153,8 +152,9 @@ app.post('/confirm',
 
 // 3. List Attachments
 app.get('/:entityId', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const entityId = c.req.param('entityId')
 
@@ -171,8 +171,9 @@ app.get('/:entityId', async (c) => {
 
 // 4. Delete Attachment
 app.delete('/:id', async (c) => {
-    const session = await getSession(c)
-    if (!session) return c.json({ error: 'Unauthorized' }, 401)
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
@@ -181,19 +182,18 @@ app.delete('/:id', async (c) => {
 
     // Check ownership or admin (simplified: allow uploader or super_admin)
     // TODO: Implement stricter checks based on Entity ownership (e.g. Project Owner)
-    if (file.uploadedBy !== session.user.id && (session.user as any).globalRole !== 'super_admin') {
+    if (file.uploadedBy !== user.id && user.globalRole !== 'super_admin') {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
-    // Delete from S3
-    await storage.deleteFile(file.key)
+    // Delete from S3 and DB in parallel; audit log is non-blocking
+    await Promise.all([
+        storage.deleteFile(file.key),
+        db.delete(attachments).where(eq(attachments.id, id)),
+    ])
 
-    // Delete from DB
-    await db.delete(attachments).where(eq(attachments.id, id))
-
-    // Audit log for file deletion
-    await createAuditLog({
-        userId: session.user.id,
+    createAuditLog({
+        userId: user.id,
         organizationId: null,
         action: 'DELETE',
         resource: 'attachment',

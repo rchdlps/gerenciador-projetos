@@ -12,4 +12,5 @@ export default defineConfig({
     dbCredentials: {
         url: isProd ? process.env.DATABASE_URL_PROD! : process.env.DATABASE_URL!,
     },
+    tablesFilter: ["!pg_stat_statements*", "!pg_buffercache*", "!pg_stat_monitor*"],
 });

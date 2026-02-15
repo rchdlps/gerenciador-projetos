@@ -1,11 +1,10 @@
 import { createMiddleware } from 'hono/factory'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { memberships, organizations } from '../../../db/schema'
+import { memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-
-type Role = 'secretario' | 'gestor' | 'viewer'
+import { ORG_ROLES, hasMinRole, type OrgRole } from '@/lib/permissions'
 
 export type AuthVariables = {
     user: typeof auth.$Infer.Session.user
@@ -13,10 +12,89 @@ export type AuthVariables = {
     membership?: typeof memberships.$inferSelect
 }
 
-export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
-    const session = await auth.api.getSession({
-        headers: c.req.raw.headers
+// ── In-memory session cache ──────────────────────────────────────────
+// Avoids calling auth.api.getSession() (which hits the DB) on every
+// single API request. TTL of 30s means sessions are re-validated at most
+// once every 30 seconds per token. Concurrent requests with the same
+// token share a single in-flight promise (deduplication).
+const SESSION_CACHE_TTL = 30_000 // 30 seconds
+const SESSION_CACHE_MAX = 500    // max entries before cleanup
+
+type CachedSession = {
+    data: typeof auth.$Infer.Session | null
+    expiresAt: number
+}
+
+const sessionCache = new Map<string, CachedSession>()
+// Track in-flight promises to deduplicate concurrent requests
+const inflightSessions = new Map<string, Promise<typeof auth.$Infer.Session | null>>()
+
+function extractSessionToken(headers: Headers): string | null {
+    const cookie = headers.get('cookie')
+    if (!cookie) return null
+
+    const match = cookie.match(/better-auth\.session_token=([^;]+)/)
+    return match?.[1] || null
+}
+
+function cleanupCache() {
+    if (sessionCache.size <= SESSION_CACHE_MAX) return
+    const now = Date.now()
+    for (const [key, entry] of sessionCache) {
+        if (entry.expiresAt < now) sessionCache.delete(key)
+    }
+    // If still over limit, remove oldest entries
+    if (sessionCache.size > SESSION_CACHE_MAX) {
+        const entries = [...sessionCache.entries()]
+        entries.sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+        const toRemove = entries.slice(0, entries.length - SESSION_CACHE_MAX)
+        for (const [key] of toRemove) sessionCache.delete(key)
+    }
+}
+
+export async function getCachedSession(headers: Headers): Promise<typeof auth.$Infer.Session | null> {
+    const token = extractSessionToken(headers)
+    if (!token) return auth.api.getSession({ headers })
+
+    const now = Date.now()
+
+    // Check cache
+    const cached = sessionCache.get(token)
+    if (cached && cached.expiresAt > now) {
+        return cached.data
+    }
+
+    // Deduplicate concurrent requests for the same token
+    const inflight = inflightSessions.get(token)
+    if (inflight) return inflight
+
+    // Fetch and cache
+    const promise = auth.api.getSession({ headers }).then(session => {
+        sessionCache.set(token, { data: session, expiresAt: now + SESSION_CACHE_TTL })
+        inflightSessions.delete(token)
+        cleanupCache()
+        return session
+    }).catch(err => {
+        inflightSessions.delete(token)
+        throw err
     })
+
+    inflightSessions.set(token, promise)
+    return promise
+}
+
+/** Invalidate cache for a token (call after sign-out, org switch, etc.) */
+export function invalidateSessionCache(token?: string) {
+    if (token) {
+        sessionCache.delete(token)
+    } else {
+        sessionCache.clear()
+    }
+}
+// ─────────────────────────────────────────────────────────────────────
+
+export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
+    const session = await getCachedSession(c.req.raw.headers)
 
     if (!session) {
         c.set('user', null as any)
@@ -30,9 +108,7 @@ export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (
 })
 
 export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
-    const session = await auth.api.getSession({
-        headers: c.req.raw.headers
-    })
+    const session = await getCachedSession(c.req.raw.headers)
 
     if (!session) {
         return c.json({ error: 'Unauthorized' }, 401)
@@ -43,27 +119,26 @@ export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async 
     await next()
 })
 
-export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async (c, next) => {
+/**
+ * Organization-level access middleware. Checks membership + optional role hierarchy.
+ *
+ * Best suited for **org-scoped routes** where `orgId` is available as a param or header
+ * (e.g., member management, org settings). For **project-scoped routes**, prefer
+ * `canAccessProject()` from `@/lib/queries/scoped` — it handles the project→org lookup
+ * chain and returns the membership for viewer checks in a single call.
+ */
+export const requireOrgAccess = (requiredRole?: OrgRole) => createMiddleware(async (c, next) => {
     const user = c.get('user')
     if (!user) {
         throw new HTTPException(401, { message: 'Unauthorized' })
     }
 
-    // Attempt to get Organization ID from params, query, or header
-    // Strategy: Look for :orgId param, or explicit header X-Organization-ID
-    // For now, let's assume specific routes will use :orgId param mostly.
-    // Or we stick to project-based access where we look up the project first.
-
-    // For specific Organization Management routes:
     const orgId = c.req.param('orgId') || c.req.header('X-Organization-ID')
 
     if (!orgId) {
-        // If no org context, we can't check org access. 
-        // Logic depends on usage. For now, let's assume this middleware is used on routes WITH orgId.
         throw new HTTPException(400, { message: 'Organization Context Missing' })
     }
 
-    // Check Membership
     const membership = await db.query.memberships.findFirst({
         where: and(
             eq(memberships.userId, user.id),
@@ -72,7 +147,6 @@ export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async 
     })
 
     if (!membership) {
-        // Check if Super Admin? (Not implemented yet, but good hook)
         if (user.globalRole === 'super_admin') {
             await next()
             return
@@ -82,11 +156,7 @@ export const requireOrgAccess = (requiredRole?: Role) => createMiddleware(async 
 
     // Role Hierarchy Check
     if (requiredRole) {
-        const roles: Role[] = ['viewer', 'gestor', 'secretario']
-        const userRoleIndex = roles.indexOf(membership.role as Role)
-        const requiredRoleIndex = roles.indexOf(requiredRole)
-
-        if (userRoleIndex < requiredRoleIndex) {
+        if (!hasMinRole(membership.role, requiredRole)) {
             throw new HTTPException(403, { message: 'Forbidden: Insufficient Permissions' })
         }
     }
