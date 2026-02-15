@@ -170,28 +170,37 @@ export async function getNotifications(
 
 /**
  * Mark a single notification as read
+ * Returns true if a notification was found and updated, false otherwise
  */
-export async function markAsRead(notificationId: string, userId: string) {
-    await db
+export async function markAsRead(notificationId: string, userId: string): Promise<boolean> {
+    const result = await db
         .update(notifications)
         .set({ isRead: true })
         .where(and(
             eq(notifications.id, notificationId),
-            eq(notifications.userId, userId)
-        ));
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false)
+        ))
+        .returning({ id: notifications.id });
+
+    return result.length > 0;
 }
 
 /**
  * Mark all notifications as read for a user
+ * Returns the number of notifications updated
  */
-export async function markAllAsRead(userId: string) {
-    await db
+export async function markAllAsRead(userId: string): Promise<number> {
+    const result = await db
         .update(notifications)
         .set({ isRead: true })
         .where(and(
             eq(notifications.userId, userId),
             eq(notifications.isRead, false)
-        ));
+        ))
+        .returning({ id: notifications.id });
+
+    return result.length;
 }
 
 /**

@@ -17,6 +17,15 @@ if (!notification) return Astro.redirect("/notifications?error=not-found");
 if (!notification.isRead) {
     markAsRead(id, ctx.user.id).catch(() => {});
 }
+
+// Serialize for client component: Date → ISO string, parse JSON data
+const clientNotification = {
+    ...notification,
+    createdAt: notification.createdAt instanceof Date
+        ? notification.createdAt.toISOString()
+        : String(notification.createdAt),
+    data: notification.data ? JSON.parse(notification.data) : null,
+};
 ---
 
 <DashboardLayout
@@ -25,6 +34,6 @@ if (!notification.isRead) {
     orgSessionData={ctx.orgSessionData}
 >
   <div class="container mx-auto py-6">
-    <NotificationDetails client:load notification={notification} />
+    <NotificationDetails client:load notification={clientNotification} />
   </div>
 </DashboardLayout>

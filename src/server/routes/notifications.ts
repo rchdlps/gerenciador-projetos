@@ -58,6 +58,19 @@ notificationsRouter.get("/unread-count", async (c) => {
 });
 
 /**
+ * POST /notifications/read-all
+ * Mark all notifications as read
+ * NOTE: registered before /:id/read to avoid route collision
+ */
+notificationsRouter.post("/read-all", async (c) => {
+    const user = c.get("user");
+
+    const count = await markAllAsRead(user.id);
+
+    return c.json({ success: true, count });
+});
+
+/**
  * POST /notifications/:id/read
  * Mark single notification as read
  */
@@ -65,19 +78,11 @@ notificationsRouter.post("/:id/read", async (c) => {
     const user = c.get("user");
     const notificationId = c.req.param("id");
 
-    await markAsRead(notificationId, user.id);
+    const updated = await markAsRead(notificationId, user.id);
 
-    return c.json({ success: true });
-});
-
-/**
- * POST /notifications/read-all
- * Mark all notifications as read
- */
-notificationsRouter.post("/read-all", async (c) => {
-    const user = c.get("user");
-
-    await markAllAsRead(user.id);
+    if (!updated) {
+        return c.json({ error: "Notification not found or already read" }, 404);
+    }
 
     return c.json({ success: true });
 });
