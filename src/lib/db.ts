@@ -16,7 +16,11 @@ import { LatencyLogger } from './latency-logger';
 
 console.log(`🔌 Database connected to: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
 
-export const client = postgres(connectionString);
+export const client = postgres(connectionString, {
+    max: 10,
+    idle_timeout: 30,
+    connect_timeout: 5,
+});
 export const db = drizzle(client, {
     schema,
     logger: process.env.DB_LOGGING === 'true' ? new LatencyLogger() : undefined
