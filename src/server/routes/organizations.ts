@@ -7,6 +7,7 @@ import { organizations, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { createAuditLog } from '@/lib/audit-logger'
+import { invalidateOrgCache } from '@/lib/queries/page-context'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -105,6 +106,8 @@ app.post('/',
             role: 'secretario'
         })
 
+        invalidateOrgCache()
+
         // Fire-and-forget audit
         createAuditLog({
             userId: user.id,
@@ -150,6 +153,8 @@ app.put('/:id',
                 updatedAt: new Date()
             })
             .where(eq(organizations.id, id))
+
+        invalidateOrgCache()
 
         // Fire-and-forget audit
         createAuditLog({
