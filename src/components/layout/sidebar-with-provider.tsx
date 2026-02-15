@@ -1,3 +1,4 @@
+import { Providers } from "@/components/providers"
 import { OrgProvider } from "@/contexts/org-context"
 import { Sidebar } from "./sidebar"
 
@@ -17,8 +18,10 @@ interface SidebarWithProviderProps {
  */
 export function SidebarWithProvider({ user, initialData, initialPath }: SidebarWithProviderProps) {
     return (
-        <OrgProvider initialData={initialData}>
-            <Sidebar user={user} initialPath={initialPath} />
-        </OrgProvider>
+        <Providers>
+            <OrgProvider initialData={initialData}>
+                <Sidebar user={user} initialPath={initialPath} />
+            </OrgProvider>
+        </Providers>
     )
 }
