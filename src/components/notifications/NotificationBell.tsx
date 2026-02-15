@@ -130,7 +130,7 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
                     )}
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80" align="end" forceMount>
+            <DropdownMenuContent className="w-[400px]" align="end" forceMount>
                 <DropdownMenuLabel className="flex items-center justify-between">
                     <span className="font-semibold">Notificações</span>
                     {unreadCount > 0 && (
@@ -187,14 +187,14 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
                                         <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0 animate-pulse" title="Não lida" />
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 break-all">
                                     {notification.message}
                                 </p>
                                 <div className="flex items-center justify-between mt-2">
                                     <span className="text-[10px] font-medium text-muted-foreground/70 uppercase tracking-tight">
                                         {formatTime(notification.createdAt)}
                                     </span>
-                                    <div className="flex gap-1.5">
+                                    <div className="flex gap-1.5 shrink-0">
                                         <button
                                             type="button"
                                             className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wide rounded bg-[#367962] text-white hover:bg-[#2d6552] transition-colors shadow-sm"
