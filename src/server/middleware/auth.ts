@@ -12,10 +12,89 @@ export type AuthVariables = {
     membership?: typeof memberships.$inferSelect
 }
 
-export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
-    const session = await auth.api.getSession({
-        headers: c.req.raw.headers
+// ── In-memory session cache ──────────────────────────────────────────
+// Avoids calling auth.api.getSession() (which hits the DB) on every
+// single API request. TTL of 30s means sessions are re-validated at most
+// once every 30 seconds per token. Concurrent requests with the same
+// token share a single in-flight promise (deduplication).
+const SESSION_CACHE_TTL = 30_000 // 30 seconds
+const SESSION_CACHE_MAX = 500    // max entries before cleanup
+
+type CachedSession = {
+    data: typeof auth.$Infer.Session | null
+    expiresAt: number
+}
+
+const sessionCache = new Map<string, CachedSession>()
+// Track in-flight promises to deduplicate concurrent requests
+const inflightSessions = new Map<string, Promise<typeof auth.$Infer.Session | null>>()
+
+function extractSessionToken(headers: Headers): string | null {
+    const cookie = headers.get('cookie')
+    if (!cookie) return null
+
+    const match = cookie.match(/better-auth\.session_token=([^;]+)/)
+    return match?.[1] || null
+}
+
+function cleanupCache() {
+    if (sessionCache.size <= SESSION_CACHE_MAX) return
+    const now = Date.now()
+    for (const [key, entry] of sessionCache) {
+        if (entry.expiresAt < now) sessionCache.delete(key)
+    }
+    // If still over limit, remove oldest entries
+    if (sessionCache.size > SESSION_CACHE_MAX) {
+        const entries = [...sessionCache.entries()]
+        entries.sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+        const toRemove = entries.slice(0, entries.length - SESSION_CACHE_MAX)
+        for (const [key] of toRemove) sessionCache.delete(key)
+    }
+}
+
+export async function getCachedSession(headers: Headers): Promise<typeof auth.$Infer.Session | null> {
+    const token = extractSessionToken(headers)
+    if (!token) return auth.api.getSession({ headers })
+
+    const now = Date.now()
+
+    // Check cache
+    const cached = sessionCache.get(token)
+    if (cached && cached.expiresAt > now) {
+        return cached.data
+    }
+
+    // Deduplicate concurrent requests for the same token
+    const inflight = inflightSessions.get(token)
+    if (inflight) return inflight
+
+    // Fetch and cache
+    const promise = auth.api.getSession({ headers }).then(session => {
+        sessionCache.set(token, { data: session, expiresAt: now + SESSION_CACHE_TTL })
+        inflightSessions.delete(token)
+        cleanupCache()
+        return session
+    }).catch(err => {
+        inflightSessions.delete(token)
+        throw err
     })
+
+    inflightSessions.set(token, promise)
+    return promise
+}
+
+/** Invalidate cache for a token (call after sign-out, org switch, etc.) */
+export function invalidateSessionCache(token?: string) {
+    if (token) {
+        sessionCache.delete(token)
+    } else {
+        sessionCache.clear()
+    }
+}
+// ─────────────────────────────────────────────────────────────────────
+
+export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
+    const session = await getCachedSession(c.req.raw.headers)
 
     if (!session) {
         c.set('user', null as any)
@@ -29,9 +108,7 @@ export const getSession = createMiddleware<{ Variables: AuthVariables }>(async (
 })
 
 export const requireAuth = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
-    const session = await auth.api.getSession({
-        headers: c.req.raw.headers
-    })
+    const session = await getCachedSession(c.req.raw.headers)
 
     if (!session) {
         return c.json({ error: 'Unauthorized' }, 401)

@@ -1,11 +1,9 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects, users, stakeholders, memberships } from '../../../db/schema'
-import { eq, asc, and } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { tasks } from '../../../db/schema'
+import { eq } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
 import { getBoardData } from '@/lib/queries/board'
@@ -18,21 +16,20 @@ app.use('*', requireAuth)
 // Get Board Data (Columns + Tasks)
 app.get('/:projectId', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
-
-    // Verify Access
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
-
-    // Access Scope Check
     const isSuperAdmin = user.globalRole === 'super_admin'
-    const { allowed } = await canAccessProject(projectId, user.id, isSuperAdmin)
-    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
-    const columns = await getBoardData(projectId)
+    // Access check and board data in parallel
+    const [access, columns] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        getBoardData(projectId),
+    ])
+
+    if (!access.project) return c.json({ error: 'Project not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
+
     return c.json(columns)
 })
 
@@ -47,8 +44,7 @@ app.patch('/reorder',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const { items } = c.req.valid('json')
 
@@ -72,8 +68,7 @@ app.patch('/cards/:id/move',
     zValidator('json', z.object({ columnId: z.string() })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
         const id = c.req.param('id')
         const { columnId } = c.req.valid('json')
 

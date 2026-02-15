@@ -27,27 +27,26 @@ app.get('/:projectId', async (c) => {
     const projectId = c.req.param('projectId')
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    const { allowed } = await canAccessProject(projectId, user.id, isSuperAdmin)
-    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
+    // Access check + all 3 data queries in parallel
+    const [access, notesRows, suppliers, contracts] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        db.select().from(knowledgeAreas).where(
+            and(
+                eq(knowledgeAreas.projectId, projectId),
+                eq(knowledgeAreas.area, 'Aquisicoes')
+            )
+        ),
+        db.select().from(procurementSuppliers)
+            .where(eq(procurementSuppliers.projectId, projectId))
+            .orderBy(desc(procurementSuppliers.createdAt)),
+        db.select().from(procurementContracts)
+            .where(eq(procurementContracts.projectId, projectId))
+            .orderBy(desc(procurementContracts.createdAt)),
+    ])
 
-    // 1. Fetch Notes (from knowledge_areas)
-    const [notesArea] = await db.select().from(knowledgeAreas).where(
-        and(
-            eq(knowledgeAreas.projectId, projectId),
-            eq(knowledgeAreas.area, 'Aquisicoes')
-        )
-    )
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
-    // 2. Fetch Suppliers
-    const suppliers = await db.select().from(procurementSuppliers)
-        .where(eq(procurementSuppliers.projectId, projectId))
-        .orderBy(desc(procurementSuppliers.createdAt))
-
-    // 3. Fetch Contracts
-    const contracts = await db.select().from(procurementContracts)
-        .where(eq(procurementContracts.projectId, projectId))
-        .orderBy(desc(procurementContracts.createdAt))
-
+    const notesArea = notesRows[0]
     return c.json({
         notes: notesArea?.content || '',
         notesId: notesArea?.id,

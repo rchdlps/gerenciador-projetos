@@ -3,18 +3,58 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { tasks, projectPhases, projects, users, memberships } from '../../../db/schema'
-import { eq, or, isNotNull, and, inArray, asc } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { tasks, projectPhases, projects, memberships, sessions } from '../../../db/schema'
+import { eq, and } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { getDatedTasks } from '@/lib/queries/tasks'
-import { getScopedOrgIds } from '@/lib/queries/scoped'
-import { sessions } from '../../../db/schema'
+import { getScopedOrgIds, canAccessProject } from '@/lib/queries/scoped'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
 app.use('*', requireAuth)
+
+// Helper: get project access from a phaseId using a single join
+async function getProjectAccessFromPhase(phaseId: string, userId: string, globalRole: string | null | undefined) {
+    const [row] = await db.select({
+        phaseId: projectPhases.id,
+        projectId: projectPhases.projectId,
+        projectOrgId: projects.organizationId,
+        projectUserId: projects.userId,
+    })
+        .from(projectPhases)
+        .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+        .where(eq(projectPhases.id, phaseId))
+
+    if (!row) return { found: false as const }
+
+    const isSuperAdmin = globalRole === 'super_admin'
+    const { allowed, membership } = await canAccessProject(row.projectId, userId, isSuperAdmin)
+
+    return { found: true as const, row, allowed, membership, isSuperAdmin }
+}
+
+// Helper: get project access from a taskId using a double join
+async function getProjectAccessFromTask(taskId: string, userId: string, globalRole: string | null | undefined) {
+    const [row] = await db.select({
+        taskId: tasks.id,
+        taskTitle: tasks.title,
+        projectId: projects.id,
+        projectOrgId: projects.organizationId,
+        projectUserId: projects.userId,
+    })
+        .from(tasks)
+        .innerJoin(projectPhases, eq(projectPhases.id, tasks.phaseId))
+        .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+        .where(eq(tasks.id, taskId))
+
+    if (!row) return { found: false as const }
+
+    const isSuperAdmin = globalRole === 'super_admin'
+    const { allowed, membership } = await canAccessProject(row.projectId, userId, isSuperAdmin)
+
+    return { found: true as const, row, allowed, membership, isSuperAdmin }
+}
 
 // Get All Dated Tasks (Global Calendar)
 app.get('/dated', async (c) => {
@@ -50,32 +90,16 @@ app.post('/',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const data = c.req.valid('json')
 
-        // Check project access
-        const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, data.phaseId))
-        if (!phase) return c.json({ error: 'Phase not found' }, 404)
-
-        const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-        if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        const access = await getProjectAccessFromPhase(data.phaseId, user.id, user.globalRole)
+        if (!access.found) return c.json({ error: 'Phase not found' }, 404)
+        if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
         // Viewers cannot create tasks
-        if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
+        if (access.membership?.role === 'viewer' && !access.isSuperAdmin) {
             return c.json({ error: 'Visualizadores não podem criar tarefas' }, 403)
         }
 
@@ -93,14 +117,13 @@ app.post('/',
             status: data.status || 'todo'
         }).returning()
 
-        // Audit log
-        await createAuditLog({
+        createAuditLog({
             userId: user.id,
-            organizationId: project?.organizationId || null,
+            organizationId: access.row.projectOrgId,
             action: 'CREATE',
             resource: 'task',
             resourceId: id,
-            metadata: { title: data.title, status: data.status || 'todo', projectId: project?.id }
+            metadata: { title: data.title, status: data.status || 'todo', projectId: access.row.projectId }
         })
 
         return c.json(newTask)
@@ -118,35 +141,18 @@ app.patch('/reorder',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const { items } = c.req.valid('json')
 
-        // Check project access for the first item (assuming all items belong to same project context or checking each)
-        // For efficiency, we check the first item's phase -> project. 
-        // Ideally we should check all, but simpler for now.
+        // Check project access for the first item (all items belong to same project)
         const firstItem = items[0]
         if (firstItem) {
-            const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, firstItem.phaseId))
-            if (phase) {
-                const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-                if (project) {
-                    const [membership] = await db.select()
-                        .from(memberships)
-                        .where(and(
-                            eq(memberships.userId, user.id),
-                            eq(memberships.organizationId, project.organizationId!)
-                        ))
-
-                    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-                        return c.json({ error: 'Forbidden' }, 403)
-                    }
-
-                    // Viewers cannot reorder tasks
-                    if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
-                        return c.json({ error: 'Visualizadores não podem reordenar tarefas' }, 403)
-                    }
+            const access = await getProjectAccessFromPhase(firstItem.phaseId, user.id, user.globalRole)
+            if (access.found) {
+                if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
+                if (access.membership?.role === 'viewer' && !access.isSuperAdmin) {
+                    return c.json({ error: 'Visualizadores não podem reordenar tarefas' }, 403)
                 }
             }
         }
@@ -181,37 +187,21 @@ app.patch('/:id',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const id = c.req.param('id')
         const data = c.req.valid('json')
 
-        // Verify access
-        const [task] = await db.select().from(tasks).where(eq(tasks.id, id))
-        if (!task) return c.json({ error: 'Task not found' }, 404)
-
-        const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId))
-        if (!phase) return c.json({ error: 'Phase not found' }, 404)
-
-        const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-        if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        // Single double-join: task → phase → project
+        const access = await getProjectAccessFromTask(id, user.id, user.globalRole)
+        if (!access.found) return c.json({ error: 'Task not found' }, 404)
+        if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
         // Viewers cannot update tasks
-        if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
+        if (access.membership?.role === 'viewer' && !access.isSuperAdmin) {
             return c.json({ error: 'Visualizadores não podem editar tarefas' }, 403)
         }
+
         const updateData: any = { ...data }
         if (data.startDate) updateData.startDate = new Date(data.startDate)
         if (data.endDate) updateData.endDate = new Date(data.endDate)
@@ -225,10 +215,9 @@ app.patch('/:id',
             .where(eq(tasks.id, id))
             .returning()
 
-        // Audit log
-        await createAuditLog({
+        createAuditLog({
             userId: user.id,
-            organizationId: project?.organizationId || null,
+            organizationId: access.row.projectOrgId,
             action: 'UPDATE',
             resource: 'task',
             resourceId: id,
@@ -242,48 +231,30 @@ app.patch('/:id',
 // Delete Task
 app.delete('/:id', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
-    // Get task info before deletion for audit log and auth check
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, id))
-    if (!task) return c.json({ error: 'Task not found' }, 404)
-
-    const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId))
-    const [project] = phase ? await db.select().from(projects).where(eq(projects.id, phase.projectId)) : [null]
-    if (!project) return c.json({ error: 'Project not found' }, 404)
-
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
+    // Single double-join: task → phase → project
+    const access = await getProjectAccessFromTask(id, user.id, user.globalRole)
+    if (!access.found) return c.json({ error: 'Task not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
     // Viewers cannot delete tasks
-    if (membership && membership.role === 'viewer' && user.globalRole !== 'super_admin') {
+    if (access.membership?.role === 'viewer' && !access.isSuperAdmin) {
         return c.json({ error: 'Visualizadores não podem excluir tarefas' }, 403)
     }
 
     await db.delete(tasks).where(eq(tasks.id, id))
 
-    // Audit log
-    if (task) { // task is guaranteed to exist here due to the check above
-        await createAuditLog({
-            userId: user.id,
-            organizationId: project?.organizationId || null,
-            action: 'DELETE',
-            resource: 'task',
-            resourceId: id,
-            metadata: { title: task.title, projectId: project?.id }
-        })
-    }
+    createAuditLog({
+        userId: user.id,
+        organizationId: access.row.projectOrgId,
+        action: 'DELETE',
+        resource: 'task',
+        resourceId: id,
+        metadata: { title: access.row.taskTitle, projectId: access.row.projectId }
+    })
 
     return c.json({ success: true })
 })

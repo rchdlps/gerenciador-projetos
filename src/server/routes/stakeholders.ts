@@ -17,18 +17,19 @@ app.use('*', requireAuth)
 // Get stakeholders for a project
 app.get('/:projectId', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
-
-    // Access Scope Check
     const isSuperAdmin = user.globalRole === 'super_admin'
 
-    const { allowed } = await canAccessProject(projectId, user.id, isSuperAdmin)
-    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
+    // Access check and data fetch in parallel
+    const [access, projectStakeholders] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        getProjectStakeholders(projectId),
+    ])
 
-    const projectStakeholders = await getProjectStakeholders(projectId)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
+
     return c.json(projectStakeholders)
 })
 
@@ -41,8 +42,7 @@ app.post('/:projectId',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const { name, role, level, email } = c.req.valid('json')
@@ -62,8 +62,7 @@ app.post('/:projectId',
             email
         }).returning()
 
-        // Audit log
-        await createAuditLog({
+        createAuditLog({
             userId: user.id,
             organizationId: project.organizationId,
             action: 'CREATE',
@@ -85,19 +84,25 @@ app.put('/:id',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const id = c.req.param('id')
         const { name, role, level, email } = c.req.valid('json')
 
-        // Verify ownership
-        const [stakeholder] = await db.select().from(stakeholders).where(eq(stakeholders.id, id))
-        if (!stakeholder) return c.json({ error: 'Not found' }, 404)
+        // Single join: stakeholder → project
+        const [row] = await db.select({
+            stakeholder: stakeholders,
+            projectOrgId: projects.organizationId,
+            projectUserId: projects.userId,
+        })
+            .from(stakeholders)
+            .innerJoin(projects, eq(projects.id, stakeholders.projectId))
+            .where(eq(stakeholders.id, id))
+
+        if (!row) return c.json({ error: 'Not found' }, 404)
 
         const isSuperAdmin = user.globalRole === 'super_admin'
-        const { allowed, project } = await canAccessProject(stakeholder.projectId, user.id, isSuperAdmin)
-        if (!project) return c.json({ error: 'Project not found' }, 404)
+        const { allowed } = await canAccessProject(row.stakeholder.projectId, user.id, isSuperAdmin)
         if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         const [updated] = await db.update(stakeholders)
@@ -105,10 +110,9 @@ app.put('/:id',
             .where(eq(stakeholders.id, id))
             .returning()
 
-        // Audit log
-        await createAuditLog({
+        createAuditLog({
             userId: user.id,
-            organizationId: project.organizationId,
+            organizationId: row.projectOrgId,
             action: 'UPDATE',
             resource: 'stakeholder',
             resourceId: id,
@@ -121,29 +125,34 @@ app.put('/:id',
 
 app.delete('/:id', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
 
-    const [stakeholder] = await db.select().from(stakeholders).where(eq(stakeholders.id, id))
-    if (!stakeholder) return c.json({ error: 'Not found' }, 404)
+    // Single join: stakeholder → project
+    const [row] = await db.select({
+        stakeholder: stakeholders,
+        projectOrgId: projects.organizationId,
+    })
+        .from(stakeholders)
+        .innerJoin(projects, eq(projects.id, stakeholders.projectId))
+        .where(eq(stakeholders.id, id))
+
+    if (!row) return c.json({ error: 'Not found' }, 404)
 
     const isSuperAdmin = user.globalRole === 'super_admin'
-    const { allowed, project } = await canAccessProject(stakeholder.projectId, user.id, isSuperAdmin)
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    const { allowed } = await canAccessProject(row.stakeholder.projectId, user.id, isSuperAdmin)
     if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
     await db.delete(stakeholders).where(eq(stakeholders.id, id))
 
-    // Audit log
-    await createAuditLog({
+    createAuditLog({
         userId: user.id,
-        organizationId: project.organizationId,
+        organizationId: row.projectOrgId,
         action: 'DELETE',
         resource: 'stakeholder',
         resourceId: id,
-        metadata: { name: stakeholder.name, projectId: project.id }
+        metadata: { name: row.stakeholder.name, projectId: row.stakeholder.projectId }
     })
 
     return c.json({ success: true })

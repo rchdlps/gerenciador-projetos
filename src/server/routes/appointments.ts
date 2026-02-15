@@ -3,9 +3,8 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { appointments, projects, users, memberships, sessions } from '../../../db/schema'
-import { eq, desc, and, inArray } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { appointments, projects, sessions } from '../../../db/schema'
+import { eq, desc } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { getScopedOrgIds, scopedAppointments, canAccessProject } from '@/lib/queries/scoped'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
@@ -37,27 +36,22 @@ app.get('/', async (c) => {
 // Get Appointments for Project
 app.get('/:projectId', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    // Access check and data fetch in parallel
+    const [access, projectAppointments] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        db.select()
+            .from(appointments)
+            .where(eq(appointments.projectId, projectId))
+            .orderBy(desc(appointments.date)),
+    ])
 
-    // TODO: stricter role check?
-
-    const projectAppointments = await db.select()
-        .from(appointments)
-        .where(eq(appointments.projectId, projectId))
-        .orderBy(desc(appointments.date))
-
-    console.log(`[DEBUG] Project Appointments:`, {
-        projectId,
-        count: projectAppointments.length,
-        first: projectAppointments[0]
-    })
+    if (!access.project) return c.json({ error: 'Project not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
     return c.json(projectAppointments)
 })
@@ -71,29 +65,17 @@ app.post('/',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const { projectId, description, date } = c.req.valid('json')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-        // Verify Access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project, membership } = await canAccessProject(projectId, user.id, isSuperAdmin)
         if (!project) return c.json({ error: 'Project not found' }, 404)
-
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        // Check access
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
         // Viewers cannot create appointments
-        if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+        if (membership?.role === 'viewer' && !isSuperAdmin) {
             return c.json({ error: 'Visualizadores não podem criar compromissos' }, 403)
         }
 
@@ -105,8 +87,7 @@ app.post('/',
             date: new Date(date)
         }).returning()
 
-        // Audit log
-        await createAuditLog({
+        createAuditLog({
             userId: user.id,
             organizationId: project.organizationId,
             action: 'CREATE',
@@ -122,45 +103,40 @@ app.post('/',
 // Delete Appointment
 app.delete('/:id', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Get appointment info before deletion
-    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id))
-    if (!appointment) return c.json({ error: 'Appointment not found' }, 404)
+    // Single join: appointment → project
+    const [row] = await db.select({
+        appointment: appointments,
+        projectOrgId: projects.organizationId,
+        projectUserId: projects.userId,
+    })
+        .from(appointments)
+        .innerJoin(projects, eq(projects.id, appointments.projectId))
+        .where(eq(appointments.id, id))
 
-    const [project] = await db.select().from(projects).where(eq(projects.id, appointment.projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    if (!row) return c.json({ error: 'Appointment not found' }, 404)
 
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
-
-    // Check access
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
+    const { allowed, membership } = await canAccessProject(row.appointment.projectId, user.id, isSuperAdmin)
+    if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
     // Viewers cannot delete appointments
-    if (membership && membership.role === 'viewer' && user?.globalRole !== 'super_admin') {
+    if (membership?.role === 'viewer' && !isSuperAdmin) {
         return c.json({ error: 'Visualizadores não podem excluir compromissos' }, 403)
     }
 
     await db.delete(appointments).where(eq(appointments.id, id))
 
-    // Audit log
-    await createAuditLog({
+    createAuditLog({
         userId: user.id,
-        organizationId: project.organizationId,
+        organizationId: row.projectOrgId,
         action: 'DELETE',
         resource: 'appointment',
         resourceId: id,
-        metadata: { description: appointment.description, projectId: appointment.projectId }
+        metadata: { description: row.appointment.description, projectId: row.appointment.projectId }
     })
 
     return c.json({ success: true })

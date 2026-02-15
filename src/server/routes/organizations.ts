@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { organizations, memberships, users } from '../../../db/schema'
+import { organizations, memberships } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 import { createAuditLog } from '@/lib/audit-logger'
@@ -43,22 +43,25 @@ app.get('/:id', async (c) => {
     const user = c.get('user')
     const id = c.req.param('id')
 
-    const [org] = await db.select().from(organizations).where(eq(organizations.id, id))
-    if (!org) return c.json({ error: 'Not found' }, 404)
-
-    // Admin Bypass
+    // Super admin: just fetch org
     if (user && user.globalRole === 'super_admin') {
+        const [org] = await db.select().from(organizations).where(eq(organizations.id, id))
+        if (!org) return c.json({ error: 'Not found' }, 404)
         return c.json(org)
     }
 
-    // Check membership
-    const membership = await db.query.memberships.findFirst({
-        where: and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, id)
-        )
-    })
+    // Parallelize: org fetch + membership check
+    const [[org], membership] = await Promise.all([
+        db.select().from(organizations).where(eq(organizations.id, id)),
+        db.query.memberships.findFirst({
+            where: and(
+                eq(memberships.userId, user.id),
+                eq(memberships.organizationId, id)
+            )
+        }),
+    ])
 
+    if (!org) return c.json({ error: 'Not found' }, 404)
     if (!membership) return c.json({ error: 'Forbidden' }, 403)
 
     return c.json(org)
@@ -84,6 +87,7 @@ app.post('/',
         const { name, code, logoUrl, secretario, secretariaAdjunta, diretoriaTecnica } = c.req.valid('json')
         const id = nanoid()
 
+        // Insert org first (membership depends on it via FK)
         await db.insert(organizations).values({
             id,
             name,
@@ -94,15 +98,15 @@ app.post('/',
             diretoriaTecnica
         })
 
-        // Auto-add creator as 'secretario'
+        // Auto-add creator as 'secretario' — depends on org existing
         await db.insert(memberships).values({
             userId: user.id,
             organizationId: id,
             role: 'secretario'
         })
 
-        // Audit log
-        await createAuditLog({
+        // Fire-and-forget audit
+        createAuditLog({
             userId: user.id,
             organizationId: id,
             action: 'CREATE',
@@ -147,8 +151,8 @@ app.put('/:id',
             })
             .where(eq(organizations.id, id))
 
-        // Audit log
-        await createAuditLog({
+        // Fire-and-forget audit
+        createAuditLog({
             userId: user.id,
             organizationId: id,
             action: 'UPDATE',

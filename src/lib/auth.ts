@@ -4,6 +4,7 @@ import { db } from "./db";
 import * as schema from "../../db/schema";
 import { sendRecoveryEmail, sendVerificationEmail } from "./email/client";
 import { APIError } from "better-auth";
+import { eq } from "drizzle-orm";
 
 const baseURL = process.env.BETTER_AUTH_URL || (import.meta.env as any).BETTER_AUTH_URL || "http://localhost:4321";
 console.log("[Better Auth] Using Base URL:", baseURL);
@@ -80,11 +81,14 @@ export const auth = betterAuth({
         session: {
             create: {
                 before: async (session) => {
-                    const user = await db.query.users.findFirst({
-                        where: (users, { eq }) => eq(users.id, session.userId)
-                    });
+                    // Lightweight check — only fetch isActive, not the full user row
+                    const [result] = await db
+                        .select({ isActive: schema.users.isActive })
+                        .from(schema.users)
+                        .where(eq(schema.users.id, session.userId))
+                        .limit(1);
 
-                    if (user && !user.isActive) {
+                    if (result && !result.isActive) {
                         throw new APIError("BAD_REQUEST", {
                             message: "Sua conta está inativa. Entre em contato com o administrador."
                         });

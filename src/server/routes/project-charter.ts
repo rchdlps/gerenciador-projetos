@@ -3,11 +3,11 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { nanoid } from 'nanoid'
 import { db } from '@/lib/db'
-import { projectCharters, projects, users, memberships } from '../../../db/schema'
-import { eq, and } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { projectCharters } from '../../../db/schema'
+import { eq } from 'drizzle-orm'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
+import { canAccessProject } from '@/lib/queries/scoped'
 
 const app = new Hono<{ Variables: AuthVariables }>()
 
@@ -16,29 +16,21 @@ app.use('*', requireAuth)
 // Get TAP for Project
 app.get('/:projectId', async (c) => {
     const user = c.get('user')
-    const session = c.get('session')
-    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+    if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
     const projectId = c.req.param('projectId')
+    const isSuperAdmin = user.globalRole === 'super_admin'
 
-    // Verify Access
-    const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
-    if (!project) return c.json({ error: 'Project not found' }, 404)
+    // Access check and charter fetch in parallel
+    const [access, charters] = await Promise.all([
+        canAccessProject(projectId, user.id, isSuperAdmin),
+        db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId)),
+    ])
 
-    // Check if user is a member of the organization
-    const [membership] = await db.select()
-        .from(memberships)
-        .where(and(
-            eq(memberships.userId, user.id),
-            eq(memberships.organizationId, project.organizationId!)
-        ))
+    if (!access.project) return c.json({ error: 'Project not found' }, 404)
+    if (!access.allowed) return c.json({ error: 'Forbidden' }, 403)
 
-    if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-        return c.json({ error: 'Forbidden' }, 403)
-    }
-
-    const [charter] = await db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId))
-
+    const charter = charters[0]
     if (!charter) {
         return c.json({
             justification: "",
@@ -59,29 +51,16 @@ app.put('/:projectId',
     })),
     async (c) => {
         const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+        if (!user) return c.json({ error: 'Unauthorized' }, 401)
 
         const projectId = c.req.param('projectId')
         const data = c.req.valid('json')
+        const isSuperAdmin = user.globalRole === 'super_admin'
 
-        // Verify Access
-        const [project] = await db.select().from(projects).where(eq(projects.id, projectId))
+        const { allowed, project } = await canAccessProject(projectId, user.id, isSuperAdmin)
         if (!project) return c.json({ error: 'Project not found' }, 404)
+        if (!allowed) return c.json({ error: 'Forbidden' }, 403)
 
-        // Check if user is a member of the organization
-        const [membership] = await db.select()
-            .from(memberships)
-            .where(and(
-                eq(memberships.userId, user.id),
-                eq(memberships.organizationId, project.organizationId!)
-            ))
-
-        if ((!user || user.globalRole !== 'super_admin') && project.userId !== user.id && !membership) {
-            return c.json({ error: 'Forbidden' }, 403)
-        }
-
-        // Check if exists
         const [existing] = await db.select().from(projectCharters).where(eq(projectCharters.projectId, projectId))
 
         if (existing) {
@@ -93,8 +72,7 @@ app.put('/:projectId',
                 .where(eq(projectCharters.id, existing.id))
                 .returning()
 
-            // Audit log for UPDATE
-            await createAuditLog({
+            createAuditLog({
                 userId: user.id,
                 organizationId: project.organizationId,
                 action: 'UPDATE',
@@ -111,8 +89,7 @@ app.put('/:projectId',
                 ...data
             }).returning()
 
-            // Audit log for CREATE
-            await createAuditLog({
+            createAuditLog({
                 userId: user.id,
                 organizationId: project.organizationId,
                 action: 'CREATE',

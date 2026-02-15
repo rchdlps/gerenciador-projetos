@@ -34,7 +34,7 @@ export const scheduledNotifications = pgTable("scheduled_notifications", {
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
     statusScheduledIdx: index('scheduled_notif_status_scheduled_idx').on(t.status, t.scheduledFor),
-    creatorIdx: index('scheduled_notif_creator_idx').on(t.creatorId),
+    creatorStatusIdx: index('scheduled_notif_creator_status_idx').on(t.creatorId, t.status, t.scheduledFor),
     orgIdx: index('scheduled_notif_org_idx').on(t.organizationId),
 }));
 

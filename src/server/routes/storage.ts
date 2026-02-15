@@ -27,25 +27,25 @@ async function checkViewerPermission(entityId: string, entityType: string, userI
 
     let organizationId: string | null = null
 
-    // Get organization from entity
+    // Get organization from entity — use joins to avoid sequential queries
     if (entityType === 'task') {
-        const [task] = await db.select().from(tasks).where(eq(tasks.id, entityId))
-        if (task) {
-            const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, task.phaseId))
-            if (phase) {
-                const [project] = await db.select().from(projects).where(eq(projects.id, phase.projectId))
-                organizationId = project?.organizationId || null
-            }
-        }
+        const [row] = await db.select({ orgId: projects.organizationId })
+            .from(tasks)
+            .innerJoin(projectPhases, eq(projectPhases.id, tasks.phaseId))
+            .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+            .where(eq(tasks.id, entityId))
+        organizationId = row?.orgId || null
     } else if (entityType === 'project') {
-        const [project] = await db.select().from(projects).where(eq(projects.id, entityId))
-        organizationId = project?.organizationId || null
+        const [project] = await db.select({ orgId: projects.organizationId })
+            .from(projects)
+            .where(eq(projects.id, entityId))
+        organizationId = project?.orgId || null
     } else if (entityType === 'knowledge_area') {
-        const [ka] = await db.select().from(knowledgeAreas).where(eq(knowledgeAreas.id, entityId))
-        if (ka) {
-            const [project] = await db.select().from(projects).where(eq(projects.id, ka.projectId))
-            organizationId = project?.organizationId || null
-        }
+        const [row] = await db.select({ orgId: projects.organizationId })
+            .from(knowledgeAreas)
+            .innerJoin(projects, eq(projects.id, knowledgeAreas.projectId))
+            .where(eq(knowledgeAreas.id, entityId))
+        organizationId = row?.orgId || null
     }
 
     if (!organizationId) {
@@ -134,10 +134,10 @@ app.post('/confirm',
             uploadedBy: user.id
         }).returning()
 
-        // Audit log for file upload
-        await createAuditLog({
+        // Audit log is non-blocking; get signed URL in parallel
+        createAuditLog({
             userId: user.id,
-            organizationId: null, // Files don't have direct org association
+            organizationId: null,
             action: 'CREATE',
             resource: 'attachment',
             resourceId: attachment.id,
@@ -186,14 +186,13 @@ app.delete('/:id', async (c) => {
         return c.json({ error: 'Forbidden' }, 403)
     }
 
-    // Delete from S3
-    await storage.deleteFile(file.key)
+    // Delete from S3 and DB in parallel; audit log is non-blocking
+    await Promise.all([
+        storage.deleteFile(file.key),
+        db.delete(attachments).where(eq(attachments.id, id)),
+    ])
 
-    // Delete from DB
-    await db.delete(attachments).where(eq(attachments.id, id))
-
-    // Audit log for file deletion
-    await createAuditLog({
+    createAuditLog({
         userId: user.id,
         organizationId: null,
         action: 'DELETE',

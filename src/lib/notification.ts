@@ -145,19 +145,22 @@ export async function getNotifications(
         }
     }
 
-    const data = await db
-        .select()
-        .from(notifications)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(notifications.createdAt))
-        .limit(limit)
-        .offset(offset);
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
-    // Get total count for pagination
-    const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(notifications)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
+    // Parallelize: data + count
+    const [data, countResult] = await Promise.all([
+        db
+            .select()
+            .from(notifications)
+            .where(whereClause)
+            .orderBy(desc(notifications.createdAt))
+            .limit(limit)
+            .offset(offset),
+        db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(notifications)
+            .where(whereClause),
+    ])
 
     return {
         items: data,

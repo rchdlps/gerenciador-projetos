@@ -1,12 +1,12 @@
 import { db } from '@/lib/db'
 import { auth } from '@/lib/auth'
+import { getCachedSession } from '@/server/middleware/auth'
 import { users, sessions, memberships, organizations } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
-import { getScopedOrgIds } from './scoped'
 
 export type PageContext = {
     session: typeof auth.$Infer.Session
-    user: typeof users.$inferSelect
+    user: typeof auth.$Infer.Session.user
     sessionRow: typeof sessions.$inferSelect
     isSuperAdmin: boolean
     activeOrgId: string | null
@@ -24,32 +24,35 @@ type OrgSessionData = {
 /**
  * Shared SSR page context loader.
  *
- * Fetches auth session, user row, active org, and scoped org IDs
+ * Fetches auth session, active org, and scoped org IDs
  * in as few sequential round-trips as possible.
  *
- * Typical reduction: from 6–10 sequential queries down to 3 batches.
+ * Batch 1: auth.api.getSession() — session + user loaded by better-auth
+ * Batch 2: Promise.all([sessionRow, membershipsWithOrgs, allOrgs?])
+ *           — session.user already has globalRole/isActive, no separate user query needed
+ *           — memberships include org details to avoid a 3rd query in buildOrgSessionData
  *
- * Batch 1: auth.api.getSession()
- * Batch 2: Promise.all([userRow, sessionRow, userMemberships, allOrgs?])
- * Batch 3: getScopedOrgIds() (only if not already computable in-memory)
+ * Result: 2 sequential batches instead of 4.
  */
 export async function getPageContext(
     headers: Headers
 ): Promise<PageContext | null> {
-    // Batch 1: Session validation (always required first)
-    const session = await auth.api.getSession({ headers })
+    // Batch 1: Session validation (uses in-memory cache from auth middleware)
+    const session = await getCachedSession(headers)
     if (!session) return null
 
-    // Batch 2: Run user, session row, and memberships in parallel
-    const [userRows, sessionRows, userMemberships, allOrgs] = await Promise.all([
-        db.select().from(users).where(eq(users.id, session.user.id)),
+    const isSuperAdmin = session.user.globalRole === 'super_admin'
+
+    // Batch 2: session row + memberships (with org details) + allOrgs (super admin)
+    // No separate user query — session.user already has id, globalRole, isActive
+    const [sessionRows, membershipWithOrgs, allOrgs] = await Promise.all([
         db.select().from(sessions).where(eq(sessions.id, session.session.id)),
-        db.select({
-            orgId: memberships.organizationId,
-            role: memberships.role,
-        }).from(memberships).where(eq(memberships.userId, session.user.id)),
-        // Only fetch all orgs if user might be super_admin (check from session first)
-        session.user.globalRole === 'super_admin'
+        // Include org details in membership query to avoid a 3rd batch
+        db.query.memberships.findMany({
+            where: eq(memberships.userId, session.user.id),
+            with: { organization: true },
+        }),
+        isSuperAdmin
             ? db.select({
                 id: organizations.id,
                 name: organizations.name,
@@ -59,12 +62,9 @@ export async function getPageContext(
             : Promise.resolve([]),
     ])
 
-    const user = userRows[0]
     const sessionRow = sessionRows[0]
+    if (!sessionRow) return null
 
-    if (!user || !sessionRow) return null
-
-    const isSuperAdmin = user.globalRole === 'super_admin'
     const activeOrgId = sessionRow.activeOrganizationId || null
 
     // Compute scoped org IDs in-memory (no extra DB call needed)
@@ -72,33 +72,28 @@ export async function getPageContext(
     if (isSuperAdmin && !activeOrgId) {
         orgIds = null // Super admin sees all
     } else if (activeOrgId) {
-        // Verify user has access (unless super admin)
         if (!isSuperAdmin) {
-            const hasMembership = userMemberships.some(m => m.orgId === activeOrgId)
-            if (!hasMembership) {
-                orgIds = [] // No access
-            } else {
-                orgIds = [activeOrgId]
-            }
+            const hasMembership = membershipWithOrgs.some(m => m.organizationId === activeOrgId)
+            orgIds = hasMembership ? [activeOrgId] : []
         } else {
             orgIds = [activeOrgId]
         }
     } else {
-        orgIds = userMemberships.map(m => m.orgId)
+        orgIds = membershipWithOrgs.map(m => m.organizationId)
     }
 
-    // Build orgSessionData (same shape as GET /api/org-session)
-    // so the layout sidebar gets its data without a separate API call
+    // Build orgSessionData entirely in-memory (no extra queries)
     let activeOrganization = null
     if (activeOrgId) {
-        const membership = userMemberships.find(m => m.orgId === activeOrgId)
+        const membership = membershipWithOrgs.find(m => m.organizationId === activeOrgId)
         if (membership) {
-            const orgDetail = allOrgs.find(o => o.id === activeOrgId)
-                || userMemberships.find(m => m.orgId === activeOrgId)
-            // We need org name/code. Get from allOrgs if super admin, otherwise
-            // we need to include org data in memberships query. For now, build
-            // from the membership join data we have.
-            activeOrganization = { id: activeOrgId, role: membership.role }
+            activeOrganization = {
+                id: membership.organization.id,
+                name: membership.organization.name,
+                code: membership.organization.code,
+                logoUrl: membership.organization.logoUrl,
+                role: membership.role,
+            }
         } else if (isSuperAdmin) {
             const org = allOrgs.find(o => o.id === activeOrgId)
             if (org) {
@@ -107,45 +102,7 @@ export async function getPageContext(
         }
     }
 
-    // For orgSessionData, we need org details. If user is not super admin,
-    // we need a lightweight membership-with-org query. Let's build from
-    // what we already have when possible.
-    const orgSessionData = await buildOrgSessionData(
-        isSuperAdmin,
-        activeOrgId,
-        activeOrganization,
-        userMemberships,
-        allOrgs,
-        session.user.id,
-    )
-
-    return {
-        session,
-        user,
-        sessionRow,
-        isSuperAdmin,
-        activeOrgId,
-        orgIds,
-        orgSessionData,
-    }
-}
-
-/**
- * Build org session data (same shape as GET /api/org-session response)
- * to feed the sidebar without an extra API call.
- */
-async function buildOrgSessionData(
-    isSuperAdmin: boolean,
-    activeOrgId: string | null,
-    activeOrganization: any,
-    userMemberships: { orgId: string; role: string }[],
-    allOrgs: { id: string; name: string; code: string; logoUrl: string | null }[],
-    userId: string,
-): Promise<OrgSessionData> {
-    // For the org list in the sidebar, we need org names.
-    // Super admins already have allOrgs. Regular users need a join query.
     let orgList: any[]
-
     if (isSuperAdmin) {
         orgList = allOrgs.map(org => ({
             id: org.id,
@@ -155,11 +112,6 @@ async function buildOrgSessionData(
             role: 'admin',
         }))
     } else {
-        // Regular users: we need org details. Do a single query with join.
-        const membershipWithOrgs = await db.query.memberships.findMany({
-            where: eq(memberships.userId, userId),
-            with: { organization: true },
-        })
         orgList = membershipWithOrgs.map(m => ({
             id: m.organization.id,
             name: m.organization.name,
@@ -167,26 +119,22 @@ async function buildOrgSessionData(
             logoUrl: m.organization.logoUrl,
             role: m.role,
         }))
-
-        // Also fill in activeOrganization details if we have them
-        if (activeOrgId && !activeOrganization?.name) {
-            const activeMembership = membershipWithOrgs.find(m => m.organizationId === activeOrgId)
-            if (activeMembership) {
-                activeOrganization = {
-                    id: activeMembership.organization.id,
-                    name: activeMembership.organization.name,
-                    code: activeMembership.organization.code,
-                    logoUrl: activeMembership.organization.logoUrl,
-                    role: activeMembership.role,
-                }
-            }
-        }
     }
 
-    return {
+    const orgSessionData: OrgSessionData = {
         activeOrganizationId: activeOrgId,
         activeOrganization,
         isSuperAdmin,
         organizations: orgList,
+    }
+
+    return {
+        session,
+        user: session.user,
+        sessionRow,
+        isSuperAdmin,
+        activeOrgId,
+        orgIds,
+        orgSessionData,
     }
 }

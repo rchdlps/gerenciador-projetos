@@ -13,80 +13,101 @@ import {
     processPendingScheduledNotifications,
 } from "@/lib/admin-notifications";
 import { db } from "@/lib/db";
-import { users, organizations, memberships } from "../../../db/schema"; // organizations used in /targets org search
+import { users, organizations, memberships } from "../../../db/schema";
 import { eq, or, and, ilike, inArray } from "drizzle-orm";
 
-const adminNotificationsRouter = new Hono<{ Variables: AuthVariables }>();
+type NotificationContext = {
+    role: string;
+    orgId: string | null;
+};
 
-// Require authentication for all routes
+type AdminNotificationVariables = AuthVariables & {
+    notificationContext: NotificationContext;
+};
+
+const adminNotificationsRouter = new Hono<{ Variables: AdminNotificationVariables }>();
+
 adminNotificationsRouter.use("*", requireAuth);
 
 /**
- * Middleware: Check if user has permission to send notifications
- * Allowed: super_admin, org secretario
+ * Middleware: Check permission and store context in c.set()
+ * Eliminates redundant getUserContext() queries in handlers
  */
-const requireNotificationPermission = async (c: any, next: any) => {
+adminNotificationsRouter.use("*", async (c, next) => {
     const user = c.get("user");
     const isSuperAdmin = user.globalRole === "super_admin";
+    const orgId = c.req.query("orgId") || null;
 
-    // Get query param for org context (for secretario/gestor)
-    const orgId = c.req.query("orgId");
+    if (isSuperAdmin) {
+        c.set("notificationContext" as any, { role: "super_admin", orgId });
+        return next();
+    }
 
-    if (!isSuperAdmin && !orgId) {
+    if (!orgId) {
         return c.json({ error: "Organization context required" }, 403);
     }
 
-    // Check if user is secretario or gestor in the org
-    if (!isSuperAdmin && orgId) {
-        const membership = await db
-            .select()
+    // Single membership query — shared across all handlers
+    const [membership] = await db
+        .select({ role: memberships.role })
+        .from(memberships)
+        .where(
+            and(
+                eq(memberships.userId, user.id),
+                eq(memberships.organizationId, orgId),
+                eq(memberships.role, "secretario")
+            )
+        )
+        .limit(1);
+
+    if (!membership) {
+        return c.json({ error: "Forbidden: Insufficient permissions" }, 403);
+    }
+
+    c.set("notificationContext" as any, { role: membership.role, orgId });
+    await next();
+});
+
+/**
+ * Shared: validate target permissions for send/schedule
+ */
+async function validateTargetPermissions(
+    context: NotificationContext,
+    targetType: string,
+    targetIds: string[]
+): Promise<string | null> {
+    if (context.role === "super_admin") return null;
+
+    if (targetType === "all" || targetType === "multi-org") {
+        return "Forbidden: Only super admins can send to all users or multiple orgs";
+    }
+
+    if (targetType === "organization" && targetIds[0] !== context.orgId) {
+        return "Forbidden: Can only send to your organization";
+    }
+
+    if (targetType === "user" && context.orgId && targetIds.length > 0) {
+        const orgMembers = await db
+            .select({ userId: memberships.userId })
             .from(memberships)
             .where(
                 and(
-                    eq(memberships.userId, user.id),
-                    eq(memberships.organizationId, orgId),
-                    eq(memberships.role, "secretario")
+                    eq(memberships.organizationId, context.orgId),
+                    inArray(memberships.userId, targetIds)
                 )
-            )
-            .limit(1);
-
-        if (membership.length === 0) {
-            return c.json({ error: "Forbidden: Insufficient permissions" }, 403);
+            );
+        const validUserIds = new Set(orgMembers.map((m) => m.userId));
+        const invalidIds = targetIds.filter((id) => !validUserIds.has(id));
+        if (invalidIds.length > 0) {
+            return "Forbidden: Some target users are not members of your organization";
         }
     }
 
-    await next();
-};
-
-adminNotificationsRouter.use("*", requireNotificationPermission);
-
-/**
- * Helper to get user context and validate permissions
- */
-async function getUserContext(user: any, orgId?: string | null) {
-    // If no orgId, check if they are actually a super admin globally
-    if (!orgId) {
-        if (user.globalRole === "super_admin") {
-            return { role: "super_admin", orgId: null };
-        }
-        return { role: "viewer", orgId: null };
-    }
-
-    const membership = await db
-        .select()
-        .from(memberships)
-        .where(and(eq(memberships.userId, user.id), eq(memberships.organizationId, orgId)))
-        .limit(1);
-
-    return {
-        role: membership[0]?.role || "viewer",
-        orgId,
-    };
+    return null;
 }
 
 /**
  * POST /admin/notifications/send
- * Send immediate notification
  */
 const sendSchema = z.object({
     targetType: z.enum(["user", "organization", "role", "multi-org", "all"]),
@@ -100,41 +121,11 @@ const sendSchema = z.object({
 
 adminNotificationsRouter.post("/send", zValidator("json", sendSchema), async (c) => {
     const user = c.get("user");
-    const orgId = c.req.query("orgId");
-    const context = await getUserContext(user, orgId);
+    const context = c.get("notificationContext" as any) as NotificationContext;
     const body = c.req.valid("json");
 
-    // Validate permissions for target type
-    if (context.role !== "super_admin") {
-        // Non-super admins can only send to their org or users within their org
-        if (body.targetType === "all" || body.targetType === "multi-org") {
-            return c.json({ error: "Forbidden: Only super admins can send to all users or multiple orgs" }, 403);
-        }
-
-        if (body.targetType === "organization" && body.targetIds[0] !== context.orgId) {
-            return c.json({ error: "Forbidden: Can only send to your organization" }, 403);
-        }
-
-        // For user targeting, validate all target users belong to the secretario's org
-        if (body.targetType === "user" && context.orgId && body.targetIds.length > 0) {
-            const orgMembers = await db
-                .select({ userId: memberships.userId })
-                .from(memberships)
-                .where(
-                    and(
-                        eq(memberships.organizationId, context.orgId),
-                        inArray(memberships.userId, body.targetIds)
-                    )
-                );
-            const validUserIds = new Set(orgMembers.map((m) => m.userId));
-            const invalidIds = body.targetIds.filter((id) => !validUserIds.has(id));
-            if (invalidIds.length > 0) {
-                return c.json({
-                    error: "Forbidden: Some target users are not members of your organization",
-                }, 403);
-            }
-        }
-    }
+    const permError = await validateTargetPermissions(context, body.targetType, body.targetIds);
+    if (permError) return c.json({ error: permError }, 403);
 
     try {
         const result = await sendImmediateNotification({
@@ -162,7 +153,6 @@ adminNotificationsRouter.post("/send", zValidator("json", sendSchema), async (c)
 
 /**
  * POST /admin/notifications/schedule
- * Schedule notification for later
  */
 const scheduleSchema = sendSchema.extend({
     scheduledFor: z.string().datetime(),
@@ -170,40 +160,11 @@ const scheduleSchema = sendSchema.extend({
 
 adminNotificationsRouter.post("/schedule", zValidator("json", scheduleSchema), async (c) => {
     const user = c.get("user");
-    const orgId = c.req.query("orgId");
-    const context = await getUserContext(user, orgId);
+    const context = c.get("notificationContext" as any) as NotificationContext;
     const body = c.req.valid("json");
 
-    // Same permission checks as /send
-    if (context.role !== "super_admin") {
-        if (body.targetType === "all" || body.targetType === "multi-org") {
-            return c.json({ error: "Forbidden: Only super admins can send to all users or multiple orgs" }, 403);
-        }
-
-        if (body.targetType === "organization" && body.targetIds[0] !== context.orgId) {
-            return c.json({ error: "Forbidden: Can only send to your organization" }, 403);
-        }
-
-        // For user targeting, validate all target users belong to the secretario's org
-        if (body.targetType === "user" && context.orgId && body.targetIds.length > 0) {
-            const orgMembers = await db
-                .select({ userId: memberships.userId })
-                .from(memberships)
-                .where(
-                    and(
-                        eq(memberships.organizationId, context.orgId),
-                        inArray(memberships.userId, body.targetIds)
-                    )
-                );
-            const validUserIds = new Set(orgMembers.map((m) => m.userId));
-            const invalidIds = body.targetIds.filter((id) => !validUserIds.has(id));
-            if (invalidIds.length > 0) {
-                return c.json({
-                    error: "Forbidden: Some target users are not members of your organization",
-                }, 403);
-            }
-        }
-    }
+    const permError = await validateTargetPermissions(context, body.targetType, body.targetIds);
+    if (permError) return c.json({ error: permError }, 403);
 
     try {
         const scheduledId = await scheduleNotification({
@@ -227,7 +188,6 @@ adminNotificationsRouter.post("/schedule", zValidator("json", scheduleSchema), a
 
 /**
  * GET /admin/notifications/scheduled
- * List scheduled notifications
  */
 adminNotificationsRouter.get("/scheduled", async (c) => {
     const user = c.get("user");
@@ -236,13 +196,11 @@ adminNotificationsRouter.get("/scheduled", async (c) => {
     const offset = parseInt(c.req.query("offset") || "0");
 
     const scheduled = await getScheduledNotifications(user.id, status, limit, offset);
-
     return c.json({ scheduled });
 });
 
 /**
  * PATCH /admin/notifications/scheduled/:id
- * Update scheduled notification
  */
 const updateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
@@ -262,7 +220,6 @@ adminNotificationsRouter.patch("/scheduled/:id", zValidator("json", updateSchema
             ...body,
             scheduledFor: body.scheduledFor ? new Date(body.scheduledFor) : undefined,
         });
-
         return c.json({ success: true });
     } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : "Failed to update" }, 500);
@@ -271,7 +228,6 @@ adminNotificationsRouter.patch("/scheduled/:id", zValidator("json", updateSchema
 
 /**
  * DELETE /admin/notifications/scheduled/:id
- * Cancel scheduled notification
  */
 adminNotificationsRouter.delete("/scheduled/:id", async (c) => {
     const user = c.get("user");
@@ -287,7 +243,6 @@ adminNotificationsRouter.delete("/scheduled/:id", async (c) => {
 
 /**
  * GET /admin/notifications/history
- * Get send history
  */
 adminNotificationsRouter.get("/history", async (c) => {
     const user = c.get("user");
@@ -295,16 +250,12 @@ adminNotificationsRouter.get("/history", async (c) => {
     const offset = parseInt(c.req.query("offset") || "0");
 
     const history = await getSendHistory(user.id, limit, offset);
-
     return c.json({ history });
 });
 
 /**
  * POST /admin/notifications/process-now
- * Manually trigger processing of all pending scheduled notifications.
- * Bypasses the Inngest cron — useful when the cron is unavailable (local dev,
- * first deploy, or Inngest cloud not yet synced with the app URL).
- * Restricted to super_admin only.
+ * Super admin only — manually trigger scheduled notification processing
  */
 adminNotificationsRouter.post("/process-now", async (c) => {
     const user = c.get("user");
@@ -323,7 +274,6 @@ adminNotificationsRouter.post("/process-now", async (c) => {
 
 /**
  * GET /admin/notifications/stats/:id
- * Get delivery stats for a send log
  */
 adminNotificationsRouter.get("/stats/:id", async (c) => {
     const id = c.req.param("id");
@@ -345,18 +295,13 @@ adminNotificationsRouter.get("/targets", async (c) => {
     const query = c.req.query("q") || "";
     const limit = parseInt(c.req.query("limit") || "20");
 
-    const user = c.get("user");
-    const orgId = c.req.query("orgId");
-
-    // Validate permission and get context
-    const context = await getUserContext(user, orgId);
+    const context = c.get("notificationContext" as any) as NotificationContext;
 
     if (context.role !== "super_admin" && !context.orgId) {
         return c.json({ error: "Organization context required" }, 403);
     }
 
     if (type === "user") {
-        // If not super admin, filter users by organization membership via join
         if (context.role !== "super_admin") {
             const results = await db
                 .select({ id: users.id, name: users.name, email: users.email })
@@ -373,7 +318,6 @@ adminNotificationsRouter.get("/targets", async (c) => {
             return c.json({ users: results });
         }
 
-        // Super admin: search all users
         const results = await db
             .select({ id: users.id, name: users.name, email: users.email })
             .from(users)
@@ -383,7 +327,6 @@ adminNotificationsRouter.get("/targets", async (c) => {
         return c.json({ users: results });
 
     } else if (type === "organization") {
-        // Only super admin can search organizations
         if (context.role !== "super_admin") {
             return c.json({ organizations: [] });
         }
