@@ -132,7 +132,7 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={isSwitching}
                 className={cn(
-                    "w-full flex items-center gap-2 p-2 rounded-md border transition-all",
+                    "w-full flex items-center gap-2 p-2 rounded-md border transition-all cursor-pointer",
                     "hover:bg-accent hover:border-accent-foreground/20",
                     isOpen && "bg-accent border-accent-foreground/20",
                     isSwitching && "opacity-50 cursor-wait",
@@ -201,7 +201,7 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                                 <button
                                     onClick={() => handleSwitch(null)}
                                     className={cn(
-                                        "w-full flex items-center gap-2 px-3 py-2 text-left",
+                                        "w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer",
                                         "hover:bg-accent transition-colors",
                                         isViewingAll && "bg-amber-50"
                                     )}
@@ -249,7 +249,7 @@ export function OrgSwitcher({ isSuperAdmin = false }: OrgSwitcherProps) {
                                     key={org.id}
                                     onClick={() => handleSwitch(org.id)}
                                     className={cn(
-                                        "w-full flex items-center gap-2 px-3 py-2 text-left",
+                                        "w-full flex items-center gap-2 px-3 py-2 text-left cursor-pointer",
                                         "hover:bg-accent transition-colors",
                                         org.id === activeOrgId && "bg-primary/5"
                                     )}
