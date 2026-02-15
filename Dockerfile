@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM node:24-slim AS build
+FROM node:22-slim AS build
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV DEPLOY_TARGET=railway
 RUN npm run build
 
 # ── Stage 2: Runtime ────────────────────────────────────────
-FROM node:24-slim AS runtime
+FROM node:22-slim AS runtime
 
 WORKDIR /app
 
