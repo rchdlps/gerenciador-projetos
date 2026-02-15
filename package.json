@@ -96,5 +96,8 @@
     "happy-dom": "^20.5.0",
     "jsdom": "^28.0.0",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "esbuild": "^0.25.0"
   }
 }
