@@ -9,6 +9,9 @@ import { eq } from "drizzle-orm";
 const baseURL = process.env.BETTER_AUTH_URL || (import.meta.env as any).BETTER_AUTH_URL || "http://localhost:4321";
 console.log("[Better Auth] Using Base URL:", baseURL);
 
+// Normalize base URL to remove trailing slash for origin check
+const normalizedBaseURL = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+
 export const auth = betterAuth({
     baseURL,
     database: drizzleAdapter(db, {
@@ -102,8 +105,10 @@ export const auth = betterAuth({
         }
     },
     trustedOrigins: [
-        baseURL,
-        "http://localhost:4321", // Astro default
+        normalizedBaseURL,
+        // Add the domain without protocol just in case (some deployments might need it)
+        normalizedBaseURL.replace(/^https?:\/\//, ""),
+        "http://localhost:4321",
         "http://127.0.0.1:4321",
     ],
     // Add other providers here
