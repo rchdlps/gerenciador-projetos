@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Toaster } from "@/components/ui/sonner"
 import { OrgMembersManager } from "./org-members-manager"
 import { OrgProvider } from "@/contexts/org-context"
 
@@ -24,7 +23,6 @@ export function OrgMembersWrapper({ organizationId, canManage, userRole, isSuper
                     isSuperAdmin={isSuperAdmin}
                 />
             </OrgProvider>
-            <Toaster />
         </QueryClientProvider>
     )
 }
