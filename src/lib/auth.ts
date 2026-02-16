@@ -102,11 +102,9 @@ export const auth = betterAuth({
         }
     },
     trustedOrigins: [
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://localhost:4321",
+        baseURL,
+        "http://localhost:4321", // Astro default
         "http://127.0.0.1:4321",
-        ...(baseURL !== "http://127.0.0.1:4321" ? [baseURL] : []),
     ],
     // Add other providers here
 });
