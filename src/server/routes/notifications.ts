@@ -64,10 +64,16 @@ notificationsRouter.get("/unread-count", async (c) => {
  */
 notificationsRouter.post("/read-all", async (c) => {
     const user = c.get("user");
+    console.log("[Notification API] Processing read-all for user:", user.id);
 
-    const count = await markAllAsRead(user.id);
-
-    return c.json({ success: true, count });
+    try {
+        const count = await markAllAsRead(user.id);
+        console.log("[Notification API] read-all success, count (dummy):", count);
+        return c.json({ success: true, count });
+    } catch (error) {
+        console.error("[Notification API] read-all failed:", error);
+        return c.json({ error: "Failed to mark all as read" }, 500);
+    }
 });
 
 /**

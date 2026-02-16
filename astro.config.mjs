@@ -4,12 +4,9 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 
-import vercel from '@astrojs/vercel';
 import node from '@astrojs/node';
 
 import sentry from "@sentry/astro";
-
-const isRailway = process.env.DEPLOY_TARGET === 'railway';
 
 // https://astro.build/config
 export default defineConfig({
@@ -24,12 +21,16 @@ export default defineConfig({
   output: 'server',
 
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [/** @type {any} */ (tailwindcss())]
   },
 
-  adapter: isRailway
-    ? node({ mode: 'standalone' })
-    : vercel({ maxDuration: 60 }),
+  adapter: node({ mode: 'standalone' }),
+
+  // Disable Astro's built-in origin check for POST requests.
+  // CSRF protection is handled by better-auth's trustedOrigins instead.
+  security: {
+    checkOrigin: false
+  },
 
   image: {
     domains: ['hel1.your-objectstorage.com']

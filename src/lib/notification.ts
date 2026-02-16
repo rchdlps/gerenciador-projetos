@@ -191,16 +191,20 @@ export async function markAsRead(notificationId: string, userId: string): Promis
  * Returns the number of notifications updated
  */
 export async function markAllAsRead(userId: string): Promise<number> {
-    const result = await db
-        .update(notifications)
-        .set({ isRead: true })
-        .where(and(
-            eq(notifications.userId, userId),
-            eq(notifications.isRead, false)
-        ))
-        .returning({ id: notifications.id });
+    try {
+        await db
+            .update(notifications)
+            .set({ isRead: true })
+            .where(and(
+                eq(notifications.userId, userId),
+                eq(notifications.isRead, false)
+            ));
 
-    return result.length;
+        return 1;
+    } catch (err) {
+        console.error("Error marking all as read:", err);
+        throw err;
+    }
 }
 
 /**

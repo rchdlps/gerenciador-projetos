@@ -8,7 +8,11 @@ import { eq } from "drizzle-orm";
 
 export const POST: APIRoute = async ({ request }) => {
     try {
-        const session = await auth.api.getSession({ headers: request.headers });
+        // Only pass cookie header — passing Origin triggers better-auth's CSRF check
+        const authHeaders = new Headers();
+        const cookie = request.headers.get('cookie');
+        if (cookie) authHeaders.set('cookie', cookie);
+        const session = await auth.api.getSession({ headers: authHeaders });
         if (!session) {
             return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
         }

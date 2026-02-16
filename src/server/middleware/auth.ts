@@ -53,9 +53,26 @@ function cleanupCache() {
     }
 }
 
+/**
+ * Build minimal headers for auth.api.getSession().
+ *
+ * better-auth's origin-check middleware validates the Origin header on
+ * non-GET requests and throws APIError("FORBIDDEN") when it doesn't match
+ * trustedOrigins. That check is meant for browser→auth-endpoint calls,
+ * NOT for server-side session lookups. We only need the cookie header.
+ */
+function sessionOnlyHeaders(headers: Headers): Headers {
+    const h = new Headers()
+    const cookie = headers.get('cookie')
+    if (cookie) h.set('cookie', cookie)
+    return h
+}
+
 export async function getCachedSession(headers: Headers): Promise<typeof auth.$Infer.Session | null> {
     const token = extractSessionToken(headers)
-    if (!token) return auth.api.getSession({ headers })
+    const safeHeaders = sessionOnlyHeaders(headers)
+
+    if (!token) return auth.api.getSession({ headers: safeHeaders })
 
     const now = Date.now()
 
@@ -70,7 +87,7 @@ export async function getCachedSession(headers: Headers): Promise<typeof auth.$I
     if (inflight) return inflight
 
     // Fetch and cache
-    const promise = auth.api.getSession({ headers }).then(session => {
+    const promise = auth.api.getSession({ headers: safeHeaders }).then(session => {
         sessionCache.set(token, { data: session, expiresAt: now + SESSION_CACHE_TTL })
         inflightSessions.delete(token)
         cleanupCache()
