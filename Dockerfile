@@ -19,6 +19,13 @@ COPY . .
 
 # Build with Railway adapter
 ENV DEPLOY_TARGET=railway
+
+# Capture build arguments for client-side env vars
+ARG PUBLIC_PUSHER_KEY
+ARG PUBLIC_PUSHER_CLUSTER
+ENV PUBLIC_PUSHER_KEY=$PUBLIC_PUSHER_KEY
+ENV PUBLIC_PUSHER_CLUSTER=$PUBLIC_PUSHER_CLUSTER
+
 RUN npm run build
 
 # ── Stage 2: Runtime ────────────────────────────────────────
