@@ -12,6 +12,11 @@ export type Attachment = {
     fileType: string
     fileSize: number
     url?: string
+    variantUrls?: {
+        thumb?: string
+        medium?: string
+        optimized?: string
+    } | null
     createdAt: string
     uploadedBy: string
 }
@@ -41,8 +46,8 @@ export function AttachmentList({ attachments, onDelete, isDeleting, readonly = f
                         <CardContent className="p-3">
                             <div className="flex items-start gap-3">
                                 <div className="h-10 w-10 shrink-0 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                                    {isImage && file.url ? (
-                                        <img src={file.url} alt={file.fileName} className="h-full w-full object-cover" loading="lazy" />
+                                    {isImage && (file.variantUrls?.thumb || file.url) ? (
+                                        <img src={file.variantUrls?.thumb || file.url} alt={file.fileName} className="h-full w-full object-cover" loading="lazy" />
                                     ) : (
                                         <FileIcon className="h-5 w-5 text-muted-foreground" />
                                     )}
@@ -60,7 +65,7 @@ export function AttachmentList({ attachments, onDelete, isDeleting, readonly = f
                             </div>
 
                             <div className="absolute top-2 right-2 flex gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 opacity-0 group-hover:opacity-100 transition-opacity border shadow-sm">
-                                {isImage && file.url && (
+                                {isImage && (file.variantUrls?.medium || file.url) && (
                                     <Dialog>
                                         <DialogTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -68,7 +73,7 @@ export function AttachmentList({ attachments, onDelete, isDeleting, readonly = f
                                             </Button>
                                         </DialogTrigger>
                                         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-transparent shadow-none">
-                                            <img src={file.url} alt={file.fileName} className="w-full h-auto rounded-lg" loading="lazy" />
+                                            <img src={file.variantUrls?.medium || file.url} alt={file.fileName} className="w-full h-auto rounded-lg" loading="lazy" />
                                         </DialogContent>
                                     </Dialog>
                                 )}
