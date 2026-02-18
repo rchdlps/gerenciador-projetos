@@ -21,7 +21,10 @@ export default defineConfig({
   output: 'server',
 
   vite: {
-    plugins: [/** @type {any} */ (tailwindcss())]
+    plugins: [/** @type {any} */ (tailwindcss())],
+    ssr: {
+      external: ['sharp'],
+    },
   },
 
   adapter: node({ mode: 'standalone' }),
