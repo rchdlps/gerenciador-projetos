@@ -42,6 +42,7 @@ These variables must be set in the Railway project settings:
 | `INNGEST_SIGNING_KEY` | Signing Key from Inngest Cloud to verify webhooks. |
 | `HOST` | Set to `0.0.0.0` to expose the server to Railway's ingress. |
 | `PORT` | (Optional) Railway sets this, usually `3000` or random. |
+| `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `ENDPOINT`, `REGION` | Auto-injected by Railway when a Bucket is linked to the service. |
 
 ## Deployment Workflow
 
