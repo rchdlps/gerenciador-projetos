@@ -7,6 +7,7 @@ import { attachments, tasks, projectPhases, projects, users, memberships, knowle
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { createAuditLog } from '@/lib/audit-logger'
+import { inngest } from '@/lib/inngest/client'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
 const app = new Hono<{ Variables: AuthVariables }>()
@@ -127,6 +128,14 @@ app.post('/upload', async (c) => {
             resourceId: attachment.id,
             metadata: { fileName: file.name, fileType: file.type, entityType, entityId },
         })
+
+        // Trigger background image processing for image files
+        if (file.type.startsWith('image/')) {
+            inngest.send({
+                name: "image/process",
+                data: { key, attachmentId: attachment.id, type: "attachment" },
+            }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
+        }
 
         const signedUrl = await storage.getDownloadUrl(key)
 
