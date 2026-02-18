@@ -110,6 +110,7 @@ export const auth = betterAuth({
         normalizedBaseURL.replace(/^https?:\/\//, ""),
         "http://localhost:4321",
         "http://127.0.0.1:4321",
+        "https://inngest.datagov.tec.br"
     ],
     // Add other providers here
 });
