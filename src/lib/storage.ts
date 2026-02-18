@@ -20,7 +20,7 @@ const s3 = new S3Client({
         accessKeyId: accessKeyId || "",
         secretAccessKey: secretAccessKey || "",
     },
-    forcePathStyle: false,
+    forcePathStyle: true,
 })
 
 console.log("[S3 Init]", {
@@ -34,22 +34,22 @@ console.log("[S3 Init]", {
 const BUCKET = bucketName!
 
 export const storage = {
-    uploadFile: async (key: string, body: Buffer | Uint8Array, contentType: string, contentLength: number) => {
+    uploadFile: async (key: string, body: Buffer | Uint8Array, contentType: string) => {
         const command = new PutObjectCommand({
             Bucket: BUCKET,
             Key: key,
             Body: body,
             ContentType: contentType,
-            ContentLength: contentLength,
         })
-        await s3.send(command)
+        const result = await s3.send(command)
+        console.log(`[Storage] PutObject response for ${key}:`, result.$metadata.httpStatusCode)
 
         // Verify the object was actually persisted
         try {
             const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
             console.log(`[Storage] Upload verified: ${key} (${head.ContentLength} bytes)`)
-        } catch (err) {
-            console.error(`[Storage] Upload verification FAILED for key: ${key}`, err)
+        } catch (err: any) {
+            console.error(`[Storage] Upload verification FAILED for key: ${key}`, err.name, err.message)
         }
     },
 
@@ -78,7 +78,7 @@ export const storage = {
 
     getPublicUrl: (key: string) => {
         const cleanEndpoint = endpoint?.replace("https://", "").replace("http://", "")
-        return `https://${BUCKET}.${cleanEndpoint}/${key}`
+        return `https://${cleanEndpoint}/${BUCKET}/${key}`
     },
 
     deleteFile: async (key: string) => {

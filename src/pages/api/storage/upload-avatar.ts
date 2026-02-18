@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
         const key = `avatars/${session.user.id}/${nanoid()}-${file.name}`
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        await storage.uploadFile(key, buffer, file.type, file.size)
+        await storage.uploadFile(key, buffer, file.type)
 
         const publicUrl = storage.getPublicUrl(key)
 

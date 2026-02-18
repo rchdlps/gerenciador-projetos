@@ -107,7 +107,7 @@ app.post('/upload', async (c) => {
         const key = `${entityId}/${nanoid()}-${file.name}`
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        await storage.uploadFile(key, buffer, file.type, file.size)
+        await storage.uploadFile(key, buffer, file.type)
 
         const [attachment] = await db.insert(attachments).values({
             id: nanoid(),
