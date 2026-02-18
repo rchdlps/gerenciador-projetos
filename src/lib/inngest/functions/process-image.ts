@@ -67,7 +67,7 @@ export const processImage = inngest.createFunction(
             for (const config of VARIANTS) {
                 const variantKey = `${key}.${config.suffix}.webp`;
                 const processed = await generateVariant(buffer, config);
-                await storage.uploadFile(variantKey, processed, "image/webp", processed.length);
+                await storage.uploadFile(variantKey, processed, "image/webp");
                 console.log(
                     `[ImageProcessing] Generated ${config.suffix}: ${processed.length} bytes -> ${variantKey}`
                 );
