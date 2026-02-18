@@ -138,5 +138,6 @@ export const mockStorage = {
   uploadFile: vi.fn(() => Promise.resolve()),
   getDownloadUrl: vi.fn(() => Promise.resolve('https://test-download-url.com')),
   getPublicUrl: vi.fn((key: string) => `https://test-storage.example.com/bucket/${key}`),
+  downloadFile: vi.fn(() => Promise.resolve(Buffer.from('test-image-data'))),
   deleteFile: vi.fn(() => Promise.resolve()),
 }
