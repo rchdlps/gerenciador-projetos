@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db } from "./db";
+import { inngest } from "./inngest/client";
 import {
     scheduledNotifications,
     notificationDeliveries,
@@ -123,6 +124,20 @@ export async function scheduleNotification(input: ScheduleNotificationInput): Pr
         status: "pending",
     });
 
+    // Trigger Inngest event for precise scheduling.
+    // If this fails, the daily safety-net cron will still pick it up.
+    try {
+        await inngest.send({
+            name: "notification/scheduled",
+            data: {
+                notificationId: id,
+                scheduledFor: input.scheduledFor.toISOString(),
+            },
+        });
+    } catch (error) {
+        console.error(`[ScheduledNotifications] Failed to emit Inngest event for ${id}, will rely on safety-net cron:`, error);
+    }
+
     return id;
 }
 
@@ -219,6 +234,14 @@ export async function cancelScheduledNotification(id: string, creatorId: string)
                 eq(scheduledNotifications.status, "pending")
             )
         );
+
+    // Cancel any pending Inngest function for this notification
+    await inngest.send({
+        name: "notification/cancelled",
+        data: {
+            notificationId: id,
+        },
+    });
 }
 
 /**
@@ -229,7 +252,8 @@ export async function updateScheduledNotification(
     creatorId: string,
     updates: Partial<Omit<ScheduleNotificationInput, "creatorId">>
 ): Promise<void> {
-    await db
+    // Check if it was actually updated (exists and was pending)
+    const result = await db
         .update(scheduledNotifications)
         .set({ ...updates, updatedAt: new Date() })
         .where(
@@ -238,7 +262,27 @@ export async function updateScheduledNotification(
                 eq(scheduledNotifications.creatorId, creatorId),
                 eq(scheduledNotifications.status, "pending")
             )
-        );
+        )
+        .returning({ id: scheduledNotifications.id, scheduledFor: scheduledNotifications.scheduledFor });
+
+    if (result.length > 0) {
+        // Cancel the in-flight Inngest function, then re-schedule with the (possibly updated) time.
+        // The .returning() clause gives us the current scheduledFor regardless of whether it changed.
+        await inngest.send({
+            name: "notification/cancelled",
+            data: { notificationId: id },
+        });
+
+        if (result[0].scheduledFor) {
+            await inngest.send({
+                name: "notification/scheduled",
+                data: {
+                    notificationId: id,
+                    scheduledFor: result[0].scheduledFor.toISOString(),
+                },
+            });
+        }
+    }
 }
 
 /**
@@ -281,7 +325,67 @@ export async function getDeliveryStats(sendLogId: string) {
 }
 
 /**
- * Process pending scheduled notifications (called by cron)
+ * Process a single scheduled notification
+ */
+export async function processSingleNotification(id: string): Promise<{ success: boolean; error?: string }> {
+    const notifications = await db
+        .select()
+        .from(scheduledNotifications)
+        .where(
+            and(
+                eq(scheduledNotifications.id, id),
+                eq(scheduledNotifications.status, "pending")
+            )
+        )
+        .limit(1);
+
+    if (notifications.length === 0) {
+        return { success: false, error: "Notification not found or not pending" };
+    }
+
+    const scheduled = notifications[0];
+
+    try {
+        console.log(`[ScheduledNotifications] Processing ${scheduled.id}: "${scheduled.title}"`);
+
+        await sendImmediateNotification({
+            creatorId: scheduled.creatorId,
+            organizationId: scheduled.organizationId,
+            targetType: scheduled.targetType as TargetType,
+            targetIds: scheduled.targetIds || [],
+            title: scheduled.title,
+            message: scheduled.message,
+            type: scheduled.type as "activity" | "system",
+            priority: scheduled.priority as NotificationPriority,
+            link: scheduled.link || undefined,
+        });
+
+        // Mark as sent
+        await db
+            .update(scheduledNotifications)
+            .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
+            .where(eq(scheduledNotifications.id, scheduled.id));
+
+        return { success: true };
+    } catch (error) {
+        // Mark as failed
+        const failureReason = error instanceof Error ? error.message : "Unknown error";
+        await db
+            .update(scheduledNotifications)
+            .set({
+                status: "failed",
+                failureReason,
+                updatedAt: new Date(),
+            })
+            .where(eq(scheduledNotifications.id, scheduled.id));
+
+        console.error(`[ScheduledNotifications] Failed to process ${scheduled.id}:`, failureReason);
+        return { success: false, error: failureReason };
+    }
+}
+
+/**
+ * Process pending scheduled notifications (fallback cron)
  */
 export async function processPendingScheduledNotifications(limit = 50): Promise<{
     processed: number;
@@ -290,9 +394,6 @@ export async function processPendingScheduledNotifications(limit = 50): Promise<
 }> {
     const now = new Date();
 
-    // Get all pending notifications that should have been sent already
-    // We don't use a lookback window anymore to ensure we never skip a notification
-    // if the cron job fails or is delayed.
     const pending = await db
         .select()
         .from(scheduledNotifications)
@@ -304,50 +405,14 @@ export async function processPendingScheduledNotifications(limit = 50): Promise<
         )
         .limit(limit);
 
-    let processed = 0;
-    let failed = 0;
-
     console.log(`[ScheduledNotifications] Found ${pending.length} notifications to process`);
 
-    for (const scheduled of pending) {
-        try {
-            console.log(`[ScheduledNotifications] Processing ${scheduled.id}: "${scheduled.title}"`);
+    const results = await Promise.allSettled(
+        pending.map(scheduled => processSingleNotification(scheduled.id))
+    );
 
-            await sendImmediateNotification({
-                creatorId: scheduled.creatorId,
-                organizationId: scheduled.organizationId,
-                targetType: scheduled.targetType as TargetType,
-                targetIds: scheduled.targetIds || [],
-                title: scheduled.title,
-                message: scheduled.message,
-                type: scheduled.type as "activity" | "system",
-                priority: scheduled.priority as NotificationPriority,
-                link: scheduled.link || undefined,
-            });
-
-            // Mark as sent
-            await db
-                .update(scheduledNotifications)
-                .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
-                .where(eq(scheduledNotifications.id, scheduled.id));
-
-            processed++;
-        } catch (error) {
-            // Mark as failed
-            const failureReason = error instanceof Error ? error.message : "Unknown error";
-            await db
-                .update(scheduledNotifications)
-                .set({
-                    status: "failed",
-                    failureReason,
-                    updatedAt: new Date(),
-                })
-                .where(eq(scheduledNotifications.id, scheduled.id));
-
-            failed++;
-            console.error(`[ScheduledNotifications] Failed to process ${scheduled.id}:`, failureReason);
-        }
-    }
+    const processed = results.filter(r => r.status === "fulfilled" && r.value.success).length;
+    const failed = results.length - processed;
 
     // Check if there are more
     const remainingCount = await db
@@ -366,3 +431,4 @@ export async function processPendingScheduledNotifications(limit = 50): Promise<
         remaining: Number(remainingCount[0]?.count || 0)
     };
 }
+

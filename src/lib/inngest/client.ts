@@ -1,9 +1,4 @@
-import { Inngest } from "inngest";
-
-// Initialize Inngest client
-export const inngest = new Inngest({
-    id: "gerenciador-projetos",
-});
+import { Inngest, EventSchemas } from "inngest";
 
 // Event type definitions for type safety
 export type NotificationEvents = {
@@ -27,4 +22,24 @@ export type NotificationEvents = {
             // Triggered daily by cron, no payload needed
         };
     };
+    "notification/scheduled": {
+        data: {
+            notificationId: string;
+            scheduledFor: string; // ISO 8601 datetime string (JSON-serialized)
+        };
+    };
+    "notification/cancelled": {
+        data: {
+            notificationId: string;
+        };
+    };
 };
+
+// Initialize Inngest client with strict typing
+export const inngest = new Inngest({
+    id: "gerenciador-projetos",
+    schemas: new EventSchemas().fromRecord<NotificationEvents>(),
+});
+
+// Export types for use in other files
+export type NotificationEventType = keyof NotificationEvents;
