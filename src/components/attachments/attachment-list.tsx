@@ -47,7 +47,7 @@ export function AttachmentList({ attachments, onDelete, isDeleting, readonly = f
                             <div className="flex items-start gap-3">
                                 <div className="h-10 w-10 shrink-0 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                                     {isImage && (file.variantUrls?.thumb || file.url) ? (
-                                        <img src={file.variantUrls?.thumb || file.url} alt={file.fileName} className="h-full w-full object-cover" loading="lazy" />
+                                        <img src={file.variantUrls?.thumb || file.url} alt={file.fileName} className="h-full w-full object-cover" />
                                     ) : (
                                         <FileIcon className="h-5 w-5 text-muted-foreground" />
                                     )}
@@ -73,7 +73,7 @@ export function AttachmentList({ attachments, onDelete, isDeleting, readonly = f
                                             </Button>
                                         </DialogTrigger>
                                         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-transparent shadow-none">
-                                            <img src={file.variantUrls?.medium || file.url} alt={file.fileName} className="w-full h-auto rounded-lg" loading="lazy" />
+                                            <img src={file.variantUrls?.medium || file.url} alt={file.fileName} className="w-full h-auto rounded-lg" />
                                         </DialogContent>
                                     </Dialog>
                                 )}

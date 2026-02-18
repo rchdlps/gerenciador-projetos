@@ -20,7 +20,7 @@ const s3 = new S3Client({
         accessKeyId: accessKeyId || "",
         secretAccessKey: secretAccessKey || "",
     },
-    forcePathStyle: true,
+    forcePathStyle: false,
 })
 
 console.log("[S3 Init]", {
@@ -78,7 +78,7 @@ export const storage = {
 
     getPublicUrl: (key: string) => {
         const cleanEndpoint = endpoint?.replace("https://", "").replace("http://", "")
-        return `https://${cleanEndpoint}/${BUCKET}/${key}`
+        return `https://${BUCKET}.${cleanEndpoint}/${key}`
     },
 
     deleteFile: async (key: string) => {
