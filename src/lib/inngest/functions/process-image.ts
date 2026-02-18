@@ -48,8 +48,9 @@ export const processImage = inngest.createFunction(
 
         console.log(`[ImageProcessing] Processing ${type}: ${key}`);
 
-        // Download original
-        const originalBuffer = await step.run("download-original", async () => {
+        // Download original, generate all variants, and upload them in a single step
+        // to avoid exceeding Inngest's step output size limit (~4MB) with large image buffers
+        const variantKeys = await step.run("generate-variants", async () => {
             const buffer = await storage.downloadFile(key);
             const metadata = await sharp(buffer).metadata();
             if (!metadata.format) {
@@ -58,27 +59,21 @@ export const processImage = inngest.createFunction(
             console.log(
                 `[ImageProcessing] Original: ${metadata.width}x${metadata.height} ${metadata.format} (${buffer.length} bytes)`
             );
-            return buffer.toString("base64");
-        });
 
-        const imageBuffer = Buffer.from(originalBuffer, "base64");
+            const keys: Record<string, string> = {};
 
-        // Generate and upload variants
-        const variantKeys: Record<string, string> = {};
-
-        for (const config of VARIANTS) {
-            const variantKey = `${key}.${config.suffix}.webp`;
-
-            await step.run(`generate-${config.suffix}`, async () => {
-                const processed = await generateVariant(imageBuffer, config);
+            for (const config of VARIANTS) {
+                const variantKey = `${key}.${config.suffix}.webp`;
+                const processed = await generateVariant(buffer, config);
                 await storage.uploadFile(variantKey, processed, "image/webp", processed.length);
                 console.log(
                     `[ImageProcessing] Generated ${config.suffix}: ${processed.length} bytes -> ${variantKey}`
                 );
-            });
+                keys[config.suffix] = variantKey;
+            }
 
-            variantKeys[config.suffix] = variantKey;
-        }
+            return keys;
+        });
 
         // Update DB record
         await step.run("update-db", async () => {
