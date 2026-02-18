@@ -122,30 +122,19 @@ export default function RiskView({ projectId }: RiskViewProps) {
         if (!ka?.id) return
         for (const file of files) {
             try {
-                const initRes = await api.storage['presigned-url'].$post({
-                    json: {
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        entityId: ka.id,
-                        entityType: 'knowledge_area'
-                    }
-                })
-                if (!initRes.ok) {
-                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
-                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
-                }
-                const { url, key } = await initRes.json()
-                await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+                const formData = new FormData()
+                formData.append('file', file)
+                formData.append('entityId', ka.id)
+                formData.append('entityType', 'knowledge_area')
 
-                const confirmRes = await api.storage.confirm.$post({
-                    json: { fileName: file.name, fileType: file.type, fileSize: file.size, key, entityId: ka.id, entityType: 'knowledge_area' }
+                const res = await fetch('/api/storage/upload', {
+                    method: 'POST',
+                    body: formData,
                 })
-                if (!confirmRes.ok) {
-                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
-                    throw new Error((data as any).error || 'Erro ao confirmar upload')
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({ error: 'Erro ao enviar arquivo' }))
+                    throw new Error((data as any).error || 'Erro ao enviar arquivo')
                 }
-
                 toast.success(`Upload de ${file.name} concluído!`)
             } catch (error) {
                 toast.error((error as Error).message || `Erro ao enviar ${file.name}`)
