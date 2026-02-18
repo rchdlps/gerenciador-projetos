@@ -1,73 +1,68 @@
-import "dotenv/config" // Ensure env vars are loaded
+import "dotenv/config"
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
-const accessKeyId = process.env.S3_ACCESS_KEY
-const secretAccessKey = process.env.S3_SECRET_KEY
+// Railway-injected vars take precedence over legacy S3_* vars (local dev / MinIO fallback)
+const endpoint = process.env.ENDPOINT || process.env.S3_ENDPOINT
+const region = process.env.REGION || process.env.S3_REGION || "us-east-1"
+const accessKeyId = process.env.ACCESS_KEY_ID || process.env.S3_ACCESS_KEY
+const secretAccessKey = process.env.SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY
+const bucketName = process.env.BUCKET || process.env.S3_BUCKET_NAME
 
 if (!accessKeyId || !secretAccessKey) {
-    console.error("[Storage] Missing S3 Credentials in environment variables!")
+    console.error("[Storage] Missing S3 credentials in environment variables!")
 }
 
-// Initialize S3 Client
 const s3 = new S3Client({
-    region: "us-east-1", // MUST be us-east-1 for MinIO/Hetzner/R2 compatibility
-    endpoint: process.env.S3_ENDPOINT,
+    region,
+    endpoint,
     credentials: {
         accessKeyId: accessKeyId || "",
-        secretAccessKey: secretAccessKey || ""
+        secretAccessKey: secretAccessKey || "",
     },
-    forcePathStyle: true // Needed for MinIO/Hetzner
+    forcePathStyle: true,
 })
 
-console.log('[S3 Init] Env Check:', {
-    region: process.env.S3_REGION,
-    endpoint: process.env.S3_ENDPOINT,
-    hasAccessKey: !!process.env.S3_ACCESS_KEY,
-    hasSecret: !!process.env.S3_ACCESS_KEY,
-    bucket: process.env.S3_BUCKET_NAME
+console.log("[S3 Init]", {
+    endpoint,
+    region,
+    bucket: bucketName,
+    hasAccessKey: !!accessKeyId,
+    hasSecret: !!secretAccessKey,
 })
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME!
+const BUCKET = bucketName!
 
 export const storage = {
-    // Generate Pre-signed URL for Upload (PUT)
-    getUploadUrl: async (key: string, fileType: string) => {
+    uploadFile: async (key: string, body: Buffer | Uint8Array, contentType: string, contentLength: number) => {
         const command = new PutObjectCommand({
-            Bucket: BUCKET_NAME,
+            Bucket: BUCKET,
             Key: key,
-            ContentType: fileType
-        })
-        return await getSignedUrl(s3, command, { expiresIn: 3600 })
-    },
-
-    // Generate Pre-signed URL for Download (GET)
-    getDownloadUrl: async (key: string) => {
-        const command = new GetObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: key
-        })
-        return await getSignedUrl(s3, command, { expiresIn: 3600 })
-    },
-
-    // Get Public URL (assuming bucket is public)
-    getPublicUrl: (key: string) => {
-        // Remove 'https://' from endpoint to standardise
-        const endpoint = process.env.S3_ENDPOINT?.replace('https://', '').replace('http://', '')
-        return `https://${endpoint}/${BUCKET_NAME}/${key}`
-    },
-
-    // Delete file
-    deleteFile: async (key: string) => {
-        const command = new DeleteObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: key
+            Body: body,
+            ContentType: contentType,
+            ContentLength: contentLength,
         })
         await s3.send(command)
     },
 
-    // Check if bucket exists/Create bucket (optional util)
-    ensureBucket: async () => {
-        // Implementation omitted for brevity, usually handled by infra/docker
-    }
+    getDownloadUrl: async (key: string) => {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+        })
+        return await getSignedUrl(s3, command, { expiresIn: 3600 })
+    },
+
+    getPublicUrl: (key: string) => {
+        const cleanEndpoint = endpoint?.replace("https://", "").replace("http://", "")
+        return `https://${cleanEndpoint}/${BUCKET}/${key}`
+    },
+
+    deleteFile: async (key: string) => {
+        const command = new DeleteObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+        })
+        await s3.send(command)
+    },
 }

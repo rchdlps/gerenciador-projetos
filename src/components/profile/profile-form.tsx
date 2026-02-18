@@ -162,48 +162,21 @@ export function ProfileForm() {
         setUploading(true)
 
         try {
-            // 1. Get Presigned URL
-            const res = await fetch("/api/storage/init-upload", {
-                method: "POST",
-                body: JSON.stringify({
-                    filename: file.name,
-                    fileType: file.type,
-                }),
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const res = await fetch('/api/storage/upload-avatar', {
+                method: 'POST',
+                body: formData,
             })
-            if (!res.ok) throw new Error("Falha ao iniciar upload")
-            const { url, key } = await res.json()
+            if (!res.ok) throw new Error('Falha ao enviar avatar')
+            const { publicUrl } = await res.json()
 
-            // 2. Upload to S3
-            await fetch(url, {
-                method: "PUT",
-                body: file,
-                headers: { "Content-Type": file.type },
-            })
-
-            // 3. Confirm & Update User Image
-            // We construct the public URL manually or expect backend to return it? 
-            // Usually need a way to get the public URL.
-            // Assuming we use the key to construct URL or storage helper does it.
-            // Let's assume standard behavior: we get a public URL or similar.
-
-            // For now, let's update the profile form image field with a temporary blob or the key if needed
-            // But better-auth expects a URL.
-            // Let's assume we have an endpoint that confirms upload and returns public URL
-
-            const confirmRes = await fetch("/api/storage/confirm-upload", {
-                method: "POST",
-                body: JSON.stringify({ key, entityId: session?.user.id, entityType: 'user_avatar' }),
-            })
-
-            if (!confirmRes.ok) throw new Error("Falha ao confirmar upload")
-            const { publicUrl } = await confirmRes.json()
-
-            profileForm.setValue("image", publicUrl)
+            profileForm.setValue('image', publicUrl)
             await profileForm.handleSubmit(onUpdateProfile)()
-
         } catch (error) {
             console.error(error)
-            toast.error("Erro no upload do avatar")
+            toast.error('Erro no upload do avatar')
         } finally {
             setUploading(false)
         }

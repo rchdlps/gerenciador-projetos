@@ -55,7 +55,7 @@ export function FileUpload({ onUpload, className }: FileUploadProps) {
                         <p>
                             <span className="font-semibold text-foreground">Clique para enviar</span> ou arraste e solte
                             <br />
-                            <span className="text-xs">Imagens, PDF, Docs (max 10MB)</span>
+                            <span className="text-xs">Imagens, PDF, Docs (max 50MB)</span>
                         </p>
                     )}
                 </div>

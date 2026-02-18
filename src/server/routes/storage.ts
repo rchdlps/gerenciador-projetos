@@ -6,7 +6,6 @@ import { db } from '@/lib/db'
 import { attachments, tasks, projectPhases, projects, users, memberships, knowledgeAreas } from '../../../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
-import { auth } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit-logger'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
@@ -67,7 +66,78 @@ async function checkViewerPermission(entityId: string, entityType: string, userI
     return { allowed: true }
 }
 
-// 1. Get Upload URL
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
+
+// Upload file (server-proxied)
+app.post('/upload', async (c) => {
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+
+    try {
+        const body = await c.req.parseBody()
+        const file = body['file']
+        const entityId = body['entityId'] as string
+        const entityType = body['entityType'] as string
+
+        if (!file || !(file instanceof File)) {
+            return c.json({ error: 'Missing file' }, 400)
+        }
+
+        if (!entityId || !entityType) {
+            return c.json({ error: 'Missing entityId or entityType' }, 400)
+        }
+
+        const validTypes = ['task', 'project', 'comment', 'knowledge_area']
+        if (!validTypes.includes(entityType)) {
+            return c.json({ error: 'Invalid entityType' }, 400)
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            return c.json({ error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024} MB` }, 400)
+        }
+
+        // Check viewer permission
+        const permCheck = await checkViewerPermission(entityId, entityType, user.id)
+        if (!permCheck.allowed) {
+            return c.json({ error: permCheck.error }, 403)
+        }
+
+        const key = `${entityId}/${nanoid()}-${file.name}`
+        const buffer = Buffer.from(await file.arrayBuffer())
+
+        await storage.uploadFile(key, buffer, file.type, file.size)
+
+        const [attachment] = await db.insert(attachments).values({
+            id: nanoid(),
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            key,
+            entityId,
+            entityType: entityType as 'task' | 'project' | 'comment' | 'knowledge_area',
+            uploadedBy: user.id,
+        }).returning()
+
+        createAuditLog({
+            userId: user.id,
+            organizationId: null,
+            action: 'CREATE',
+            resource: 'attachment',
+            resourceId: attachment.id,
+            metadata: { fileName: file.name, fileType: file.type, entityType, entityId },
+        })
+
+        const signedUrl = await storage.getDownloadUrl(key)
+
+        return c.json({ ...attachment, url: signedUrl })
+    } catch (error: any) {
+        console.error('[Storage Error] Upload failed:', error)
+        return c.json({ error: error.message || 'Upload failed' }, 500)
+    }
+})
+
+// 1. Get Upload URL (DEPRECATED)
 app.post('/presigned-url',
     zValidator('json', z.object({
         fileName: z.string(),
@@ -77,35 +147,12 @@ app.post('/presigned-url',
         entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
-        try {
-            const user = c.get('user')
-            const session = c.get('session')
-            if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
-
-            const { fileName, fileType, entityId, entityType } = c.req.valid('json')
-
-            // Check viewer permission
-            const permCheck = await checkViewerPermission(entityId, entityType, user.id)
-            if (!permCheck.allowed) {
-                return c.json({ error: permCheck.error }, 403)
-            }
-
-            // Create a unique key: entityType/entityId/random-fileName
-            const key = `${entityId}/${nanoid()}-${fileName}`
-
-            console.log(`[Storage] Generating presigned URL for ${key} in bucket region...`)
-            const url = await storage.getUploadUrl(key, fileType)
-            console.log(`[Storage] Success: ${url}`)
-
-            return c.json({ url, key })
-        } catch (error: any) {
-            console.error('[Storage Error] Failed to generate presigned URL:', error)
-            return c.json({ error: error.message }, 500)
-        }
+        console.warn('[Storage] DEPRECATED: POST /presigned-url — use POST /upload instead')
+        return c.json({ error: 'This endpoint is deprecated. Use POST /upload with multipart/form-data instead.' }, 410)
     }
 )
 
-// 2. Confirm Upload (Record in DB)
+// 2. Confirm Upload (DEPRECATED)
 app.post('/confirm',
     zValidator('json', z.object({
         fileName: z.string(),
@@ -116,37 +163,8 @@ app.post('/confirm',
         entityType: z.enum(['task', 'project', 'comment', 'knowledge_area'])
     })),
     async (c) => {
-        const user = c.get('user')
-        const session = c.get('session')
-        if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
-
-        const data = c.req.valid('json')
-
-        // Check viewer permission
-        const permCheck = await checkViewerPermission(data.entityId, data.entityType, user.id)
-        if (!permCheck.allowed) {
-            return c.json({ error: permCheck.error }, 403)
-        }
-
-        const [attachment] = await db.insert(attachments).values({
-            id: nanoid(),
-            ...data,
-            uploadedBy: user.id
-        }).returning()
-
-        // Audit log is non-blocking; get signed URL in parallel
-        createAuditLog({
-            userId: user.id,
-            organizationId: null,
-            action: 'CREATE',
-            resource: 'attachment',
-            resourceId: attachment.id,
-            metadata: { fileName: data.fileName, fileType: data.fileType, entityType: data.entityType, entityId: data.entityId }
-        })
-
-        const signedUrl = await storage.getDownloadUrl(data.key)
-
-        return c.json({ ...attachment, url: signedUrl })
+        console.warn('[Storage] DEPRECATED: POST /confirm — use POST /upload instead')
+        return c.json({ error: 'This endpoint is deprecated. Use POST /upload with multipart/form-data instead.' }, 410)
     }
 )
 
