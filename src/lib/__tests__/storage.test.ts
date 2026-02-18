@@ -47,6 +47,10 @@ describe('storage', () => {
     expect(typeof storage.getPublicUrl).toBe('function')
   })
 
+  it('exports downloadFile method', () => {
+    expect(typeof storage.downloadFile).toBe('function')
+  })
+
   it('exports deleteFile method', () => {
     expect(typeof storage.deleteFile).toBe('function')
   })

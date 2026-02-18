@@ -6,6 +6,7 @@ import { db } from "@/lib/db"
 import { users } from "../../../../db/schema"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
+import { inngest } from "@/lib/inngest/client"
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB for avatars
 
@@ -41,6 +42,14 @@ export const POST: APIRoute = async ({ request }) => {
         const publicUrl = storage.getPublicUrl(key)
 
         await db.update(users).set({ image: publicUrl }).where(eq(users.id, session.user.id))
+
+        // Trigger background processing to optimize the avatar
+        if (file.type.startsWith('image/')) {
+            inngest.send({
+                name: "image/process",
+                data: { key, userId: session.user.id, type: "avatar" },
+            }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
+        }
 
         return new Response(JSON.stringify({ publicUrl }), { status: 200 })
     } catch (error) {

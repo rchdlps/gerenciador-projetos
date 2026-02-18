@@ -7,6 +7,7 @@ import { attachments, tasks, projectPhases, projects, users, memberships, knowle
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { createAuditLog } from '@/lib/audit-logger'
+import { inngest } from '@/lib/inngest/client'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
 const app = new Hono<{ Variables: AuthVariables }>()
@@ -128,6 +129,14 @@ app.post('/upload', async (c) => {
             metadata: { fileName: file.name, fileType: file.type, entityType, entityId },
         })
 
+        // Trigger background image processing for image files
+        if (file.type.startsWith('image/')) {
+            inngest.send({
+                name: "image/process",
+                data: { key, attachmentId: attachment.id, type: "attachment" },
+            }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
+        }
+
         const signedUrl = await storage.getDownloadUrl(key)
 
         return c.json({ ...attachment, url: signedUrl })
@@ -181,7 +190,20 @@ app.get('/:entityId', async (c) => {
     // Generate fresh signed URLs for all files
     const filesWithUrls = await Promise.all(files.map(async (file) => {
         const url = await storage.getDownloadUrl(file.key)
-        return { ...file, url }
+
+        let variantUrls: Record<string, string> | null = null
+        if (file.variants && typeof file.variants === 'object') {
+            const v = file.variants as Record<string, string>
+            const entries = await Promise.all(
+                Object.entries(v).map(async ([name, variantKey]) => {
+                    const variantUrl = await storage.getDownloadUrl(variantKey)
+                    return [name, variantUrl] as const
+                })
+            )
+            variantUrls = Object.fromEntries(entries)
+        }
+
+        return { ...file, url, variantUrls }
     }))
 
     return c.json(filesWithUrls)
@@ -205,10 +227,17 @@ app.delete('/:id', async (c) => {
     }
 
     // Delete from S3 and DB in parallel; audit log is non-blocking
-    await Promise.all([
+    const deletePromises: Promise<void>[] = [
         storage.deleteFile(file.key),
-        db.delete(attachments).where(eq(attachments.id, id)),
-    ])
+        db.delete(attachments).where(eq(attachments.id, id)).then(() => {}),
+    ]
+    if (file.variants && typeof file.variants === 'object') {
+        const v = file.variants as Record<string, string>
+        for (const variantKey of Object.values(v)) {
+            deletePromises.push(storage.deleteFile(variantKey).catch(() => {}))
+        }
+    }
+    await Promise.all(deletePromises)
 
     createAuditLog({
         userId: user.id,

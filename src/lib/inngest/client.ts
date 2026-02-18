@@ -1,7 +1,7 @@
 import { Inngest, EventSchemas } from "inngest";
 
 // Event type definitions for type safety
-export type NotificationEvents = {
+export type AppEvents = {
     "notification/activity": {
         data: {
             userId: string;
@@ -33,13 +33,21 @@ export type NotificationEvents = {
             notificationId: string;
         };
     };
+    "image/process": {
+        data: {
+            key: string;
+            attachmentId?: string;
+            userId?: string;
+            type: "attachment" | "avatar" | "logo";
+        };
+    };
 };
 
 // Initialize Inngest client with strict typing
 export const inngest = new Inngest({
     id: "gerenciador-projetos",
-    schemas: new EventSchemas().fromRecord<NotificationEvents>(),
+    schemas: new EventSchemas().fromRecord<AppEvents>(),
 });
 
 // Export types for use in other files
-export type NotificationEventType = keyof NotificationEvents;
+export type AppEventType = keyof AppEvents;

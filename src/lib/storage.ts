@@ -45,6 +45,21 @@ export const storage = {
         await s3.send(command)
     },
 
+    downloadFile: async (key: string): Promise<Buffer> => {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+        })
+        const response = await s3.send(command)
+        const stream = response.Body
+        if (!stream) throw new Error(`Empty response for key: ${key}`)
+        const chunks: Uint8Array[] = []
+        for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+            chunks.push(chunk)
+        }
+        return Buffer.concat(chunks)
+    },
+
     getDownloadUrl: async (key: string) => {
         const command = new GetObjectCommand({
             Bucket: BUCKET,
