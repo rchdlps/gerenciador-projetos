@@ -135,8 +135,8 @@ export const mockCreateAuditLog = vi.fn()
  * Mock storage utilities
  */
 export const mockStorage = {
-  getUploadUrl: vi.fn(() => Promise.resolve('https://test-upload-url.com')),
+  uploadFile: vi.fn(() => Promise.resolve()),
   getDownloadUrl: vi.fn(() => Promise.resolve('https://test-download-url.com')),
+  getPublicUrl: vi.fn((key: string) => `https://test-storage.example.com/bucket/${key}`),
   deleteFile: vi.fn(() => Promise.resolve()),
-  ensureBucket: vi.fn(() => Promise.resolve()),
 }
