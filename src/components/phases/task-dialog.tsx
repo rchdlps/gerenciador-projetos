@@ -93,45 +93,19 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
     const processUploads = async (filesToUpload: File[], targetTaskId: string) => {
         for (const file of filesToUpload) {
             try {
-                // 1. Get Presigned URL
-                const initRes = await api.storage['presigned-url'].$post({
-                    json: {
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        entityId: targetTaskId,
-                        entityType: 'task'
-                    }
+                const formData = new FormData()
+                formData.append('file', file)
+                formData.append('entityId', targetTaskId)
+                formData.append('entityType', 'task')
+
+                const res = await fetch('/api/storage/upload', {
+                    method: 'POST',
+                    body: formData,
                 })
-                if (!initRes.ok) {
-                    const data = await initRes.json().catch(() => ({ error: 'Erro ao obter URL de upload' }))
-                    throw new Error((data as any).error || 'Erro ao obter URL de upload')
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({ error: 'Erro ao enviar arquivo' }))
+                    throw new Error((data as any).error || 'Erro ao enviar arquivo')
                 }
-                const { url, key } = await initRes.json()
-
-                // 2. Upload to S3 (Directly)
-                await fetch(url, {
-                    method: 'PUT',
-                    body: file,
-                    headers: { 'Content-Type': file.type }
-                })
-
-                // 3. Confirm Upload
-                const confirmRes = await api.storage.confirm.$post({
-                    json: {
-                        fileName: file.name,
-                        fileType: file.type,
-                        fileSize: file.size,
-                        key,
-                        entityId: targetTaskId,
-                        entityType: 'task'
-                    }
-                })
-                if (!confirmRes.ok) {
-                    const data = await confirmRes.json().catch(() => ({ error: 'Erro ao confirmar upload' }))
-                    throw new Error((data as any).error || 'Erro ao confirmar upload')
-                }
-
                 toast.success(`Upload de ${file.name} concluído!`)
             } catch (error) {
                 console.error(error)
