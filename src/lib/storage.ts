@@ -1,5 +1,5 @@
 import "dotenv/config"
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 // Railway-injected vars take precedence over legacy S3_* vars (local dev / MinIO fallback)
@@ -43,6 +43,14 @@ export const storage = {
             ContentLength: contentLength,
         })
         await s3.send(command)
+
+        // Verify the object was actually persisted
+        try {
+            const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }))
+            console.log(`[Storage] Upload verified: ${key} (${head.ContentLength} bytes)`)
+        } catch (err) {
+            console.error(`[Storage] Upload verification FAILED for key: ${key}`, err)
+        }
     },
 
     downloadFile: async (key: string): Promise<Buffer> => {

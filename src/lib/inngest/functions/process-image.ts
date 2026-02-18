@@ -46,11 +46,12 @@ export const processImage = inngest.createFunction(
     async ({ event, step }) => {
         const { key, attachmentId, userId, type } = event.data;
 
-        console.log(`[ImageProcessing] Processing ${type}: ${key}`);
+        // Single step: download, generate variants, upload, and update DB
+        // Keeps everything in one step to avoid cross-step serialization issues
+        const result = await step.run("process-and-save", async () => {
+            console.log(`[ImageProcessing] Processing ${type}: ${key}`);
 
-        // Download original, generate all variants, and upload them in a single step
-        // to avoid exceeding Inngest's step output size limit (~4MB) with large image buffers
-        const variantKeys = await step.run("generate-variants", async () => {
+            // Download original
             const buffer = await storage.downloadFile(key);
             const metadata = await sharp(buffer).metadata();
             if (!metadata.format) {
@@ -60,7 +61,8 @@ export const processImage = inngest.createFunction(
                 `[ImageProcessing] Original: ${metadata.width}x${metadata.height} ${metadata.format} (${buffer.length} bytes)`
             );
 
-            const keys: Record<string, string> = {};
+            // Generate and upload variants
+            const variantKeys: Record<string, string> = {};
 
             for (const config of VARIANTS) {
                 const variantKey = `${key}.${config.suffix}.webp`;
@@ -69,20 +71,16 @@ export const processImage = inngest.createFunction(
                 console.log(
                     `[ImageProcessing] Generated ${config.suffix}: ${processed.length} bytes -> ${variantKey}`
                 );
-                keys[config.suffix] = variantKey;
+                variantKeys[config.suffix] = variantKey;
             }
 
-            return keys;
-        });
-
-        // Update DB record
-        await step.run("update-db", async () => {
+            // Update DB record
             if (type === "attachment" && attachmentId) {
                 await db
                     .update(attachments)
                     .set({ variants: variantKeys })
                     .where(eq(attachments.id, attachmentId));
-                console.log(`[ImageProcessing] Updated attachment ${attachmentId} with variants`);
+                console.log(`[ImageProcessing] Updated attachment ${attachmentId} with variants:`, variantKeys);
             } else if (type === "avatar" && userId) {
                 const thumbUrl = storage.getPublicUrl(variantKeys.thumb);
                 await db
@@ -93,9 +91,11 @@ export const processImage = inngest.createFunction(
             } else if (type === "logo") {
                 console.log(`[ImageProcessing] Logo variants generated (manual URL update needed)`);
             }
+
+            return { variantKeys };
         });
 
-        return { key, type, variants: variantKeys };
+        return { key, type, variants: result.variantKeys };
     }
 );
 
