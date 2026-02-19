@@ -81,5 +81,22 @@ describe('avatar-generator', () => {
             const svg = generateInitialsAvatar('João Silva', 'user-123')
             expect(svg.length).toBeLessThan(1024)
         })
+
+        it('escapes XML special characters in initials', () => {
+            const svg = generateInitialsAvatar('<script> foo', 'user-123')
+            expect(svg).not.toContain('><')
+            expect(svg).toContain('&lt;')
+            expect(svg).toContain('</svg>')
+        })
+
+        it('uses larger font size for single-character initials', () => {
+            const svg = generateInitialsAvatar('Admin', 'user-123')
+            expect(svg).toContain('font-size="90"')
+        })
+
+        it('uses smaller font size for two-character initials', () => {
+            const svg = generateInitialsAvatar('João Silva', 'user-123')
+            expect(svg).toContain('font-size="80"')
+        })
     })
 })

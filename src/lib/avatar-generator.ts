@@ -49,15 +49,21 @@ export function getAvatarColor(userId: string): string {
     return AVATAR_COLORS[hashString(userId) % AVATAR_COLORS.length]
 }
 
+/** Escape XML special characters to prevent malformed SVG */
+function escapeXml(str: string): string {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 /** Generate an SVG avatar with initials and a colored background circle */
 export function generateInitialsAvatar(name: string, userId: string): string {
     const initials = getInitials(name)
     const color = getAvatarColor(userId)
+    const safeInitials = escapeXml(initials)
     // Font size: smaller for 2-char initials, larger for 1-char
     const fontSize = initials.length > 1 ? 80 : 90
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
 <circle cx="100" cy="100" r="100" fill="${color}"/>
-<text x="100" y="100" dy="0.35em" text-anchor="middle" fill="white" font-family="system-ui,-apple-system,sans-serif" font-size="${fontSize}" font-weight="600">${initials}</text>
+<text x="100" y="100" dy="0.35em" text-anchor="middle" fill="white" font-family="system-ui,-apple-system,sans-serif" font-size="${fontSize}" font-weight="600">${safeInitials}</text>
 </svg>`
 }
