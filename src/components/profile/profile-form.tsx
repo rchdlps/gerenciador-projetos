@@ -20,7 +20,9 @@ import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileUpload } from "@/components/ui/file-upload"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, User, Shield, Mail, Calendar, CheckCircle2, Camera } from "lucide-react"
 
 // Schema for General Profile (Name + Avatar)
 const profileSchema = z.object({
@@ -44,6 +46,12 @@ const emailSchema = z.object({
     currentPassword: z.string().min(1, "A senha atual é obrigatória para confirmar a mudança"),
 })
 
+function formatMemberSince(dateStr: string | undefined): string {
+    if (!dateStr) return ""
+    const date = new Date(dateStr)
+    return date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+}
+
 export function ProfileForm() {
     const { data: session, isPending, error } = authClient.useSession()
     const [uploading, setUploading] = useState(false)
@@ -56,12 +64,6 @@ export function ProfileForm() {
             image: session?.user?.image || "",
         },
     })
-
-    // ... (keep other forms initialized with defaultValues which don't depend on session immediately if we handle loading) 
-
-    // BUT wait, we need session to be ready for profileForm values to be correct?
-    // profileForm uses `values` prop which updates when session changes.
-    // So it should be fine to render if we handle isPending check early.
 
     // Form 2: Password
     const passwordForm = useForm<z.infer<typeof passwordSchema>>({
@@ -139,10 +141,6 @@ export function ProfileForm() {
     }
 
     const onChangeEmail = async (values: z.infer<typeof emailSchema>) => {
-        // Warning: implementation depends on how better-auth handles email change with password check
-        // Often requires verifyCurrentPassword first or specialized hook. 
-        // Standard better-auth might send verification email to NEW email first.
-
         await authClient.changeEmail({
             newEmail: values.newEmail,
         }, {
@@ -182,24 +180,109 @@ export function ProfileForm() {
         }
     }
 
-
+    const avatarUrl = profileForm.watch("image") || session.user.image || ""
+    const initials = session.user.name
+        ?.split(" ")
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "?"
 
     return (
-        <div className="max-w-4xl mx-auto py-10 space-y-8">
-            <div className="space-y-6">
-                {/* General Section */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Informações Pessoais</CardTitle>
-                        <CardDescription>Atualize seu nome e foto de perfil.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col gap-6">
-                            {/* Avatar Section */}
+        <div className="max-w-4xl mx-auto">
+            {/* Hero Banner */}
+            <div className="relative rounded-xl overflow-hidden shadow-sm">
+                {/* Gradient strip */}
+                <div className="h-32 sm:h-40 bg-brand-gradient" />
+
+                {/* Profile info overlapping the banner */}
+                <div className="bg-card border border-t-0 rounded-b-xl px-6 pb-6 pt-0">
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-16 sm:-mt-16">
+                        {/* Avatar with camera overlay */}
+                        <div className="relative group shrink-0 self-center sm:self-auto">
+                            <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-4 border-background shadow-lg">
+                                <AvatarImage src={avatarUrl} />
+                                <AvatarFallback className="text-2xl font-semibold bg-muted">
+                                    {initials}
+                                </AvatarFallback>
+                            </Avatar>
+                            <label className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                {uploading ? (
+                                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                                ) : (
+                                    <Camera className="h-6 w-6 text-white" />
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif"
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                        const files = Array.from(e.target.files || [])
+                                        if (files.length) handleAvatarUpload(files)
+                                        e.target.value = ""
+                                    }}
+                                    disabled={uploading}
+                                />
+                            </label>
+                        </div>
+
+                        {/* Name, email, badges */}
+                        <div className="flex-1 min-w-0 text-center sm:text-left pb-1">
+                            <h1 className="text-2xl font-bold tracking-tight truncate">
+                                {session.user.name}
+                            </h1>
+                            <div className="flex items-center justify-center sm:justify-start gap-1.5 text-muted-foreground mt-0.5">
+                                <Mail className="h-3.5 w-3.5 shrink-0" />
+                                <span className="text-sm truncate">{session.user.email}</span>
+                            </div>
+                            <div className="flex items-center justify-center sm:justify-start gap-2 mt-3 flex-wrap">
+                                {session.user.createdAt && (
+                                    <Badge variant="secondary" className="gap-1 font-normal">
+                                        <Calendar className="h-3 w-3" />
+                                        Membro desde {formatMemberSince(session.user.createdAt as string)}
+                                    </Badge>
+                                )}
+                                {session.user.emailVerified ? (
+                                    <Badge variant="secondary" className="gap-1 font-normal text-emerald-700 bg-emerald-50 border-emerald-200">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Email verificado
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="secondary" className="gap-1 font-normal text-amber-700 bg-amber-50 border-amber-200">
+                                        Email não verificado
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <Tabs defaultValue="general" className="mt-6">
+                <TabsList>
+                    <TabsTrigger value="general" className="gap-1.5">
+                        <User className="h-4 w-4" />
+                        Geral
+                    </TabsTrigger>
+                    <TabsTrigger value="security" className="gap-1.5">
+                        <Shield className="h-4 w-4" />
+                        Segurança
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* General Tab */}
+                <TabsContent value="general" className="mt-4 space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Foto de Perfil</CardTitle>
+                            <CardDescription>Clique na foto acima ou use o botão abaixo para alterar.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                             <div className="flex items-center gap-6">
-                                <Avatar className="h-24 w-24">
-                                    <AvatarImage src={profileForm.watch("image") || session.user.image || ""} />
-                                    <AvatarFallback>{session.user.name?.charAt(0)}</AvatarFallback>
+                                <Avatar className="h-20 w-20 shrink-0">
+                                    <AvatarImage src={avatarUrl} />
+                                    <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
                                 </Avatar>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
@@ -211,7 +294,15 @@ export function ProfileForm() {
                                     </p>
                                 </div>
                             </div>
+                        </CardContent>
+                    </Card>
 
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Informações Pessoais</CardTitle>
+                            <CardDescription>Atualize seu nome de exibição.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                             <Form {...profileForm}>
                                 <form onSubmit={profileForm.handleSubmit(onUpdateProfile)} className="space-y-4">
                                     <FormField
@@ -227,118 +318,126 @@ export function ProfileForm() {
                                             </FormItem>
                                         )}
                                     />
-                                    <Button type="submit" disabled={profileForm.formState.isSubmitting}>
-                                        {profileForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Salvar Alterações
-                                    </Button>
-                                </form>
-                            </Form>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Security Section */}
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Alterar Senha</CardTitle>
-                            <CardDescription>Para sua segurança, exigimos sua senha atual.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Form {...passwordForm}>
-                                <form onSubmit={passwordForm.handleSubmit(onChangePassword)} className="space-y-4">
-                                    <FormField
-                                        control={passwordForm.control}
-                                        name="currentPassword"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Senha Atual</FormLabel>
-                                                <FormControl>
-                                                    <PasswordInput placeholder="••••••••" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={passwordForm.control}
-                                        name="newPassword"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Nova Senha</FormLabel>
-                                                <FormControl>
-                                                    <PasswordInput placeholder="••••••••" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={passwordForm.control}
-                                        name="confirmPassword"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Confirmar Nova Senha</FormLabel>
-                                                <FormControl>
-                                                    <PasswordInput placeholder="••••••••" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
-                                        {passwordForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Atualizar Senha
-                                    </Button>
+                                    <div className="flex justify-end">
+                                        <Button type="submit" disabled={profileForm.formState.isSubmitting}>
+                                            {profileForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Salvar Alterações
+                                        </Button>
+                                    </div>
                                 </form>
                             </Form>
                         </CardContent>
                     </Card>
+                </TabsContent>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Alterar Email</CardTitle>
-                            <CardDescription>O endereço de email atualizado será usado para login.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Form {...emailForm}>
-                                <form onSubmit={emailForm.handleSubmit(onChangeEmail)} className="space-y-4">
-                                    <FormField
-                                        control={emailForm.control}
-                                        name="newEmail"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Novo Email</FormLabel>
-                                                <FormControl>
-                                                    <Input type="email" placeholder="novo@email.com" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={emailForm.control}
-                                        name="currentPassword"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Senha Atual (Confirmação)</FormLabel>
-                                                <FormControl>
-                                                    <PasswordInput placeholder="••••••••" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <Button type="submit" variant="outline" disabled={emailForm.formState.isSubmitting}>
-                                        {emailForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Alterar Email
-                                    </Button>
-                                </form>
-                            </Form>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                {/* Security Tab */}
+                <TabsContent value="security" className="mt-4">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Alterar Senha</CardTitle>
+                                <CardDescription>Para sua segurança, exigimos sua senha atual.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Form {...passwordForm}>
+                                    <form onSubmit={passwordForm.handleSubmit(onChangePassword)} className="space-y-4">
+                                        <FormField
+                                            control={passwordForm.control}
+                                            name="currentPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Senha Atual</FormLabel>
+                                                    <FormControl>
+                                                        <PasswordInput placeholder="••••••••" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={passwordForm.control}
+                                            name="newPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Nova Senha</FormLabel>
+                                                    <FormControl>
+                                                        <PasswordInput placeholder="••••••••" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={passwordForm.control}
+                                            name="confirmPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Confirmar Nova Senha</FormLabel>
+                                                    <FormControl>
+                                                        <PasswordInput placeholder="••••••••" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <div className="flex justify-end">
+                                            <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
+                                                {passwordForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Atualizar Senha
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </Form>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Alterar Email</CardTitle>
+                                <CardDescription>O endereço de email atualizado será usado para login.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Form {...emailForm}>
+                                    <form onSubmit={emailForm.handleSubmit(onChangeEmail)} className="space-y-4">
+                                        <FormField
+                                            control={emailForm.control}
+                                            name="newEmail"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Novo Email</FormLabel>
+                                                    <FormControl>
+                                                        <Input type="email" placeholder="novo@email.com" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={emailForm.control}
+                                            name="currentPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Senha Atual (Confirmação)</FormLabel>
+                                                    <FormControl>
+                                                        <PasswordInput placeholder="••••••••" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <div className="flex justify-end">
+                                            <Button type="submit" variant="outline" disabled={emailForm.formState.isSubmitting}>
+                                                {emailForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Alterar Email
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </Form>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     )
 }
