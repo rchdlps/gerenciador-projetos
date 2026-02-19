@@ -49,6 +49,14 @@ export const processImage = inngest.createFunction(
         // Single step: download, generate variants, upload, and update DB
         // Keeps everything in one step to avoid cross-step serialization issues
         const result = await step.run("process-and-save", async () => {
+            // Debug: log S3 config to verify correct credentials in Inngest context
+            console.log(`[ImageProcessing] S3 Config:`, {
+                endpoint: process.env.ENDPOINT || process.env.S3_ENDPOINT,
+                bucket: process.env.BUCKET || process.env.S3_BUCKET_NAME,
+                region: process.env.REGION || process.env.S3_REGION,
+                hasAccessKey: !!(process.env.ACCESS_KEY_ID || process.env.S3_ACCESS_KEY),
+                hasSecret: !!(process.env.SECRET_ACCESS_KEY || process.env.S3_SECRET_KEY),
+            });
             console.log(`[ImageProcessing] Processing ${type}: ${key}`);
 
             // Download original
