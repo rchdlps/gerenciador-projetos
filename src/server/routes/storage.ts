@@ -137,9 +137,7 @@ app.post('/upload', async (c) => {
             }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
         }
 
-        const signedUrl = await storage.getDownloadUrl(key)
-
-        return c.json({ ...attachment, url: signedUrl })
+        return c.json({ ...attachment, url: `/api/storage/file/${attachment.id}` })
     } catch (error: any) {
         console.error('[Storage Error] Upload failed:', error)
         return c.json({ error: error.message || 'Upload failed' }, 500)
@@ -177,48 +175,38 @@ app.post('/confirm',
     }
 )
 
-// Debug: Test presigned URL for an attachment (temporary — remove after debugging)
-app.get('/debug/:id', async (c) => {
+// Proxy file download — streams file from S3 through the server
+// Avoids presigned URL signing issues with Tigris
+app.get('/file/:id', async (c) => {
     const user = c.get('user')
-    if (!user || user.globalRole !== 'super_admin') return c.json({ error: 'Forbidden' }, 403)
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
 
     const id = c.req.param('id')
+    const variant = c.req.query('variant') // optional: thumb, medium, optimized
+
     const [file] = await db.select().from(attachments).where(eq(attachments.id, id))
     if (!file) return c.json({ error: 'Not found' }, 404)
 
-    const url = await storage.getDownloadUrl(file.key)
+    let key = file.key
+    let contentType = file.fileType
 
-    // Test presigned URL from server side
-    let originalStatus = 'unknown'
-    try {
-        const res = await fetch(url, { method: 'HEAD' })
-        originalStatus = `${res.status} ${res.statusText}`
-    } catch (err: any) {
-        originalStatus = `error: ${err.message}`
-    }
-
-    // Test variant URLs
-    const variantResults: Record<string, string> = {}
-    if (file.variants && typeof file.variants === 'object') {
+    if (variant && file.variants && typeof file.variants === 'object') {
         const v = file.variants as Record<string, string>
-        for (const [name, variantKey] of Object.entries(v)) {
-            const variantUrl = await storage.getDownloadUrl(variantKey)
-            try {
-                const res = await fetch(variantUrl, { method: 'HEAD' })
-                variantResults[name] = `${res.status} ${res.statusText}`
-            } catch (err: any) {
-                variantResults[name] = `error: ${err.message}`
-            }
+        if (v[variant]) {
+            key = v[variant]
+            contentType = 'image/webp'
         }
     }
 
-    return c.json({
-        id: file.id,
-        key: file.key,
-        variants: file.variants,
-        originalPresignedUrl: url,
-        originalStatus,
-        variantResults,
+    const buffer = await storage.downloadFile(key)
+
+    return new Response(buffer, {
+        headers: {
+            'Content-Type': contentType,
+            'Content-Length': buffer.length.toString(),
+            'Cache-Control': 'private, max-age=3600',
+        },
     })
 })
 
@@ -232,26 +220,20 @@ app.get('/:entityId', async (c) => {
 
     const files = await db.select().from(attachments).where(eq(attachments.entityId, entityId))
 
-    // Generate fresh signed URLs for all files
-    const filesWithUrls = await Promise.all(files.map(async (file) => {
-        const url = await storage.getDownloadUrl(file.key)
+    // Generate proxy URLs (no presigned URLs — Tigris doesn't support them properly)
+    const filesWithUrls = files.map((file) => {
+        const url = `/api/storage/file/${file.id}`
 
         let variantUrls: Record<string, string> | null = null
         if (file.variants && typeof file.variants === 'object') {
             const v = file.variants as Record<string, string>
-            const entries = await Promise.all(
-                Object.entries(v).map(async ([name, variantKey]) => {
-                    const variantUrl = await storage.getDownloadUrl(variantKey)
-                    return [name, variantUrl] as const
-                })
+            variantUrls = Object.fromEntries(
+                Object.keys(v).map(name => [name, `/api/storage/file/${file.id}?variant=${name}`])
             )
-            variantUrls = Object.fromEntries(entries)
         }
 
-        console.log(`[Storage] List attachment ${file.id}: variants=${file.variants ? 'yes' : 'null'}, variantUrls=${variantUrls ? Object.keys(variantUrls).join(',') : 'null'}`)
-
         return { ...file, url, variantUrls }
-    }))
+    })
 
     return c.json(filesWithUrls)
 })
