@@ -82,10 +82,11 @@ export const processImage = inngest.createFunction(
                     .where(eq(attachments.id, attachmentId));
                 console.log(`[ImageProcessing] Updated attachment ${attachmentId} with variants:`, variantKeys);
             } else if (type === "avatar" && userId) {
-                const thumbUrl = storage.getPublicUrl(variantKeys.thumb);
+                // Store proxy URL with S3 key — avatar proxy streams from S3
+                const proxyUrl = `/api/storage/avatar/${userId}?key=${encodeURIComponent(variantKeys.thumb)}`;
                 await db
                     .update(users)
-                    .set({ image: thumbUrl })
+                    .set({ image: proxyUrl })
                     .where(eq(users.id, userId));
                 console.log(`[ImageProcessing] Updated user ${userId} avatar to optimized thumb`);
             } else if (type === "logo") {

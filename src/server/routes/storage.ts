@@ -201,7 +201,7 @@ app.get('/file/:id', async (c) => {
 
     const buffer = await storage.downloadFile(key)
 
-    return new Response(buffer, {
+    return new Response(new Uint8Array(buffer), {
         headers: {
             'Content-Type': contentType,
             'Content-Length': buffer.length.toString(),
