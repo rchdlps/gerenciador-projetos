@@ -22,7 +22,7 @@ import { FileUpload } from "@/components/ui/file-upload"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, User, Shield, Mail, Calendar, CheckCircle2, Camera, Phone } from "lucide-react"
+import { Loader2, User, Shield, Mail, Calendar, CheckCircle2, Camera, Phone, Send } from "lucide-react"
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
     const parts = (fullName || "").trim().split(/\s+/)
@@ -66,6 +66,7 @@ function formatMemberSince(dateStr: string | undefined): string {
 export function ProfileForm() {
     const { data: session, isPending, error } = authClient.useSession()
     const [uploading, setUploading] = useState(false)
+    const [sendingVerification, setSendingVerification] = useState(false)
 
     const sessionUser = session?.user as (typeof session)["user"] & {
         phone?: string
@@ -204,6 +205,22 @@ export function ProfileForm() {
         }
     }
 
+    const handleSendVerification = async () => {
+        if (!sessionUser?.email) return
+        setSendingVerification(true)
+        try {
+            await authClient.sendVerificationEmail({
+                email: sessionUser.email,
+                callbackURL: "/profile",
+            })
+            toast.success("Email de verificação enviado! Verifique sua caixa de entrada.")
+        } catch {
+            toast.error("Erro ao enviar email de verificação. Tente novamente.")
+        } finally {
+            setSendingVerification(false)
+        }
+    }
+
     const avatarUrl = profileForm.watch("image") || sessionUser?.image || ""
     const initials = sessionUser?.name
         ?.split(" ")
@@ -278,9 +295,21 @@ export function ProfileForm() {
                                         Email verificado
                                     </Badge>
                                 ) : (
-                                    <Badge variant="secondary" className="gap-1 font-normal text-amber-700 bg-amber-50 border-amber-200">
-                                        Email não verificado
-                                    </Badge>
+                                    <button
+                                        type="button"
+                                        onClick={handleSendVerification}
+                                        disabled={sendingVerification}
+                                        className="inline-flex items-center"
+                                    >
+                                        <Badge variant="secondary" className="gap-1 font-normal text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer">
+                                            {sendingVerification ? (
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                                <Send className="h-3 w-3" />
+                                            )}
+                                            {sendingVerification ? "Enviando..." : "Verificar email"}
+                                        </Badge>
+                                    </button>
                                 )}
                             </div>
                         </div>
