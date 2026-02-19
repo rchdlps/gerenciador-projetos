@@ -21,6 +21,10 @@ const s3 = new S3Client({
         secretAccessKey: secretAccessKey || "",
     },
     forcePathStyle: false,
+    // Disable SDK v3 checksum extensions — Tigris doesn't support x-amz-checksum-mode
+    // which causes presigned URLs to return 403 Forbidden
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
 })
 
 const BUCKET = bucketName!
