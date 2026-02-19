@@ -15,6 +15,13 @@
       "when": 1770667017013,
       "tag": "0001_daily_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771465362025,
+      "tag": "0002_closed_clint_barton",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, pgEnum, primaryKey, integer, index, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 export const globalRolesEnum = pgEnum("global_roles", ["super_admin", "user"]);
@@ -47,6 +47,8 @@ export const users = pgTable("users", {
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    phone: text("phone"),
+    funcao: text("funcao"),
     globalRole: globalRolesEnum("global_role").default("user"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -212,6 +214,11 @@ export const attachments = pgTable("attachments", {
     fileSize: integer("file_size").notNull(),
     key: text("key").notNull(),
     url: text("url"),
+    variants: jsonb("variants").$type<{
+        thumb?: string
+        medium?: string
+        optimized?: string
+    } | null>(),
     entityId: text("entity_id").notNull(),
     entityType: text("entity_type").notNull(), // 'task', 'project', 'comment'
     uploadedBy: text("uploaded_by").references(() => users.id).notNull(),

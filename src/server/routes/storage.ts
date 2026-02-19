@@ -7,6 +7,7 @@ import { attachments, tasks, projectPhases, projects, users, memberships, knowle
 import { eq, and } from 'drizzle-orm'
 import { storage } from '@/lib/storage'
 import { createAuditLog } from '@/lib/audit-logger'
+import { inngest } from '@/lib/inngest/client'
 import { requireAuth, type AuthVariables } from '../middleware/auth'
 
 const app = new Hono<{ Variables: AuthVariables }>()
@@ -106,7 +107,7 @@ app.post('/upload', async (c) => {
         const key = `${entityId}/${nanoid()}-${file.name}`
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        await storage.uploadFile(key, buffer, file.type, file.size)
+        await storage.uploadFile(key, buffer, file.type)
 
         const [attachment] = await db.insert(attachments).values({
             id: nanoid(),
@@ -128,9 +129,15 @@ app.post('/upload', async (c) => {
             metadata: { fileName: file.name, fileType: file.type, entityType, entityId },
         })
 
-        const signedUrl = await storage.getDownloadUrl(key)
+        // Trigger background image processing for image files
+        if (file.type.startsWith('image/')) {
+            inngest.send({
+                name: "image/process",
+                data: { key, attachmentId: attachment.id, type: "attachment" },
+            }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
+        }
 
-        return c.json({ ...attachment, url: signedUrl })
+        return c.json({ ...attachment, url: `/api/storage/file/${attachment.id}` })
     } catch (error: any) {
         console.error('[Storage Error] Upload failed:', error)
         return c.json({ error: error.message || 'Upload failed' }, 500)
@@ -168,6 +175,41 @@ app.post('/confirm',
     }
 )
 
+// Proxy file download — streams file from S3 through the server
+// Avoids presigned URL signing issues with Tigris
+app.get('/file/:id', async (c) => {
+    const user = c.get('user')
+    const session = c.get('session')
+    if (!user || !session) return c.json({ error: 'Unauthorized' }, 401)
+
+    const id = c.req.param('id')
+    const variant = c.req.query('variant') // optional: thumb, medium, optimized
+
+    const [file] = await db.select().from(attachments).where(eq(attachments.id, id))
+    if (!file) return c.json({ error: 'Not found' }, 404)
+
+    let key = file.key
+    let contentType = file.fileType
+
+    if (variant && file.variants && typeof file.variants === 'object') {
+        const v = file.variants as Record<string, string>
+        if (v[variant]) {
+            key = v[variant]
+            contentType = 'image/webp'
+        }
+    }
+
+    const buffer = await storage.downloadFile(key)
+
+    return new Response(new Uint8Array(buffer), {
+        headers: {
+            'Content-Type': contentType,
+            'Content-Length': buffer.length.toString(),
+            'Cache-Control': 'private, max-age=3600',
+        },
+    })
+})
+
 // 3. List Attachments
 app.get('/:entityId', async (c) => {
     const user = c.get('user')
@@ -178,11 +220,20 @@ app.get('/:entityId', async (c) => {
 
     const files = await db.select().from(attachments).where(eq(attachments.entityId, entityId))
 
-    // Generate fresh signed URLs for all files
-    const filesWithUrls = await Promise.all(files.map(async (file) => {
-        const url = await storage.getDownloadUrl(file.key)
-        return { ...file, url }
-    }))
+    // Generate proxy URLs (no presigned URLs — Tigris doesn't support them properly)
+    const filesWithUrls = files.map((file) => {
+        const url = `/api/storage/file/${file.id}`
+
+        let variantUrls: Record<string, string> | null = null
+        if (file.variants && typeof file.variants === 'object') {
+            const v = file.variants as Record<string, string>
+            variantUrls = Object.fromEntries(
+                Object.keys(v).map(name => [name, `/api/storage/file/${file.id}?variant=${name}`])
+            )
+        }
+
+        return { ...file, url, variantUrls }
+    })
 
     return c.json(filesWithUrls)
 })
@@ -205,10 +256,17 @@ app.delete('/:id', async (c) => {
     }
 
     // Delete from S3 and DB in parallel; audit log is non-blocking
-    await Promise.all([
+    const deletePromises: Promise<void>[] = [
         storage.deleteFile(file.key),
-        db.delete(attachments).where(eq(attachments.id, id)),
-    ])
+        db.delete(attachments).where(eq(attachments.id, id)).then(() => {}),
+    ]
+    if (file.variants && typeof file.variants === 'object') {
+        const v = file.variants as Record<string, string>
+        for (const variantKey of Object.values(v)) {
+            deletePromises.push(storage.deleteFile(variantKey).catch(() => {}))
+        }
+    }
+    await Promise.all(deletePromises)
 
     createAuditLog({
         userId: user.id,

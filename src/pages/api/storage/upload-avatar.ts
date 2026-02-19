@@ -6,6 +6,7 @@ import { db } from "@/lib/db"
 import { users } from "../../../../db/schema"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
+import { inngest } from "@/lib/inngest/client"
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB for avatars
 
@@ -36,13 +37,21 @@ export const POST: APIRoute = async ({ request }) => {
         const key = `avatars/${session.user.id}/${nanoid()}-${file.name}`
         const buffer = Buffer.from(await file.arrayBuffer())
 
-        await storage.uploadFile(key, buffer, file.type, file.size)
+        await storage.uploadFile(key, buffer, file.type)
 
-        const publicUrl = storage.getPublicUrl(key)
+        // Store proxy URL in users.image — avatar proxy resolves S3 key from URL
+        const proxyUrl = `/api/storage/avatar/${session.user.id}?key=${encodeURIComponent(key)}`
+        await db.update(users).set({ image: proxyUrl }).where(eq(users.id, session.user.id))
 
-        await db.update(users).set({ image: publicUrl }).where(eq(users.id, session.user.id))
+        // Trigger background processing to optimize the avatar
+        if (file.type.startsWith('image/')) {
+            inngest.send({
+                name: "image/process",
+                data: { key, userId: session.user.id, type: "avatar" },
+            }).catch(err => console.error("[Storage] Failed to emit image/process event:", err))
+        }
 
-        return new Response(JSON.stringify({ publicUrl }), { status: 200 })
+        return new Response(JSON.stringify({ publicUrl: proxyUrl }), { status: 200 })
     } catch (error) {
         console.error("[Storage] Avatar upload failed:", error)
         return new Response(JSON.stringify({ error: "Upload failed" }), { status: 500 })

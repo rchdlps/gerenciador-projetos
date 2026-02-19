@@ -41,7 +41,7 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
         enabled: open
     })
 
-    // Attachments Query
+    // Attachments Query — polls when images are missing variants (Inngest processing)
     const { data: attachments = [], refetch: refetchAttachments } = useQuery({
         queryKey: ['attachments', task?.id],
         queryFn: async () => {
@@ -50,7 +50,15 @@ export function TaskDialog({ open, onOpenChange, task, phaseId, projectId }: Tas
             if (!res.ok) return []
             return res.json() as Promise<Attachment[]>
         },
-        enabled: !!task?.id && open
+        enabled: !!task?.id && open,
+        refetchInterval: (query) => {
+            const data = query.state.data as Attachment[] | undefined
+            if (!data) return false
+            const hasUnprocessedImages = data.some(
+                a => a.fileType.startsWith('image/') && !a.variantUrls
+            )
+            return hasUnprocessedImages ? 5000 : false
+        },
     })
 
     // Combine server attachments with pending files for display

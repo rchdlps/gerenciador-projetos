@@ -50,7 +50,7 @@ RUN npm install -g npm@latest && \
 
 # Copy package files and install production deps only
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm rebuild
+RUN npm ci --omit=dev
 
 # Copy built output from build stage
 COPY --from=build /app/dist ./dist

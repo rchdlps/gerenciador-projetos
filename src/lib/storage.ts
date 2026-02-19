@@ -20,29 +20,39 @@ const s3 = new S3Client({
         accessKeyId: accessKeyId || "",
         secretAccessKey: secretAccessKey || "",
     },
-    forcePathStyle: true,
-})
-
-console.log("[S3 Init]", {
-    endpoint,
-    region,
-    bucket: bucketName,
-    hasAccessKey: !!accessKeyId,
-    hasSecret: !!secretAccessKey,
+    forcePathStyle: false,
+    // Disable SDK v3 checksum extensions — Tigris doesn't support x-amz-checksum-mode
+    // which causes presigned URLs to return 403 Forbidden
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
 })
 
 const BUCKET = bucketName!
 
 export const storage = {
-    uploadFile: async (key: string, body: Buffer | Uint8Array, contentType: string, contentLength: number) => {
+    uploadFile: async (key: string, body: Buffer | Uint8Array, contentType: string) => {
         const command = new PutObjectCommand({
             Bucket: BUCKET,
             Key: key,
             Body: body,
             ContentType: contentType,
-            ContentLength: contentLength,
         })
         await s3.send(command)
+    },
+
+    downloadFile: async (key: string): Promise<Buffer> => {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET,
+            Key: key,
+        })
+        const response = await s3.send(command)
+        const stream = response.Body
+        if (!stream) throw new Error(`Empty response for key: ${key}`)
+        const chunks: Uint8Array[] = []
+        for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+            chunks.push(chunk)
+        }
+        return Buffer.concat(chunks)
     },
 
     getDownloadUrl: async (key: string) => {
@@ -55,7 +65,7 @@ export const storage = {
 
     getPublicUrl: (key: string) => {
         const cleanEndpoint = endpoint?.replace("https://", "").replace("http://", "")
-        return `https://${cleanEndpoint}/${BUCKET}/${key}`
+        return `https://${BUCKET}.${cleanEndpoint}/${key}`
     },
 
     deleteFile: async (key: string) => {
