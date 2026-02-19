@@ -47,6 +47,8 @@ export const users = pgTable("users", {
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    phone: text("phone"),
+    funcao: text("funcao"),
     globalRole: globalRolesEnum("global_role").default("user"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),

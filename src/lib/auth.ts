@@ -64,6 +64,14 @@ export const auth = betterAuth({
                 type: "boolean",
                 required: false,
                 defaultValue: true
+            },
+            phone: {
+                type: "string",
+                required: false,
+            },
+            funcao: {
+                type: "string",
+                required: false,
             }
         }
     },

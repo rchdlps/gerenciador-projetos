@@ -22,11 +22,22 @@ import { FileUpload } from "@/components/ui/file-upload"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, User, Shield, Mail, Calendar, CheckCircle2, Camera } from "lucide-react"
+import { Loader2, User, Shield, Mail, Calendar, CheckCircle2, Camera, Phone } from "lucide-react"
 
-// Schema for General Profile (Name + Avatar)
+function splitName(fullName: string): { firstName: string; lastName: string } {
+    const parts = (fullName || "").trim().split(/\s+/)
+    return {
+        firstName: parts[0] || "",
+        lastName: parts.slice(1).join(" ") || "",
+    }
+}
+
+// Schema for General Profile
 const profileSchema = z.object({
-    name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres"),
+    firstName: z.string().min(2, "O nome deve ter pelo menos 2 caracteres"),
+    lastName: z.string().min(1, "O sobrenome é obrigatório"),
+    phone: z.string().optional(),
+    funcao: z.string().optional(),
     image: z.string().optional(),
 })
 
@@ -56,12 +67,22 @@ export function ProfileForm() {
     const { data: session, isPending, error } = authClient.useSession()
     const [uploading, setUploading] = useState(false)
 
+    const sessionUser = session?.user as (typeof session)["user"] & {
+        phone?: string
+        funcao?: string
+    } | undefined
+
+    const { firstName, lastName } = splitName(sessionUser?.name || "")
+
     // Form 1: General Profile
     const profileForm = useForm<z.infer<typeof profileSchema>>({
         resolver: zodResolver(profileSchema),
         values: {
-            name: session?.user?.name || "",
-            image: session?.user?.image || "",
+            firstName,
+            lastName,
+            phone: sessionUser?.phone || "",
+            funcao: sessionUser?.funcao || "",
+            image: sessionUser?.image || "",
         },
     })
 
@@ -111,10 +132,13 @@ export function ProfileForm() {
     // --- Actions ---
 
     const onUpdateProfile = async (values: z.infer<typeof profileSchema>) => {
+        const fullName = `${values.firstName} ${values.lastName}`.trim()
         await authClient.updateUser({
-            name: values.name,
+            name: fullName,
             image: values.image,
-        }, {
+            phone: values.phone || undefined,
+            funcao: values.funcao || undefined,
+        } as any, {
             onSuccess: () => {
                 toast.success("Perfil atualizado com sucesso!")
             },
@@ -180,8 +204,8 @@ export function ProfileForm() {
         }
     }
 
-    const avatarUrl = profileForm.watch("image") || session.user.image || ""
-    const initials = session.user.name
+    const avatarUrl = profileForm.watch("image") || sessionUser?.image || ""
+    const initials = sessionUser?.name
         ?.split(" ")
         .map((n) => n[0])
         .slice(0, 2)
@@ -229,20 +253,26 @@ export function ProfileForm() {
                         {/* Name, email, badges */}
                         <div className="flex-1 min-w-0 text-center sm:text-left pb-1">
                             <h1 className="text-2xl font-bold tracking-tight truncate">
-                                {session.user.name}
+                                {sessionUser?.name}
                             </h1>
                             <div className="flex items-center justify-center sm:justify-start gap-1.5 text-muted-foreground mt-0.5">
                                 <Mail className="h-3.5 w-3.5 shrink-0" />
-                                <span className="text-sm truncate">{session.user.email}</span>
+                                <span className="text-sm truncate">{sessionUser?.email}</span>
                             </div>
+                            {sessionUser?.funcao && (
+                                <div className="flex items-center justify-center sm:justify-start gap-1.5 text-muted-foreground mt-0.5">
+                                    <User className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="text-sm truncate">{sessionUser.funcao}</span>
+                                </div>
+                            )}
                             <div className="flex items-center justify-center sm:justify-start gap-2 mt-3 flex-wrap">
-                                {session.user.createdAt && (
+                                {sessionUser?.createdAt && (
                                     <Badge variant="secondary" className="gap-1 font-normal">
                                         <Calendar className="h-3 w-3" />
-                                        Membro desde {formatMemberSince(session.user.createdAt as string)}
+                                        Membro desde {formatMemberSince(sessionUser.createdAt as string)}
                                     </Badge>
                                 )}
-                                {session.user.emailVerified ? (
+                                {sessionUser?.emailVerified ? (
                                     <Badge variant="secondary" className="gap-1 font-normal text-emerald-700 bg-emerald-50 border-emerald-200">
                                         <CheckCircle2 className="h-3 w-3" />
                                         Email verificado
@@ -272,52 +302,81 @@ export function ProfileForm() {
                 </TabsList>
 
                 {/* General Tab */}
-                <TabsContent value="general" className="mt-4 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Foto de Perfil</CardTitle>
-                            <CardDescription>Clique na foto acima ou use o botão abaixo para alterar.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-6">
-                                <Avatar className="h-20 w-20 shrink-0">
-                                    <AvatarImage src={avatarUrl} />
-                                    <AvatarFallback className="text-lg font-semibold">{initials}</AvatarFallback>
-                                </Avatar>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <FileUpload onUpload={handleAvatarUpload} />
-                                        {uploading && <Loader2 className="animate-spin h-4 w-4" />}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        JPG, GIF ou PNG. Máximo de 2MB.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
+                <TabsContent value="general" className="mt-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Informações Pessoais</CardTitle>
-                            <CardDescription>Atualize seu nome de exibição.</CardDescription>
+                            <CardDescription>Atualize seus dados pessoais e de contato.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Form {...profileForm}>
                                 <form onSubmit={profileForm.handleSubmit(onUpdateProfile)} className="space-y-4">
-                                    <FormField
-                                        control={profileForm.control}
-                                        name="name"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Nome de Exibição</FormLabel>
-                                                <FormControl>
-                                                    <Input {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            control={profileForm.control}
+                                            name="firstName"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Nome</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="João" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={profileForm.control}
+                                            name="lastName"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Sobrenome</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="Silva" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            control={profileForm.control}
+                                            name="phone"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Telefone</FormLabel>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                            <Input
+                                                                className="pl-9"
+                                                                placeholder="(65) 99999-0000"
+                                                                {...field}
+                                                            />
+                                                        </div>
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={profileForm.control}
+                                            name="funcao"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Função</FormLabel>
+                                                    <FormControl>
+                                                        <Input
+                                                            placeholder="Ex: Coordenador, Analista, Gestor"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                     <div className="flex justify-end">
                                         <Button type="submit" disabled={profileForm.formState.isSubmitting}>
                                             {profileForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
