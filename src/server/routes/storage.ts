@@ -177,6 +177,51 @@ app.post('/confirm',
     }
 )
 
+// Debug: Test presigned URL for an attachment (temporary — remove after debugging)
+app.get('/debug/:id', async (c) => {
+    const user = c.get('user')
+    if (!user || user.globalRole !== 'super_admin') return c.json({ error: 'Forbidden' }, 403)
+
+    const id = c.req.param('id')
+    const [file] = await db.select().from(attachments).where(eq(attachments.id, id))
+    if (!file) return c.json({ error: 'Not found' }, 404)
+
+    const url = await storage.getDownloadUrl(file.key)
+
+    // Test presigned URL from server side
+    let originalStatus = 'unknown'
+    try {
+        const res = await fetch(url, { method: 'HEAD' })
+        originalStatus = `${res.status} ${res.statusText}`
+    } catch (err: any) {
+        originalStatus = `error: ${err.message}`
+    }
+
+    // Test variant URLs
+    const variantResults: Record<string, string> = {}
+    if (file.variants && typeof file.variants === 'object') {
+        const v = file.variants as Record<string, string>
+        for (const [name, variantKey] of Object.entries(v)) {
+            const variantUrl = await storage.getDownloadUrl(variantKey)
+            try {
+                const res = await fetch(variantUrl, { method: 'HEAD' })
+                variantResults[name] = `${res.status} ${res.statusText}`
+            } catch (err: any) {
+                variantResults[name] = `error: ${err.message}`
+            }
+        }
+    }
+
+    return c.json({
+        id: file.id,
+        key: file.key,
+        variants: file.variants,
+        originalPresignedUrl: url,
+        originalStatus,
+        variantResults,
+    })
+})
+
 // 3. List Attachments
 app.get('/:entityId', async (c) => {
     const user = c.get('user')
@@ -202,6 +247,8 @@ app.get('/:entityId', async (c) => {
             )
             variantUrls = Object.fromEntries(entries)
         }
+
+        console.log(`[Storage] List attachment ${file.id}: variants=${file.variants ? 'yes' : 'null'}, variantUrls=${variantUrls ? Object.keys(variantUrls).join(',') : 'null'}`)
 
         return { ...file, url, variantUrls }
     }))
