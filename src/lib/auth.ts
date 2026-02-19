@@ -78,6 +78,26 @@ export const auth = betterAuth({
                             globalRole: "user" // Default role
                         }
                     }
+                },
+                after: async (user) => {
+                    try {
+                        const { generateInitialsAvatar } = await import("./avatar-generator")
+                        const { storage } = await import("./storage")
+
+                        const svg = generateInitialsAvatar(user.name, user.id)
+                        const key = `avatars/${user.id}/initials.svg`
+                        const buffer = Buffer.from(svg, "utf-8")
+
+                        await storage.uploadFile(key, buffer, "image/svg+xml")
+
+                        const proxyUrl = `/api/storage/avatar/${user.id}?key=${encodeURIComponent(key)}`
+                        await db.update(schema.users).set({ image: proxyUrl }).where(eq(schema.users.id, user.id))
+
+                        console.log(`[Auth] Generated initials avatar for user ${user.id}`)
+                    } catch (err) {
+                        // Non-blocking — user creation should not fail if avatar generation fails
+                        console.error(`[Auth] Failed to generate initials avatar for user ${user.id}:`, err)
+                    }
                 }
             }
         },
