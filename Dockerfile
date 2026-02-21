@@ -23,14 +23,10 @@ ENV DEPLOY_TARGET=railway
 # Capture build arguments for client-side env vars
 ARG PUBLIC_URL
 
-ARG PUBLIC_PUSHER_KEY
-ARG PUBLIC_PUSHER_CLUSTER
 # ARG INNGEST_EVENT_KEY
 # ARG INNGEST_SIGNING_KEY
 ARG INNGEST_DEV
 ARG INNGEST_BASE_URL
-ENV PUBLIC_PUSHER_KEY=$PUBLIC_PUSHER_KEY
-ENV PUBLIC_PUSHER_CLUSTER=$PUBLIC_PUSHER_CLUSTER
 # ENV INNGEST_EVENT_KEY=$INNGEST_EVENT_KEY
 # ENV INNGEST_SIGNING_KEY=$INNGEST_SIGNING_KEY
 ENV INNGEST_DEV=$INNGEST_DEV
@@ -54,12 +50,14 @@ RUN npm ci --omit=dev
 
 # Copy built output from build stage
 COPY --from=build /app/dist ./dist
+COPY server.mjs ./
 
 # Railway sets PORT automatically; @astrojs/node reads HOST and PORT
 ENV HOST=0.0.0.0
+ENV ASTRO_NODE_AUTOSTART=disabled
 ENV PORT=3000
 
 EXPOSE 3000
 
 # Start the standalone Node.js server
-CMD ["node", "dist/server/entry.mjs"]
+CMD ["node", "server.mjs"]
