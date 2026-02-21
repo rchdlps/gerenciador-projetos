@@ -85,13 +85,13 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
         },
     });
 
-    // Handle real-time Pusher notifications
+    // Handle real-time Socket.IO notifications
     const handleNewNotification = useCallback((notification: SocketNotification) => {
         queryClient.setQueryData<number>(['notifications', 'unread-count'], (old) => (old ?? 0) + 1);
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
     }, [queryClient]);
 
-    // Re-fetch unread count when Pusher reconnects after a disconnect
+    // Re-fetch unread count when Socket.IO reconnects after a disconnect
     const handleReconnect = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });

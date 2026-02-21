@@ -17,7 +17,6 @@ type UseSocketOptions = {
 
 /**
  * React hook for subscribing to real-time Socket.IO notifications.
- * Drop-in replacement for usePusher with the same interface.
  */
 export function useSocket({ userId, onNotification, onReconnect }: UseSocketOptions) {
     const [isConnected, setIsConnected] = useState(false);

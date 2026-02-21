@@ -10,7 +10,7 @@ export type NotificationPayload = {
 };
 
 // Alias for backward compatibility with existing imports
-export type PusherNotificationPayload = NotificationPayload;
+export type RealtimeNotificationPayload = NotificationPayload;
 
 function getIO(): Server | null {
     return (globalThis as any).__socketIO || null;
@@ -18,7 +18,7 @@ function getIO(): Server | null {
 
 /**
  * Push a notification to a specific user via Socket.IO.
- * Same signature as the old Pusher version — drop-in replacement.
+ * Push a real-time notification to a specific user via Socket.IO.
  */
 export async function pushNotification(userId: string, payload: NotificationPayload) {
     const io = getIO();
