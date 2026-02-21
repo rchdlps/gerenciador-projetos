@@ -20,7 +20,7 @@ import orgSessionRouter from './routes/org-session'
 import membersRouter from './routes/members'
 import notificationsRouter from './routes/notifications'
 import adminNotificationsRouter from './routes/admin-notifications'
-import pusherAuthRouter from './routes/pusher-auth'
+// pusher-auth route removed (replaced by Socket.IO auth in server.mjs)
 
 const app = new Hono().basePath('/api')
 
@@ -47,7 +47,6 @@ const apiRoutes = app
     .route('/members', membersRouter)
     .route('/notifications', notificationsRouter)
     .route('/admin/notifications', adminNotificationsRouter)
-    .route('/pusher/auth', pusherAuthRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })
