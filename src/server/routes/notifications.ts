@@ -154,7 +154,7 @@ if (process.env.NODE_ENV !== "production") {
 
         // Import here to avoid circular deps
         const { storeNotification } = await import("@/lib/notification");
-        const { pushNotification } = await import("@/lib/pusher");
+        const { pushNotification } = await import("@/lib/realtime");
 
         // Create notification directly
         const notificationId = await storeNotification({
@@ -165,7 +165,7 @@ if (process.env.NODE_ENV !== "production") {
             data: { test: true, timestamp: new Date().toISOString() },
         });
 
-        // Try to push real-time (will fail gracefully if Pusher not configured)
+        // Try to push real-time (will fail gracefully if Socket.IO not configured)
         try {
             await pushNotification(user.id, {
                 id: notificationId,

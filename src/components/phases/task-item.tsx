@@ -127,8 +127,9 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
     return (
         <div ref={setNodeRef} style={style} {...attributes} aria-label={`Tarefa: ${task.title}`}>
             <Card
-                className="mb-2 hover:shadow-md transition-shadow border-l-4 group"
+                className="mb-2 hover:shadow-md transition-shadow border-l-4 group cursor-pointer"
                 style={{ borderLeftColor: task.status === 'done' ? '#10b981' : '#e5e7eb' }}
+                onClick={() => setOpen(true)}
             >
                 <CardContent className="p-4">
                     <div className="flex justify-between items-start">
@@ -137,15 +138,13 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                             <div
                                 {...listeners}
                                 className="mr-3 mt-1 cursor-grab text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <GripVertical className="h-4 w-4" />
                             </div>
                         )}
 
-                        <div
-                            className="space-y-1 flex-1 cursor-pointer"
-                            onClick={() => setOpen(true)}
-                        >
+                        <div className="space-y-1 flex-1">
                             <h4 className={`font-medium ${task.status === 'done' ? 'line-through text-gray-500' : ''}`}>
                                 {task.title}
                             </h4>

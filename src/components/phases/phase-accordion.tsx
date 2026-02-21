@@ -127,7 +127,7 @@ export function PhaseAccordion({ phase, projectId, index }: PhaseAccordionProps)
                 className={`border rounded-xl px-4 mb-4 bg-white shadow-sm border-l-4 transition-all duration-300 ${color.border}`}
             >
                 <AccordionTrigger
-                    className="hover:no-underline py-6"
+                    className="hover:no-underline py-6 cursor-pointer"
                     extraActions={
                         !isViewer && (
                             <DropdownMenu>

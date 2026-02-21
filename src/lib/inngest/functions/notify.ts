@@ -5,7 +5,7 @@ import {
     getDigestItems,
     markAsEmailed
 } from "@/lib/notification";
-import { pushNotification } from "@/lib/pusher";
+import { pushNotification } from "@/lib/realtime";
 import { sendDailyDigestEmail } from "@/lib/email/client";
 import { db } from "@/lib/db";
 import { users } from "../../../../db/schema";
@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm";
 
 /**
  * Handle activity notifications (comments, task updates, assignments)
- * Stores in DB and pushes real-time via Pusher
+ * Stores in DB and pushes real-time via Socket.IO
  */
 export const handleActivityNotification = inngest.createFunction(
     { id: "notification-activity" },
@@ -33,7 +33,7 @@ export const handleActivityNotification = inngest.createFunction(
                 data: data as Record<string, unknown> | undefined,
             });
 
-            // Only push via Pusher here when we're the ones storing — when emitNotification()
+            // Only push via Socket.IO here when we're the ones storing — when emitNotification()
             // is the caller it already pushed directly before sending this event.
             await pushNotification(userId, {
                 id: notificationId,

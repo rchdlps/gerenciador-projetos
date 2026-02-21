@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Neon)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (Hetzner Object Storage).
+This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Railway)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (Hetzner Object Storage).
 
 The application manages projects across multiple organizations (secretarias), with role-based access control, knowledge area tracking based on project management methodologies (PMBoK-inspired), task management, stakeholders, calendaring, procurement, communication plans, quality metrics, comprehensive audit logging, and a real-time notification system.
 
@@ -185,7 +185,7 @@ const { data: projects } = useQuery({
 
 The notification system has two delivery paths:
 
-**Real-time:** Pusher (`pusher` / `pusher-js`) delivers notifications instantly to connected clients. The server sends events via `src/pages/api/pusher/` endpoints; the React client subscribes using `PUBLIC_PUSHER_KEY` / `PUBLIC_PUSHER_CLUSTER`.
+**Real-time:** Socket.IO (`socket.io` / `socket.io-client`) delivers notifications instantly via WebSocket. The server attaches Socket.IO to the same HTTP server in `server.mjs`; the React client subscribes using the `useSocket` hook (`src/hooks/useSocket.ts`). Auth is handled via session cookie validation on connection.
 
 **Background Jobs:** Inngest (`inngest` package) handles scheduled/batch notification delivery. Functions are defined in `src/lib/inngest/functions/` and served at `src/pages/api/inngest.ts`. Admin can schedule notifications via `src/server/routes/admin-notifications.ts`.
 
@@ -336,10 +336,10 @@ const failedCount = results.filter(r => r.status === 'rejected').length
 
 `emitNotification()` in `src/lib/notification.ts` uses a resilient fan-out:
 1. **DB store** (critical path) — notification is persisted immediately
-2. **Pusher** (real-time) — fire-and-forget `.catch()` for instant delivery
+2. **Socket.IO** (real-time) — fire-and-forget `.catch()` for instant delivery
 3. **Inngest** (side-effects) — fire-and-forget `.catch()` for email/analytics
 
-The DB is the source of truth. Pusher and Inngest are best-effort — failures don't block or lose notifications.
+The DB is the source of truth. Socket.IO and Inngest are best-effort — failures don't block or lose notifications.
 
 ### 10. better-auth Session Pitfalls
 
@@ -390,14 +390,13 @@ The DB is the source of truth. Pusher and Inngest are best-effort — failures d
 
 See `.env.example` for required variables:
 
-- `DATABASE_URL`: Neon PostgreSQL connection string
+- `DATABASE_URL`: Railway PostgreSQL connection string
 - `BETTER_AUTH_SECRET`: Auth secret key
 - `BETTER_AUTH_URL`: Base URL for auth callbacks
 - `S3_ENDPOINT` / `S3_REGION` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET_NAME`: Hetzner Object Storage
 - `RESEND_API_KEY`: Email delivery via Resend
 - `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY`: Inngest background jobs
-- `PUSHER_APP_ID` / `PUSHER_KEY` / `PUSHER_SECRET` / `PUSHER_CLUSTER`: Real-time events (server)
-- `PUBLIC_PUSHER_KEY` / `PUBLIC_PUSHER_CLUSTER`: Real-time events (client-side, exposed to browser)
+- Real-time notifications use Socket.IO (self-hosted, no external service or env vars needed)
 - `SENTRY_AUTH_TOKEN`: Error tracking
 - `PUBLIC_URL`: Base URL for the app (used in email links, etc.)
 
@@ -465,13 +464,15 @@ Every significant action (create project, update task, delete stakeholder, etc.)
 
 ## Deployment
 
-**Platform:** Vercel (configured in `astro.config.mjs`)
+**Platform:** Railway (Docker-based)
 
-**Adapter:** `@astrojs/vercel` with `maxDuration: 60` for serverless functions
+**Adapter:** `@astrojs/node` in standalone mode
 
-**Build:** `npm run build` produces output in `dist/`
+**Entry Point:** `server.mjs` wraps Astro's handler + Socket.IO on the same HTTP server. Uses `ASTRO_NODE_AUTOSTART=disabled` to prevent Astro from starting its own server.
 
-**Database:** Neon serverless PostgreSQL (WebSocket-based pooling)
+**Build:** `npm run build` produces output in `dist/`. Production runs via `node server.mjs`.
+
+**Database:** PostgreSQL (Railway)
 
 ## Testing Strategy
 

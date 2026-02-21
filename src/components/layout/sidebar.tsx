@@ -94,8 +94,8 @@ export function Sidebar({ user, initialPath }: { user?: any, initialPath?: strin
                                 <FolderDot className={cn("w-4 h-4 group-hover:text-blue-700", isActive(`/projects/${projectId}`) ? "text-blue-700" : "text-blue-500")} />
                                 Visão Geral
                             </a>
-                            <a href={`/projects/${projectId}/knowledge-areas`} className={getLinkClass(isActive(`/projects/${projectId}/knowledge-areas`), true)}>
-                                <BookOpen className={cn("w-4 h-4 group-hover:text-blue-700", isActive(`/projects/${projectId}/knowledge-areas`) ? "text-blue-700" : "text-slate-400")} />
+                            <a href={`/projects/${projectId}/knowledge-areas`} className={getLinkClass(currentPath.startsWith(`/projects/${projectId}/knowledge-areas`), true)}>
+                                <BookOpen className={cn("w-4 h-4 group-hover:text-blue-700", currentPath.startsWith(`/projects/${projectId}/knowledge-areas`) ? "text-blue-700" : "text-slate-400")} />
                                 Áreas de Conhecimento
                             </a>
                             <a href={`/projects/${projectId}/calendar`} className={getLinkClass(isActive(`/projects/${projectId}/calendar`), true)}>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Providers } from "@/components/providers";
 import { Bell, Check, CheckCheck, Eye } from "lucide-react";
@@ -11,7 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { usePusher, type PusherNotification } from "@/hooks/usePusher";
+import { useSocket, type SocketNotification } from "@/hooks/useSocket";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Notification = {
@@ -40,7 +40,7 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
     const [isOpen, setIsOpen] = useState(false);
     const queryClient = useQueryClient();
 
-    // Fetch unread count (always active, polls every 30s as fallback)
+    // Fetch unread count (once on mount, then event-driven)
     const { data: unreadCount = 0 } = useQuery({
         queryKey: ['notifications', 'unread-count'],
         queryFn: async () => {
@@ -49,7 +49,6 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
             const data = await res.json();
             return data.count || 0;
         },
-        refetchInterval: 30_000,
     });
 
     // Fetch notification list (only when dropdown is open)
@@ -86,13 +85,37 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
         },
     });
 
-    // Handle real-time Pusher notifications
-    const handleNewNotification = useCallback((notification: PusherNotification) => {
+    // Handle real-time Socket.IO notifications
+    const handleNewNotification = useCallback((notification: SocketNotification) => {
         queryClient.setQueryData<number>(['notifications', 'unread-count'], (old) => (old ?? 0) + 1);
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
     }, [queryClient]);
 
-    usePusher({ userId, onNotification: handleNewNotification });
+    // Re-fetch unread count when Socket.IO reconnects after a disconnect
+    const handleReconnect = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
+    }, [queryClient]);
+
+    useSocket({ userId, onNotification: handleNewNotification, onReconnect: handleReconnect });
+
+    // Re-fetch unread count when tab becomes visible after being hidden >60s
+    useEffect(() => {
+        let hiddenAt: number | null = null;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                hiddenAt = Date.now();
+            } else if (hiddenAt && Date.now() - hiddenAt > 60_000) {
+                queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+                queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
+                hiddenAt = null;
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [queryClient]);
 
     // Wrapper functions to match existing JSX onClick handlers
     const markAsRead = (id: string) => markReadMutation.mutate(id);

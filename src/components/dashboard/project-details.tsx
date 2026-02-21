@@ -9,6 +9,8 @@ import { useState } from "react"
 import { PhaseList } from "@/components/phases/phase-list"
 import { TaskStats } from "./task-stats"
 import { ProjectHeader } from "./project-header"
+import { ProjectReadOnlyBanner } from "./project-read-only-banner"
+import { useActiveOrgOptional } from "@/contexts/org-context"
 
 export function ProjectDetails({ id }: { id: string }) {
     const [viewMode, setViewMode] = useState<'kanban' | 'phases'>('phases')
@@ -65,6 +67,9 @@ export function ProjectDetails({ id }: { id: string }) {
     if (isLoading) return <div>Carregando...</div>
     if (!project) return <div>Projeto não encontrado</div>
 
+    const orgContext = useActiveOrgOptional()
+    const isReadOnly = orgContext ? orgContext.activeOrgId !== project.organizationId : false
+
     // Calculate Phases Stats
     const totalPhases = phases.length
     // A phase is complete if it has tasks and all tasks are 'done'
@@ -90,55 +95,58 @@ export function ProjectDetails({ id }: { id: string }) {
                 </Button>
             </div>
 
-            {/* Project Header (Info & Stats) */}
-            <ProjectHeader
-                project={project}
-                organization={organization}
-                stakeholders={stakeholders}
-                totalPhases={totalPhases}
-                completedPhases={completedPhases}
-            />
+            <ProjectReadOnlyBanner projectOrgId={project.organizationId} projectOrgName={organization?.name ?? null} />
 
-            {/* Stakeholders (Manage List) */}
-            <Stakeholders projectId={id} />
+            <div className="space-y-8">
+                {/* Project Header (Info & Stats) */}
+                <ProjectHeader
+                    project={project}
+                    organization={organization}
+                    stakeholders={stakeholders}
+                    totalPhases={totalPhases}
+                    completedPhases={completedPhases}
+                />
 
-            {/* Tasks / Phases Section */}
-            <div className="space-y-6">
-                <TaskStats columns={boardData} isLoading={isBoardLoading} projectId={id} />
+                {/* Stakeholders (Manage List) */}
+                <Stakeholders projectId={id} />
 
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-foreground">
-                        {viewMode === 'phases' ? 'Painel de Tarefas' : 'Painel de Tarefas'}
-                    </h3>
-                    <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
-                        <Button
-                            variant={viewMode === 'phases' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setViewMode('phases')}
-                            className="gap-2"
-                        >
-                            <LayoutList className="h-4 w-4" />
-                            Fases
-                        </Button>
-                        <Button
-                            variant={viewMode === 'kanban' ? 'default' : 'ghost'}
-                            size="sm"
-                            onClick={() => setViewMode('kanban')}
-                            className="gap-2"
-                        >
-                            <KanbanSquare className="h-4 w-4" />
-                            Kanban
-                        </Button>
+                {/* Tasks / Phases Section */}
+                <div className="space-y-6">
+                    <TaskStats columns={boardData} isLoading={isBoardLoading} projectId={id} />
+
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold text-foreground">
+                            {viewMode === 'phases' ? 'Painel de Tarefas' : 'Painel de Tarefas'}
+                        </h3>
+                        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+                            <Button
+                                variant={viewMode === 'phases' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setViewMode('phases')}
+                                className="gap-2"
+                            >
+                                <LayoutList className="h-4 w-4" />
+                                Fases
+                            </Button>
+                            <Button
+                                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setViewMode('kanban')}
+                                className="gap-2"
+                            >
+                                <KanbanSquare className="h-4 w-4" />
+                                Kanban
+                            </Button>
+                        </div>
                     </div>
+
+                    {viewMode === 'phases' ? (
+                        <PhaseList projectId={id} />
+                    ) : (
+                        <ScrumbanBoard projectId={id} />
+                    )}
                 </div>
-
-                {viewMode === 'phases' ? (
-                    <PhaseList projectId={id} />
-                ) : (
-                    <ScrumbanBoard projectId={id} />
-                )}
             </div>
-
         </div>
     )
 }
