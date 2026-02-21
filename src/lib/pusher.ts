@@ -1,22 +1,6 @@
-import Pusher from "pusher";
+import type { Server } from "socket.io";
 
-const pusherAppId = process.env.PUSHER_APP_ID || (import.meta.env as any).PUSHER_APP_ID;
-const pusherKey = process.env.PUSHER_KEY || (import.meta.env as any).PUSHER_KEY;
-const pusherSecret = process.env.PUSHER_SECRET || (import.meta.env as any).PUSHER_SECRET;
-const pusherCluster = process.env.PUSHER_CLUSTER || (import.meta.env as any).PUSHER_CLUSTER || "us2";
-
-// Dev mode fallback - log instead of pushing
-const isDev = !pusherAppId || !pusherKey || !pusherSecret;
-
-const pusher = isDev ? null : new Pusher({
-    appId: pusherAppId!,
-    key: pusherKey!,
-    secret: pusherSecret!,
-    cluster: pusherCluster,
-    useTLS: true,
-});
-
-export type PusherNotificationPayload = {
+export type NotificationPayload = {
     id: string;
     type: "activity" | "system";
     title: string;
@@ -25,47 +9,33 @@ export type PusherNotificationPayload = {
     createdAt: string;
 };
 
-/**
- * Push a notification to a specific user's channel
- * Channel name format: private-notifications-{userId}
- */
-export async function pushNotification(userId: string, payload: PusherNotificationPayload) {
-    const channelName = `private-notifications-${userId}`;
+// Alias for backward compatibility with existing imports
+export type PusherNotificationPayload = NotificationPayload;
 
-    if (isDev || !pusher) {
-        console.log('--- MOCK PUSHER NOTIFICATION ---');
-        console.log(`Channel: ${channelName}`);
+function getIO(): Server | null {
+    return (globalThis as any).__socketIO || null;
+}
+
+/**
+ * Push a notification to a specific user via Socket.IO.
+ * Same signature as the old Pusher version — drop-in replacement.
+ */
+export async function pushNotification(userId: string, payload: NotificationPayload) {
+    const io = getIO();
+
+    if (!io) {
+        console.log("--- MOCK SOCKET NOTIFICATION ---");
+        console.log(`User: ${userId}`);
         console.log(`Payload:`, JSON.stringify(payload, null, 2));
-        console.log('--------------------------------');
+        console.log("--------------------------------");
         return { success: true };
     }
 
     try {
-        await pusher.trigger(channelName, "new-notification", payload);
+        io.to(`user:${userId}`).emit("notification", payload);
         return { success: true };
     } catch (error) {
-        console.error("Failed to push notification via Pusher:", error);
+        console.error("Failed to push notification via Socket.IO:", error);
         return { success: false, error };
     }
 }
-
-/**
- * Authenticate a user for a private Pusher channel
- * Used by the /api/pusher/auth endpoint
- */
-export function authenticatePusherChannel(socketId: string, channelName: string, userId: string) {
-    // Verify user is allowed to subscribe to this channel
-    const expectedChannel = `private-notifications-${userId}`;
-
-    if (channelName !== expectedChannel) {
-        throw new Error("Unauthorized channel access");
-    }
-
-    if (isDev || !pusher) {
-        return { auth: "mock-auth-token" };
-    }
-
-    return pusher.authorizeChannel(socketId, channelName);
-}
-
-export { pusher };
