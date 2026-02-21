@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Neon)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (Hetzner Object Storage).
+This is a **project management system** (Gerenciador de Projetos) for municipal government departments (Secretarias) in Brazil. It's built with **Astro + React** on the frontend, **Hono** as the API framework, **Drizzle ORM** with **PostgreSQL (Railway)**, and uses **better-auth** for authentication. File uploads are handled via **S3-compatible storage** (Hetzner Object Storage).
 
 The application manages projects across multiple organizations (secretarias), with role-based access control, knowledge area tracking based on project management methodologies (PMBoK-inspired), task management, stakeholders, calendaring, procurement, communication plans, quality metrics, comprehensive audit logging, and a real-time notification system.
 
@@ -390,7 +390,7 @@ The DB is the source of truth. Socket.IO and Inngest are best-effort — failure
 
 See `.env.example` for required variables:
 
-- `DATABASE_URL`: Neon PostgreSQL connection string
+- `DATABASE_URL`: Railway PostgreSQL connection string
 - `BETTER_AUTH_SECRET`: Auth secret key
 - `BETTER_AUTH_URL`: Base URL for auth callbacks
 - `S3_ENDPOINT` / `S3_REGION` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET_NAME`: Hetzner Object Storage
@@ -472,7 +472,7 @@ Every significant action (create project, update task, delete stakeholder, etc.)
 
 **Build:** `npm run build` produces output in `dist/`. Production runs via `node server.mjs`.
 
-**Database:** PostgreSQL (Neon)
+**Database:** PostgreSQL (Railway)
 
 ## Testing Strategy
 
