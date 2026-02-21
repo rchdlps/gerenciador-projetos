@@ -7,6 +7,7 @@ import tailwindcss from '@tailwindcss/vite';
 import node from '@astrojs/node';
 
 import sentry from "@sentry/astro";
+import { socketIODevPlugin } from './src/server/vite-socket-plugin';
 
 // https://astro.build/config
 export default defineConfig({
@@ -21,9 +22,9 @@ export default defineConfig({
   output: 'server',
 
   vite: {
-    plugins: [/** @type {any} */ (tailwindcss())],
+    plugins: [/** @type {any} */ (tailwindcss()), socketIODevPlugin()],
     ssr: {
-      external: ['sharp'],
+      external: ['sharp', 'socket.io'],
     },
   },
 

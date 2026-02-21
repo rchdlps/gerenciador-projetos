@@ -9,7 +9,7 @@ import type {
     CreateNotificationInput,
     NotificationFilter
 } from "./notification-types";
-import { pushNotification } from "./pusher";
+import { pushNotification } from "./realtime";
 
 export type { NotificationType, NotificationData, CreateNotificationInput, NotificationFilter };
 
@@ -21,7 +21,7 @@ export async function emitNotification(input: CreateNotificationInput) {
     // Store in DB immediately for reliability
     const notificationId = await storeNotification(input);
 
-    // Send to Pusher immediately for real-time feedback (catch errors to not block)
+    // Send to Socket.IO immediately for real-time feedback (catch errors to not block)
     pushNotification(input.userId, {
         id: notificationId,
         type: input.type,

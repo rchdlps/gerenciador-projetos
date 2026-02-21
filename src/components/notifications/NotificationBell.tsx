@@ -11,7 +11,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { usePusher, type PusherNotification } from "@/hooks/usePusher";
+import { useSocket, type SocketNotification } from "@/hooks/useSocket";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Notification = {
@@ -85,19 +85,19 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
         },
     });
 
-    // Handle real-time Pusher notifications
-    const handleNewNotification = useCallback((notification: PusherNotification) => {
+    // Handle real-time Socket.IO notifications
+    const handleNewNotification = useCallback((notification: SocketNotification) => {
         queryClient.setQueryData<number>(['notifications', 'unread-count'], (old) => (old ?? 0) + 1);
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
     }, [queryClient]);
 
-    // Re-fetch unread count when Pusher reconnects after a disconnect
+    // Re-fetch unread count when Socket.IO reconnects after a disconnect
     const handleReconnect = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
     }, [queryClient]);
 
-    usePusher({ userId, onNotification: handleNewNotification, onReconnect: handleReconnect });
+    useSocket({ userId, onNotification: handleNewNotification, onReconnect: handleReconnect });
 
     // Re-fetch unread count when tab becomes visible after being hidden >60s
     useEffect(() => {
