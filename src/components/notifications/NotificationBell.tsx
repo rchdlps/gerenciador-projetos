@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Providers } from "@/components/providers";
 import { Bell, Check, CheckCheck, Eye } from "lucide-react";
@@ -98,6 +98,24 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
     }, [queryClient]);
 
     usePusher({ userId, onNotification: handleNewNotification, onReconnect: handleReconnect });
+
+    // Re-fetch unread count when tab becomes visible after being hidden >60s
+    useEffect(() => {
+        let hiddenAt: number | null = null;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                hiddenAt = Date.now();
+            } else if (hiddenAt && Date.now() - hiddenAt > 60_000) {
+                queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+                queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
+                hiddenAt = null;
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [queryClient]);
 
     // Wrapper functions to match existing JSX onClick handlers
     const markAsRead = (id: string) => markReadMutation.mutate(id);
