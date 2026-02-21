@@ -90,10 +90,10 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-stretch" aria-label="Cabeçalho do Projeto">
             <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden relative group/card flex flex-col h-full">
                 {!isViewer && (
-                    <div className="absolute top-4 right-4 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 ease-in-out z-10">
+                    <div className="absolute top-4 right-4 z-10 transition-opacity duration-300">
                         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors cursor-pointer">
                                     <Pencil className="h-4 w-4" />
                                 </Button>
                             </DialogTrigger>

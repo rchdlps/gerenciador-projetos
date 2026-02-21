@@ -24,7 +24,8 @@ if (project) {
         allowed = true;
     } else if (project.organizationId) {
         // orgIds already contains the user's accessible org IDs
-        allowed = ctx.orgIds === null || ctx.orgIds.includes(project.organizationId);
+        allowed =
+            ctx.orgIds === null || ctx.orgIds.includes(project.organizationId);
     }
 }
 
@@ -38,5 +39,5 @@ if (!allowed || !project) {
     session={ctx.session}
     orgSessionData={ctx.orgSessionData}
 >
-    <ProjectPage client:load id={id} />
+    <ProjectPage client:load id={id} initialData={ctx.orgSessionData} />
 </DashboardLayout>

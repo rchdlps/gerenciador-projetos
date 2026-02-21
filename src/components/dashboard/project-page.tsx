@@ -1,10 +1,18 @@
 import { Providers } from "@/components/providers"
+import { OrgProvider } from "@/contexts/org-context"
 import { ProjectDetails } from "./project-details"
 
-export function ProjectPage({ id }: { id: string }) {
+interface ProjectPageProps {
+    id: string
+    initialData?: any
+}
+
+export function ProjectPage({ id, initialData }: ProjectPageProps) {
     return (
         <Providers>
-            <ProjectDetails id={id} />
+            <OrgProvider initialData={initialData}>
+                <ProjectDetails id={id} />
+            </OrgProvider>
         </Providers>
     )
 }

@@ -1,10 +1,13 @@
 import { Providers } from "@/components/providers"
 import { KnowledgeAreas } from "./knowledge-areas"
+import { OrgProvider } from "@/contexts/org-context"
 
-export function KnowledgeAreasPage({ projectId, initialData }: { projectId: string; initialData?: any[] }) {
+export function KnowledgeAreasPage({ projectId, initialData, orgSessionData }: { projectId: string; initialData?: any[]; orgSessionData?: any }) {
     return (
         <Providers>
-            <KnowledgeAreas projectId={projectId} initialData={initialData} />
+            <OrgProvider initialData={orgSessionData}>
+                <KnowledgeAreas projectId={projectId} initialData={initialData} />
+            </OrgProvider>
         </Providers>
     )
 }

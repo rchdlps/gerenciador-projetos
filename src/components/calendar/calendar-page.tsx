@@ -4,12 +4,16 @@ import { api } from "@/lib/api-client"
 import { CalendarView } from "@/components/calendar/calendar-view"
 import { CalendarRightPanel } from "@/components/calendar/calendar-right-panel"
 import { Providers } from "@/components/providers"
+import { OrgProvider } from "@/contexts/org-context"
+import { ProjectReadOnlyBanner } from "@/components/dashboard/project-read-only-banner"
 
 
-export function CalendarPage({ projectId, initialData }: { projectId?: string; initialData?: any }) {
+export function CalendarPage({ projectId, initialData, orgSessionData }: { projectId?: string; initialData?: any; orgSessionData?: any }) {
     return (
         <Providers>
-            <CalendarPageContent projectId={projectId} initialData={initialData} />
+            <OrgProvider initialData={orgSessionData}>
+                <CalendarPageContent projectId={projectId} initialData={initialData} />
+            </OrgProvider>
         </Providers>
     )
 }
@@ -60,33 +64,36 @@ function CalendarPageContent({ projectId, initialData }: { projectId?: string; i
     })
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-            {/* Left Panel: Calendar */}
-            <div className="md:col-span-2 bg-white dark:bg-card rounded-2xl shadow-sm border p-8 flex flex-col">
-                <CalendarView
-                    date={date}
-                    setDate={setDate}
-                    currentMonth={currentMonth}
-                    setCurrentMonth={handleSetCurrentMonth}
-                    tasks={tasks}
-                    appointments={appointments}
-                    showProjectNames={!projectId}
-                />
-            </div>
-
-            {/* Right Panel: Day Details & Appointments */}
-            {/* Wrapper to ensure height matches Left Panel in grid */}
-            <div className="md:col-span-1 relative md:h-full min-h-[500px]">
-                <div className="md:absolute md:inset-0">
-                    <CalendarRightPanel
+        <div className="space-y-4">
+            {projectId && <ProjectReadOnlyBanner projectId={projectId} />}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                {/* Left Panel: Calendar */}
+                <div className="md:col-span-2 bg-white dark:bg-card rounded-2xl shadow-sm border p-8 flex flex-col">
+                    <CalendarView
                         date={date}
+                        setDate={setDate}
                         currentMonth={currentMonth}
+                        setCurrentMonth={handleSetCurrentMonth}
                         tasks={tasks}
                         appointments={appointments}
-                        projectId={projectId}
-                        onClearDate={() => setDate(undefined)}
-                        className="h-full"
+                        showProjectNames={!projectId}
                     />
+                </div>
+
+                {/* Right Panel: Day Details & Appointments */}
+                {/* Wrapper to ensure height matches Left Panel in grid */}
+                <div className="md:col-span-1 relative md:h-full min-h-[500px]">
+                    <div className="md:absolute md:inset-0">
+                        <CalendarRightPanel
+                            date={date}
+                            currentMonth={currentMonth}
+                            tasks={tasks}
+                            appointments={appointments}
+                            projectId={projectId}
+                            onClearDate={() => setDate(undefined)}
+                            className="h-full"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

@@ -24,6 +24,8 @@ const AREAS = [
     { id: "partes", icon: Users2, title: "Partes Interessadas", desc: "Engajamento e gerenciamento de stakeholders" },
 ]
 
+import { ProjectReadOnlyBanner } from "./project-read-only-banner"
+
 export function KnowledgeAreas({ projectId, initialData = [] }: { projectId: string; initialData?: any[] }) {
     const { data: areasData = [], isLoading } = useQuery({
         queryKey: ['knowledge-areas', projectId],
@@ -40,6 +42,8 @@ export function KnowledgeAreas({ projectId, initialData = [] }: { projectId: str
 
     return (
         <div className="space-y-6" aria-label="Áreas de Conhecimento">
+            <ProjectReadOnlyBanner projectId={projectId} />
+
             {/* Header Info */}
             <div className="bg-sky-50 border-l-4 border-[#1d4e46] p-4 rounded-r flex gap-3 text-sm text-[#1d4e46] items-start shadow-sm">
                 <Lightbulb className="w-5 h-5 shrink-0 text-yellow-600 mt-0.5" />
