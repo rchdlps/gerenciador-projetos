@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PusherNotification = {
     id: string;
@@ -12,14 +12,26 @@ export type PusherNotification = {
 type UsePusherOptions = {
     userId: string;
     onNotification?: (notification: PusherNotification) => void;
+    onReconnect?: () => void;
 };
 
 /**
  * React hook for subscribing to real-time Pusher notifications
  */
-export function usePusher({ userId, onNotification }: UsePusherOptions) {
+export function usePusher({ userId, onNotification, onReconnect }: UsePusherOptions) {
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<Error | null>(null);
+
+    const onNotificationRef = useRef(onNotification);
+    const onReconnectRef = useRef(onReconnect);
+
+    useEffect(() => {
+        onNotificationRef.current = onNotification;
+    }, [onNotification]);
+
+    useEffect(() => {
+        onReconnectRef.current = onReconnect;
+    }, [onReconnect]);
 
     useEffect(() => {
         // Check if Pusher is configured
@@ -44,6 +56,20 @@ export function usePusher({ userId, onNotification }: UsePusherOptions) {
                     authEndpoint: "/api/pusher/auth",
                 });
 
+                let wasDisconnected = false;
+
+                pusherInstance.connection.bind("state_change", (states: { previous: string; current: string }) => {
+                    if (states.current === "disconnected" || states.current === "unavailable") {
+                        wasDisconnected = true;
+                        setIsConnected(false);
+                    }
+                    if (states.current === "connected" && wasDisconnected) {
+                        wasDisconnected = false;
+                        setIsConnected(true);
+                        onReconnectRef.current?.();
+                    }
+                });
+
                 const channelName = `private-notifications-${userId}`;
                 channel = pusherInstance.subscribe(channelName);
 
@@ -58,7 +84,7 @@ export function usePusher({ userId, onNotification }: UsePusherOptions) {
                 });
 
                 channel.bind("new-notification", (data: PusherNotification) => {
-                    onNotification?.(data);
+                    onNotificationRef.current?.(data);
                 });
             } catch (err) {
                 setError(err instanceof Error ? err : new Error("Failed to initialize Pusher"));
@@ -68,6 +94,9 @@ export function usePusher({ userId, onNotification }: UsePusherOptions) {
         initPusher();
 
         return () => {
+            if (pusherInstance) {
+                pusherInstance.connection.unbind("state_change");
+            }
             if (channel) {
                 channel.unsubscribe();
             }
@@ -75,7 +104,7 @@ export function usePusher({ userId, onNotification }: UsePusherOptions) {
                 pusherInstance.disconnect();
             }
         };
-    }, [userId, onNotification]);
+    }, [userId]);
 
     return { isConnected, error };
 }
