@@ -15,23 +15,7 @@ export function useUserRole() {
 
     const activeOrg = session?.activeOrganization
 
-    // Enforce read-only when in Visão Global (no active organization)
-    if (session && !activeOrg) {
-        return {
-            role: 'viewer' as const,
-            isViewer: true,
-            isGestor: false,
-            isSecretario: false,
-            isAdmin: false,
-            // We preserve the super admin identity, but restrict project editing actions
-            isSuperAdmin: session.isSuperAdmin || false,
-            canSendNotifications: false,
-            isLoading,
-            activeOrg: null
-        }
-    }
-
-    // If super admin and NOT in Visão Global, they have all permissions
+    // Super admins always have full permissions regardless of active org
     if (session?.isSuperAdmin) {
         return {
             role: 'secretario' as const,
@@ -43,6 +27,22 @@ export function useUserRole() {
             canSendNotifications: true,
             isLoading,
             activeOrg
+        }
+    }
+
+    // Enforce read-only when in Visão Global (no active organization)
+    // Only applies to regular users — super admins are handled above
+    if (session && !activeOrg) {
+        return {
+            role: 'viewer' as const,
+            isViewer: true,
+            isGestor: false,
+            isSecretario: false,
+            isAdmin: false,
+            isSuperAdmin: false,
+            canSendNotifications: false,
+            isLoading,
+            activeOrg: null
         }
     }
 
