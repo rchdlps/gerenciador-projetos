@@ -11,6 +11,7 @@ export interface Organization {
 
 interface OrgSessionData {
     activeOrganizationId: string | null
+    activeOrganization: Organization | null
     organizations: Organization[]
     isSuperAdmin: boolean
 }
@@ -31,6 +32,7 @@ interface OrgProviderProps {
     children: ReactNode
     initialData?: {
         activeOrganizationId: string | null
+        activeOrganization?: Organization | null
         organizations: Organization[]
         isSuperAdmin?: boolean
     }
@@ -49,6 +51,7 @@ export function OrgProvider({ children, initialData }: OrgProviderProps) {
         staleTime: 60_000,
         initialData: initialData ? {
             activeOrganizationId: initialData.activeOrganizationId,
+            activeOrganization: initialData.activeOrganization ?? null,
             organizations: initialData.organizations,
             isSuperAdmin: initialData.isSuperAdmin ?? false,
         } : undefined,
