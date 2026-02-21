@@ -34,6 +34,12 @@ export function useSocket({ userId, onNotification, onReconnect }: UseSocketOpti
     }, [onReconnect]);
 
     useEffect(() => {
+        // In dev mode, Astro's Vite server doesn't have Socket.IO attached.
+        // Only connect in production where server.mjs runs.
+        if (import.meta.env.DEV) {
+            return;
+        }
+
         let socket: any = null;
 
         const initSocket = async () => {
