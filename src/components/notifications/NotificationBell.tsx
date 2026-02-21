@@ -40,7 +40,7 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
     const [isOpen, setIsOpen] = useState(false);
     const queryClient = useQueryClient();
 
-    // Fetch unread count (always active, polls every 30s as fallback)
+    // Fetch unread count (once on mount, then event-driven)
     const { data: unreadCount = 0 } = useQuery({
         queryKey: ['notifications', 'unread-count'],
         queryFn: async () => {
@@ -49,7 +49,6 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
             const data = await res.json();
             return data.count || 0;
         },
-        refetchInterval: 30_000,
     });
 
     // Fetch notification list (only when dropdown is open)
@@ -92,7 +91,13 @@ function NotificationBellInner({ userId }: NotificationBellProps) {
         queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
     }, [queryClient]);
 
-    usePusher({ userId, onNotification: handleNewNotification });
+    // Re-fetch unread count when Pusher reconnects after a disconnect
+    const handleReconnect = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'recent'] });
+    }, [queryClient]);
+
+    usePusher({ userId, onNotification: handleNewNotification, onReconnect: handleReconnect });
 
     // Wrapper functions to match existing JSX onClick handlers
     const markAsRead = (id: string) => markReadMutation.mutate(id);
