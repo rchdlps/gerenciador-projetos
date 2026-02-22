@@ -9,7 +9,7 @@ import {
     organizations,
     memberships,
 } from "../../db/schema";
-import { eq, and, sql, inArray, gte, lt, desc } from "drizzle-orm";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
 import { emitNotification, storeNotification } from "./notification";
 
 export type TargetType = "user" | "organization" | "role" | "multi-org" | "all";

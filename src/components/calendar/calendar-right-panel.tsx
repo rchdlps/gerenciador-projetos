@@ -1,6 +1,6 @@
 
 import { useState } from "react"
-import { format, isSameDay, isSameMonth, parseISO } from "date-fns"
+import { format, isSameDay, isSameMonth } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ListTodo, CheckCircle2, Circle, Plus, Loader2, Trash2, Pin, Calendar as CalendarIcon, Clock } from "lucide-react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"

@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
-import { CalendarView } from "@/components/calendar/calendar-view"
-import { CalendarRightPanel } from "@/components/calendar/calendar-right-panel"
+import { lazy, Suspense } from "react"
+const CalendarView = lazy(() => import("@/components/calendar/calendar-view").then(m => ({ default: m.CalendarView })))
+const CalendarRightPanel = lazy(() => import("@/components/calendar/calendar-right-panel").then(m => ({ default: m.CalendarRightPanel })))
 import { Providers } from "@/components/providers"
 import { OrgProvider } from "@/contexts/org-context"
 import { ProjectReadOnlyBanner } from "@/components/dashboard/project-read-only-banner"
@@ -69,30 +70,34 @@ function CalendarPageContent({ projectId, initialData }: { projectId?: string; i
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                 {/* Left Panel: Calendar */}
                 <div className="md:col-span-2 bg-white dark:bg-card rounded-2xl shadow-sm border p-8 flex flex-col">
-                    <CalendarView
-                        date={date}
-                        setDate={setDate}
-                        currentMonth={currentMonth}
-                        setCurrentMonth={handleSetCurrentMonth}
-                        tasks={tasks}
-                        appointments={appointments}
-                        showProjectNames={!projectId}
-                    />
+                    <Suspense fallback={<div className="h-96 flex items-center justify-center animate-pulse text-muted-foreground">Carregando calendário...</div>}>
+                        <CalendarView
+                            date={date}
+                            setDate={setDate}
+                            currentMonth={currentMonth}
+                            setCurrentMonth={handleSetCurrentMonth}
+                            tasks={tasks}
+                            appointments={appointments}
+                            showProjectNames={!projectId}
+                        />
+                    </Suspense>
                 </div>
 
                 {/* Right Panel: Day Details & Appointments */}
                 {/* Wrapper to ensure height matches Left Panel in grid */}
                 <div className="md:col-span-1 relative md:h-full min-h-[500px]">
                     <div className="md:absolute md:inset-0">
-                        <CalendarRightPanel
-                            date={date}
-                            currentMonth={currentMonth}
-                            tasks={tasks}
-                            appointments={appointments}
-                            projectId={projectId}
-                            onClearDate={() => setDate(undefined)}
-                            className="h-full"
-                        />
+                        <Suspense fallback={<div className="h-96 flex items-center justify-center animate-pulse text-muted-foreground">Carregando painel...</div>}>
+                            <CalendarRightPanel
+                                date={date}
+                                currentMonth={currentMonth}
+                                tasks={tasks}
+                                appointments={appointments}
+                                projectId={projectId}
+                                onClearDate={() => setDate(undefined)}
+                                className="h-full"
+                            />
+                        </Suspense>
                     </div>
                 </div>
             </div>

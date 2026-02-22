@@ -20,7 +20,6 @@ import {
     useSensor,
     useSensors,
     DragOverlay,
-    defaultDropAnimationSideEffects,
     type DragStartEvent,
     type DragOverEvent,
     type DragEndEvent

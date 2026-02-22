@@ -1,4 +1,4 @@
-import { Home, Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug, Users, Bell, Megaphone } from "lucide-react"
+import { Briefcase, LayoutDashboard, Settings, FolderDot, Building2, BookOpen, Calendar, ArrowLeft, Bug, Users, Bell, Megaphone } from "lucide-react"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { authClient } from "@/lib/auth-client"

@@ -17,12 +17,19 @@ interface Props {
 	orgSessionData?: any;
 }
 
-const { title, session: propSession, orgSessionData: propOrgSession } = Astro.props;
+const {
+	title,
+	session: propSession,
+	orgSessionData: propOrgSession,
+} = Astro.props;
 
 // Use pre-fetched session if available, otherwise fetch (fallback for simple pages)
-const session = propSession !== undefined ? propSession : await auth.api.getSession({
-	headers: Astro.request.headers,
-});
+const session =
+	propSession !== undefined
+		? propSession
+		: await auth.api.getSession({
+				headers: Astro.request.headers,
+			});
 
 // Use pre-fetched org session data if available, otherwise fetch
 let orgSessionData = propOrgSession !== undefined ? propOrgSession : null;
@@ -69,7 +76,8 @@ if (orgSessionData === null && session?.user) {
 	</head>
 	<body class="bg-background min-h-screen font-sans antialiased">
 		<!-- Loading bar: animated during View Transitions -->
-		<div id="nav-loading-bar" class="nav-loading-bar" aria-hidden="true"></div>
+		<div id="nav-loading-bar" class="nav-loading-bar" aria-hidden="true">
+		</div>
 
 		<Header transition:persist="header" client:load user={session?.user} />
 		<div class="flex">
@@ -87,7 +95,7 @@ if (orgSessionData === null && session?.user) {
 				<slot />
 			</main>
 		</div>
-		<Toaster transition:persist="toaster" client:load />
+		<Toaster transition:persist="toaster" client:idle />
 
 		<style is:global>
 			/* ── Navigation loading bar ── */
@@ -97,7 +105,11 @@ if (orgSessionData === null && session?.user) {
 				left: 0;
 				height: 3px;
 				width: 0%;
-				background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--secondary)));
+				background: linear-gradient(
+					90deg,
+					hsl(var(--primary)),
+					hsl(var(--secondary))
+				);
 				z-index: 9999;
 				opacity: 0;
 				transition: none;
@@ -105,7 +117,8 @@ if (orgSessionData === null && session?.user) {
 			}
 			.nav-loading-bar.loading {
 				opacity: 1;
-				animation: nav-bar-grow 8s cubic-bezier(0.1, 0.5, 0.3, 1) forwards;
+				animation: nav-bar-grow 8s cubic-bezier(0.1, 0.5, 0.3, 1)
+					forwards;
 			}
 			.nav-loading-bar.done {
 				width: 100% !important;
@@ -113,22 +126,46 @@ if (orgSessionData === null && session?.user) {
 				transition: opacity 0.3s ease 0.1s;
 			}
 			@keyframes nav-bar-grow {
-				0%   { width: 0%; }
-				10%  { width: 30%; }
-				30%  { width: 55%; }
-				50%  { width: 70%; }
-				80%  { width: 85%; }
-				100% { width: 95%; }
+				0% {
+					width: 0%;
+				}
+				10% {
+					width: 30%;
+				}
+				30% {
+					width: 55%;
+				}
+				50% {
+					width: 70%;
+				}
+				80% {
+					width: 85%;
+				}
+				100% {
+					width: 95%;
+				}
 			}
 
 			/* ── Smooth fade for main content ── */
 			@keyframes fade-in {
-				from { opacity: 0; transform: translateY(4px); }
-				to   { opacity: 1; transform: translateY(0); }
+				from {
+					opacity: 0;
+					transform: translateY(4px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
 			}
 			@keyframes fade-out {
-				from { opacity: 1; transform: translateY(0); }
-				to   { opacity: 0; transform: translateY(-4px); }
+				from {
+					opacity: 1;
+					transform: translateY(0);
+				}
+				to {
+					opacity: 0;
+					transform: translateY(-4px);
+				}
 			}
 			::view-transition-old(main-content) {
 				animation: fade-out 0.15s ease-out both;
@@ -149,25 +186,25 @@ if (orgSessionData === null && session?.user) {
 		<script>
 			// Loading bar logic — event listeners are added once and persist across
 			// View Transition navigations (Astro doesn't re-run <script> tags by default).
-			const bar = document.getElementById('nav-loading-bar');
+			const bar = document.getElementById("nav-loading-bar");
 
 			if (bar) {
-				document.addEventListener('astro:before-preparation', () => {
-					bar.style.width = '0%';
-					bar.classList.remove('done');
-					bar.classList.add('loading');
+				document.addEventListener("astro:before-preparation", () => {
+					bar.style.width = "0%";
+					bar.classList.remove("done");
+					bar.classList.add("loading");
 				});
 
-				document.addEventListener('astro:after-swap', () => {
-					bar.classList.remove('loading');
-					bar.classList.add('done');
+				document.addEventListener("astro:after-swap", () => {
+					bar.classList.remove("loading");
+					bar.classList.add("done");
 				});
 
-				document.addEventListener('astro:page-load', () => {
+				document.addEventListener("astro:page-load", () => {
 					// Clean up after transition completes
 					setTimeout(() => {
-						bar.classList.remove('loading', 'done');
-						bar.style.width = '0%';
+						bar.classList.remove("loading", "done");
+						bar.style.width = "0%";
 					}, 400);
 				});
 			}

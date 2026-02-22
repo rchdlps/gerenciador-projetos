@@ -4,9 +4,10 @@ import { api } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, BookOpen, LayoutList, KanbanSquare } from "lucide-react"
 import { Stakeholders } from "./stakeholders"
-import { ScrumbanBoard } from "./board"
-import { useState } from "react"
-import { PhaseList } from "@/components/phases/phase-list"
+import { useState, lazy, Suspense } from "react"
+
+const PhaseList = lazy(() => import("@/components/phases/phase-list").then(m => ({ default: m.PhaseList })))
+const ScrumbanBoard = lazy(() => import("./board").then(m => ({ default: m.ScrumbanBoard })))
 import { TaskStats } from "./task-stats"
 import { ProjectHeader } from "./project-header"
 import { ProjectReadOnlyBanner } from "./project-read-only-banner"
@@ -140,11 +141,13 @@ export function ProjectDetails({ id }: { id: string }) {
                         </div>
                     </div>
 
-                    {viewMode === 'phases' ? (
-                        <PhaseList projectId={id} />
-                    ) : (
-                        <ScrumbanBoard projectId={id} />
-                    )}
+                    <Suspense fallback={<div className="h-64 flex items-center justify-center text-muted-foreground animate-pulse bg-muted/20 rounded-lg">Carregando painel...</div>}>
+                        {viewMode === 'phases' ? (
+                            <PhaseList projectId={id} />
+                        ) : (
+                            <ScrumbanBoard projectId={id} />
+                        )}
+                    </Suspense>
                 </div>
             </div>
         </div>
