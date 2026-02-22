@@ -7,6 +7,9 @@ import { createAuditLog } from '@/lib/audit-logger'
 
 export type RawRow = Record<string, string | undefined>
 
+const MAX_IMPORT_ROWS = 5000
+const BATCH_SIZE = 500
+
 export interface ImportResult {
     total: number
     imported: number
@@ -273,6 +276,11 @@ export async function parseAndImportTasks(
 ): Promise<ImportResult> {
     const result: ImportResult = { total: rows.length, imported: 0, errors: [] }
 
+    if (rows.length > MAX_IMPORT_ROWS) {
+        result.errors.push({ row: 0, reason: `Máximo de ${MAX_IMPORT_ROWS} linhas permitido (recebido: ${rows.length})` })
+        return result
+    }
+
     // Fetch existing phases for this project
     const phases = await db.select().from(projectPhases).where(eq(projectPhases.projectId, projectId))
 
@@ -337,7 +345,9 @@ export async function parseAndImportTasks(
     }
 
     if (validTasks.length > 0) {
-        await db.insert(tasks).values(validTasks)
+        for (let i = 0; i < validTasks.length; i += BATCH_SIZE) {
+            await db.insert(tasks).values(validTasks.slice(i, i + BATCH_SIZE))
+        }
         result.imported = validTasks.length
 
         // Fire-and-forget audit log
@@ -365,6 +375,11 @@ export async function parseAndImportStakeholders(
     userId: string,
 ): Promise<ImportResult> {
     const result: ImportResult = { total: rows.length, imported: 0, errors: [] }
+
+    if (rows.length > MAX_IMPORT_ROWS) {
+        result.errors.push({ row: 0, reason: `Máximo de ${MAX_IMPORT_ROWS} linhas permitido (recebido: ${rows.length})` })
+        return result
+    }
 
     const validStakeholders: {
         id: string
@@ -409,7 +424,9 @@ export async function parseAndImportStakeholders(
     }
 
     if (validStakeholders.length > 0) {
-        await db.insert(stakeholders).values(validStakeholders)
+        for (let i = 0; i < validStakeholders.length; i += BATCH_SIZE) {
+            await db.insert(stakeholders).values(validStakeholders.slice(i, i + BATCH_SIZE))
+        }
         result.imported = validStakeholders.length
 
         // Fire-and-forget audit log

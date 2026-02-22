@@ -166,6 +166,12 @@ app.post('/import', async (c) => {
         return c.json({ error: `Arquivo muito grande. Tamanho máximo: ${MAX_IMPORT_SIZE / 1024 / 1024} MB` }, 400)
     }
 
+    // Validate file extension
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (!ext || !['xlsx', 'csv'].includes(ext)) {
+        return c.json({ error: 'Formato de arquivo inválido. Use .xlsx ou .csv' }, 400)
+    }
+
     const isSuperAdmin = user.globalRole === 'super_admin'
 
     // Check project access
@@ -179,7 +185,8 @@ app.post('/import', async (c) => {
 
     // Upload raw file to S3
     const jobId = nanoid()
-    const fileKey = `imports/${projectId}/${jobId}-${file.name}`
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const fileKey = `imports/${projectId}/${jobId}-${safeName}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
     await storage.uploadFile(fileKey, buffer, file.type)
