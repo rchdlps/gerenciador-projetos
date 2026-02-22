@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Hono } from 'hono'
-import { createAuthHeaders, createMockRequest } from '../../../test/helpers'
+import { testRoute, createAuthHeaders, createMockRequest } from '../../../test/helpers'
 import {
   mockUser,
   mockSuperAdmin,
@@ -93,34 +93,22 @@ vi.mock('@/lib/file-processor/pdf/summary', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setupAuth(user: typeof mockUser | typeof mockSuperAdmin) {
-  return import('@/lib/auth').then(({ auth }) => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({
-      user,
-      session: { id: 'session-1' } as any,
-    })
+async function setupAuth(user: typeof mockUser | typeof mockSuperAdmin) {
+  const { auth } = await import('@/lib/auth')
+  vi.mocked(auth.api.getSession).mockResolvedValue({
+    user,
+    session: { id: 'session-1' } as any,
   })
 }
 
-function setupProjectAccess(overrides?: Record<string, any>) {
-  return import('@/lib/queries/scoped').then(({ canAccessProject }) => {
-    vi.mocked(canAccessProject).mockResolvedValue({
-      allowed: true,
-      project: { ...mockProject, type: 'infraestrutura', status: 'em_andamento' },
-      membership: mockMembership,
-      ...overrides,
-    } as any)
-  })
-}
-
-function setupProjectAccessDenied() {
-  return import('@/lib/queries/scoped').then(({ canAccessProject }) => {
-    vi.mocked(canAccessProject).mockResolvedValue({
-      allowed: false,
-      project: null,
-      membership: null,
-    } as any)
-  })
+async function setupProjectAccess(overrides?: Record<string, any>) {
+  const { canAccessProject } = await import('@/lib/queries/scoped')
+  vi.mocked(canAccessProject).mockResolvedValue({
+    allowed: true,
+    project: { ...mockProject, type: 'infraestrutura', status: 'em_andamento' },
+    membership: mockMembership,
+    ...overrides,
+  } as any)
 }
 
 // ---------------------------------------------------------------------------
@@ -132,12 +120,6 @@ describe('File Processor API Routes', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    // Reset module cache so mocks take effect cleanly
-    vi.resetModules()
-
-    // Re-setup mocks after resetModules
-    const { auth } = await import('@/lib/auth')
-    vi.mocked(auth.api.getSession).mockResolvedValue(null)
 
     const router = await import('../file-processor')
     app = new Hono<{ Variables: { user: any; session: any } }>().route(
@@ -154,15 +136,13 @@ describe('File Processor API Routes', () => {
       await setupAuth(mockUser)
       await setupProjectAccess()
 
-      const request = createMockRequest('POST', '/file-processor/export', {
+      const result = await testRoute(app, 'POST', '/file-processor/export', {
         headers: createAuthHeaders(),
         body: { entity: 'nonexistent', projectId: 'p1', format: 'xlsx', sync: true },
       })
-      const response = await app.fetch(request)
-      expect(response.status).toBe(400)
 
-      const data = await response.json()
-      expect(data.error).toContain('Entidade inválida')
+      expect(result.status).toBe(400)
+      expect(result.data.error).toContain('Entidade inválida')
     })
 
     it('should return spreadsheet content type for sync xlsx export', async () => {
@@ -213,16 +193,14 @@ describe('File Processor API Routes', () => {
       await setupAuth(mockUser)
       await setupProjectAccess()
 
-      const request = createMockRequest('POST', '/file-processor/export', {
+      const result = await testRoute(app, 'POST', '/file-processor/export', {
         headers: createAuthHeaders(),
         body: { entity: 'tasks', projectId: 'test-project-id', format: 'xlsx' },
       })
-      const response = await app.fetch(request)
 
-      expect(response.status).toBe(200)
-      const data = await response.json()
-      expect(data).toHaveProperty('jobId')
-      expect(typeof data.jobId).toBe('string')
+      expect(result.status).toBe(200)
+      expect(result.data).toHaveProperty('jobId')
+      expect(typeof result.data.jobId).toBe('string')
 
       // Verify inngest.send was called
       const { inngest } = await import('@/lib/inngest/client')
@@ -242,15 +220,13 @@ describe('File Processor API Routes', () => {
       await setupAuth(mockUser)
       await setupProjectAccess()
 
-      const request = createMockRequest('POST', '/file-processor/export', {
+      const result = await testRoute(app, 'POST', '/file-processor/export', {
         headers: createAuthHeaders(),
         body: { entity: 'tasks', projectId: 'test-project-id', format: 'pdf', sync: true },
       })
-      const response = await app.fetch(request)
 
-      expect(response.status).toBe(400)
-      const data = await response.json()
-      expect(data.error).toContain('PDF')
+      expect(result.status).toBe(400)
+      expect(result.data.error).toContain('PDF')
     })
   })
 
@@ -269,9 +245,7 @@ describe('File Processor API Routes', () => {
 
       const request = new Request('http://localhost:4321/file-processor/import', {
         method: 'POST',
-        headers: {
-          ...createAuthHeaders(),
-        },
+        headers: createAuthHeaders(),
         body: formData,
       })
       const response = await app.fetch(request)
@@ -284,14 +258,12 @@ describe('File Processor API Routes', () => {
     it('should return 403 for viewer role trying to import', async () => {
       await setupAuth(mockUser)
 
-      const viewerMembership = { ...mockMembership, role: 'viewer' as const }
-      await import('@/lib/queries/scoped').then(({ canAccessProject }) => {
-        vi.mocked(canAccessProject).mockResolvedValue({
-          allowed: true,
-          project: { ...mockProject, type: 'infraestrutura', status: 'em_andamento' },
-          membership: viewerMembership,
-        } as any)
-      })
+      const { canAccessProject } = await import('@/lib/queries/scoped')
+      vi.mocked(canAccessProject).mockResolvedValue({
+        allowed: true,
+        project: { ...mockProject, type: 'infraestrutura', status: 'em_andamento' },
+        membership: { ...mockMembership, role: 'viewer' as const },
+      } as any)
 
       const formData = new FormData()
       formData.append('file', new File(['data'], 'test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
@@ -300,9 +272,7 @@ describe('File Processor API Routes', () => {
 
       const request = new Request('http://localhost:4321/file-processor/import', {
         method: 'POST',
-        headers: {
-          ...createAuthHeaders(),
-        },
+        headers: createAuthHeaders(),
         body: formData,
       })
       const response = await app.fetch(request)
@@ -323,9 +293,7 @@ describe('File Processor API Routes', () => {
 
       const request = new Request('http://localhost:4321/file-processor/import', {
         method: 'POST',
-        headers: {
-          ...createAuthHeaders(),
-        },
+        headers: createAuthHeaders(),
         body: formData,
       })
       const response = await app.fetch(request)
