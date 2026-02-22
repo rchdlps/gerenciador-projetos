@@ -4,13 +4,14 @@ import { inngest } from "@/lib/inngest/client";
 import { notificationFunctions } from "@/lib/inngest/functions/notify";
 import { adminNotificationFunctions } from "@/lib/inngest/functions/admin-notify";
 import { imageFunctions } from "@/lib/inngest/functions/process-image";
+import { fileProcessorFunctions } from "@/lib/inngest/functions/file-processor";
 
 // Serve the Inngest API endpoint.
 // INNGEST_SERVE_HOST must be set to the public app URL in production (e.g. https://your-app.vercel.app)
 // so Inngest cloud can call back into this endpoint to execute cron functions.
 const handler = serve({
     client: inngest,
-    functions: [...notificationFunctions, ...adminNotificationFunctions, ...imageFunctions],
+    functions: [...notificationFunctions, ...adminNotificationFunctions, ...imageFunctions, ...fileProcessorFunctions],
     serveHost: process.env.INNGEST_SERVE_HOST || process.env.PUBLIC_URL,
 });
 
