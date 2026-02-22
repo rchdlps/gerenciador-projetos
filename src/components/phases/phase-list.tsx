@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
+import { ExportDropdown } from "@/components/file-processor/export-dropdown"
+import { ImportDialog } from "@/components/file-processor/import-dialog"
 import { PhaseAccordion } from "./phase-accordion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -272,6 +274,10 @@ export function PhaseList({ projectId }: PhaseListProps) {
                     </h2>
 
                     <div className="flex items-center gap-2">
+                        <ExportDropdown projectId={projectId} entity="tasks" />
+                        {!isViewer && (
+                            <ImportDialog projectId={projectId} entity="tasks" invalidateKeys={[["phases", projectId]]} />
+                        )}
                         {phases && phases.length > 0 && (
                             <Button
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white"

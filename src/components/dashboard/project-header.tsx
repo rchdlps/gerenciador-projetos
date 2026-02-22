@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUserRole } from "@/hooks/use-user-role"
+import { ExportDropdown } from "@/components/file-processor/export-dropdown"
 
 interface ProjectHeaderProps {
     project: any
@@ -89,8 +90,10 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 items-stretch" aria-label="Cabeçalho do Projeto">
             <Card className="lg:col-span-2 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden relative group/card flex flex-col h-full">
-                {!isViewer && (
-                    <div className="absolute top-4 right-4 z-10 transition-opacity duration-300">
+                <div className="absolute top-4 right-4 z-10 transition-opacity duration-300 flex items-center gap-1">
+                    <ExportDropdown projectId={project.id} entity="tap" formats={['pdf']} label="TAP" />
+                    <ExportDropdown projectId={project.id} entity="summary" formats={['pdf']} label="Relatório" />
+                    {!isViewer && (
                         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-sky-700 hover:bg-sky-50 transition-colors cursor-pointer">
@@ -156,8 +159,8 @@ export function ProjectHeader({ project, organization, stakeholders, totalPhases
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 <CardContent className="p-8 flex flex-col h-full justify-between gap-8">
                     <div className="space-y-6">

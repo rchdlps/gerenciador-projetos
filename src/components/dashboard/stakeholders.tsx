@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api-client"
+import { ExportDropdown } from "@/components/file-processor/export-dropdown"
+import { ImportDialog } from "@/components/file-processor/import-dialog"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -135,51 +137,57 @@ export function Stakeholders({ projectId }: { projectId: string }) {
                         <CardTitle className="text-lg">Partes Interessadas</CardTitle>
                     </div>
                 </div>
-                {!isViewer && (
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="secondary" size="sm" className="font-semibold shadow-none" onClick={openCreateDialog}>
-                                <Plus className="h-4 w-4 mr-1" /> Adicionar
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>{activeId ? "Editar Parte Interessada" : "Nova Parte Interessada"}</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name">Nome</Label>
-                                    <Input id="name" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                <div className="flex items-center gap-2">
+                    <ExportDropdown projectId={projectId} entity="stakeholders" />
+                    {!isViewer && (
+                        <ImportDialog projectId={projectId} entity="stakeholders" invalidateKeys={[['stakeholders', projectId]]} />
+                    )}
+                    {!isViewer && (
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="secondary" size="sm" className="font-semibold shadow-none text-secondary-foreground cursor-pointer" onClick={openCreateDialog}>
+                                    <Plus className="h-4 w-4 mr-1" /> Adicionar
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>{activeId ? "Editar Parte Interessada" : "Nova Parte Interessada"}</DialogTitle>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="name">Nome</Label>
+                                        <Input id="name" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="role">Papel / Cargo</Label>
+                                        <Input id="role" value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="level">Nível de Envolvimento</Label>
+                                        <Select value={newItem.level} onValueChange={val => setNewItem({ ...newItem, level: val })}>
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="patrocinador">Patrocinador</SelectItem>
+                                                <SelectItem value="gerente">Gerente</SelectItem>
+                                                <SelectItem value="equipe">Equipe</SelectItem>
+                                                <SelectItem value="interessado">Interessado</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input id="email" value={newItem.email} onChange={e => setNewItem({ ...newItem, email: e.target.value })} />
+                                    </div>
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="role">Papel / Cargo</Label>
-                                    <Input id="role" value={newItem.role} onChange={e => setNewItem({ ...newItem, role: e.target.value })} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="level">Nível de Envolvimento</Label>
-                                    <Select value={newItem.level} onValueChange={val => setNewItem({ ...newItem, level: val })}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="patrocinador">Patrocinador</SelectItem>
-                                            <SelectItem value="gerente">Gerente</SelectItem>
-                                            <SelectItem value="equipe">Equipe</SelectItem>
-                                            <SelectItem value="interessado">Interessado</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input id="email" value={newItem.email} onChange={e => setNewItem({ ...newItem, email: e.target.value })} />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={handleSave}>Salvar</Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                )}
+                                <DialogFooter>
+                                    <Button onClick={handleSave}>Salvar</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                </div>
             </CardHeader>
             {isOpen && (
                 <CardContent className="p-6">

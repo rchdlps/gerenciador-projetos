@@ -41,6 +41,26 @@ export type AppEvents = {
             type: "attachment" | "avatar" | "logo";
         };
     };
+    "file-processor/export": {
+        data: {
+            jobId: string;
+            entity: string;
+            projectId: string;
+            format: "xlsx" | "csv" | "pdf";
+            userId: string;
+            organizationId?: string;
+        };
+    };
+    "file-processor/import": {
+        data: {
+            jobId: string;
+            entity: string;
+            projectId: string;
+            fileKey: string;
+            userId: string;
+            organizationId?: string;
+        };
+    };
 };
 
 // Initialize Inngest client with strict typing
