@@ -187,7 +187,7 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                                 </Badge>
                             ) : (
                                 <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                         <Badge
                                             variant="outline"
                                             className={`cursor-pointer transition-colors ${currentStatus.color}`}
@@ -196,7 +196,7 @@ export function TaskItem({ task, phaseId, projectId }: TaskItemProps) {
                                             {currentStatus.label}
                                         </Badge>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
                                         {Object.entries(statusConfig).map(([key, config]) => (
                                             <DropdownMenuItem
                                                 key={key}

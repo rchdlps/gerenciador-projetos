@@ -145,7 +145,7 @@ export function Stakeholders({ projectId }: { projectId: string }) {
                     {!isViewer && (
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button variant="secondary" size="sm" className="font-semibold shadow-none" onClick={openCreateDialog}>
+                                <Button variant="secondary" size="sm" className="font-semibold shadow-none text-secondary-foreground cursor-pointer" onClick={openCreateDialog}>
                                     <Plus className="h-4 w-4 mr-1" /> Adicionar
                                 </Button>
                             </DialogTrigger>

@@ -67,7 +67,7 @@ export function ImportDialog({ projectId, entity, invalidateKeys, label = 'Impor
     return (
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setFile(null) }}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="cursor-pointer">
+                <Button variant="outline" size="sm" className="cursor-pointer text-foreground">
                     <Upload className="h-4 w-4 mr-1" />
                     {label}
                 </Button>

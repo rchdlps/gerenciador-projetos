@@ -69,7 +69,7 @@ export function ExportDropdown({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!!loading} className="cursor-pointer">
+                <Button variant="outline" size="sm" disabled={!!loading} className="cursor-pointer text-foreground">
                     {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
                     {label}
                 </Button>
