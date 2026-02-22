@@ -20,6 +20,7 @@ import orgSessionRouter from './routes/org-session'
 import membersRouter from './routes/members'
 import notificationsRouter from './routes/notifications'
 import adminNotificationsRouter from './routes/admin-notifications'
+import fileProcessorRouter from './routes/file-processor'
 
 
 const app = new Hono().basePath('/api')
@@ -47,6 +48,7 @@ const apiRoutes = app
     .route('/members', membersRouter)
     .route('/notifications', notificationsRouter)
     .route('/admin/notifications', adminNotificationsRouter)
+    .route('/file-processor', fileProcessorRouter)
 
 app.get('/', (c) => {
     return c.json({ message: 'Hello Hono!' })
